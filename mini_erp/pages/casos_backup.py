@@ -1,0 +1,3595 @@
+from datetime import datetime
+from nicegui import ui, run
+from ..core import (
+    layout, PRIMARY_COLOR, slugify, save_data, sync_processes_cases,
+    get_cases_list, get_clients_list, get_processes_list, get_opposing_parties_list, format_date_br,
+    get_processes_by_case, save_process as save_process_core, delete_process as delete_process_core, get_db,
+    get_client_options_for_select, get_client_id_by_name, get_client_name_by_id,
+    extract_client_name_from_formatted_option, format_client_option_for_select
+)
+from ..auth import is_authenticated
+import io
+import os
+import asyncio
+
+# Importação opcional do reportlab (se não estiver instalado, a função de exportação não funcionará)
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib import colors
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
+
+def get_short_name_helper(full_name: str, source_list: list) -> str:
+    """Retorna sigla/apelido ou primeiro nome - função auxiliar global"""
+    for item in source_list:
+        item_name = item.get('name') or item.get('full_name', '')
+        if item_name == full_name:
+            # Prioridade: nickname > alias > primeiro nome
+            if item.get('nickname'):
+                return item['nickname']
+            if item.get('alias'):
+                return item['alias']
+            # Se não tem apelido, retorna primeiro nome
+            return full_name.split()[0] if full_name else full_name
+    # Se não encontrou na lista, retorna primeiro nome
+    return full_name.split()[0] if full_name else full_name
+
+
+def create_rich_text_editor(value: str = '', placeholder: str = '', on_change=None):
+    """
+    Cria um editor de texto rico com funcionalidades similares ao Slack.
+    Toolbar inclui: Bold, Italic, Underline, Strikethrough, Link, Lists, Code Block, Quote
+    
+    O NiceGUI usa Quill editor. O editor padrão já inclui muitas dessas funcionalidades.
+    Adicionamos CSS e configuração para garantir todas as opções do Slack estejam visíveis.
+    """
+    editor = ui.editor(
+        value=value,
+        placeholder=placeholder,
+        on_change=on_change
+    ).props('''
+toolbar="bold italic underline strike | bullist numlist | outdent indent | removeformat"
+content-style="font-family: sans-serif; font-size: 14px;"
+''').classes('w-full min-h-[150px]')
+    
+    # Adicionar CSS global uma vez para melhorar a aparência da toolbar estilo Slack
+    if not hasattr(create_rich_text_editor, '_css_added'):
+        ui.add_head_html('''
+        <style>
+        /* Melhorias na toolbar do editor estilo Slack */
+        .q-editor__toolbar {
+            border-bottom: 1px solid #e0e0e0 !important;
+            padding: 6px 8px !important;
+            background: #fafafa !important;
+        }
+        .q-editor__toolbar .q-btn {
+            margin: 0 1px !important;
+            padding: 4px 6px !important;
+            min-width: 32px !important;
+        }
+        .q-editor__toolbar .q-btn:hover {
+            background-color: #e8e8e8 !important;
+        }
+        </style>
+        ''')
+        create_rich_text_editor._css_added = True
+    
+    return editor
+
+
+def remove_case(case_to_remove: dict) -> bool:
+    """
+    Remove caso da lista e atualiza dados persistidos.
+    
+    ESTRUTURA: Usa delete_case que já limpa referências em case_ids automaticamente.
+    """
+    from ..core import delete_case
+    
+    cases = get_cases_list()
+    if case_to_remove not in cases:
+        return False
+
+    slug = case_to_remove.get('slug')
+    
+    # Remove do Firestore (delete_case já limpa referências em processos automaticamente)
+    if slug:
+        delete_case(slug)
+    else:
+        # Fallback: se não tiver slug, tenta limpar manualmente
+        case_title = case_to_remove.get('title')
+        if case_title:
+            for process in get_processes_list():
+                related_cases = process.get('cases', [])
+                if case_title in related_cases:
+                    related_cases.remove(case_title)
+                    from ..core import save_process
+                    save_process(process)
+            # sync_processes_cases removido para performance - delete_case já limpa referências
+
+    return True
+
+# Opções de estado (UF)
+STATE_OPTIONS = ['Paraná', 'Santa Catarina']
+
+# URLs das bandeiras oficiais dos estados (Wikimedia Commons)
+STATE_FLAG_URLS = {
+    'Paraná': 'https://upload.wikimedia.org/wikipedia/commons/9/93/Bandeira_do_Paran%C3%A1.svg',
+    'Santa Catarina': 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Bandeira_de_Santa_Catarina.svg'
+}
+
+def get_state_flag_html(state: str, size: int = 16) -> str:
+    """Retorna HTML da bandeira do estado como imagem."""
+    url = STATE_FLAG_URLS.get(state)
+    if url:
+        return f'<img src="{url}" width="{size}" height="{int(size * 0.7)}" style="border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);" alt="{state}"/>'
+    return ''
+
+# Mapeamento de tipos de caso para visualização
+CASE_TYPE_OPTIONS = ['Antigo', 'Novo', 'Futuro']
+CASE_TYPE_EMOJIS = {
+    'Antigo': '🔴',
+    'Novo': '🔥',
+    'Futuro': '🔮'
+}
+
+# Opções de categoria do caso (Contencioso ou Consultivo)
+CASE_CATEGORY_OPTIONS = ['Contencioso', 'Consultivo']
+
+# Prefixos numéricos por tipo de caso
+CASE_TYPE_PREFIX = {
+    'Antigo': 1,
+    'Novo': 2,
+    'Futuro': 3
+}
+
+# Opções de mês para seleção
+MONTH_OPTIONS = [
+    {'value': 1, 'label': 'Janeiro'},
+    {'value': 2, 'label': 'Fevereiro'},
+    {'value': 3, 'label': 'Março'},
+    {'value': 4, 'label': 'Abril'},
+    {'value': 5, 'label': 'Maio'},
+    {'value': 6, 'label': 'Junho'},
+    {'value': 7, 'label': 'Julho'},
+    {'value': 8, 'label': 'Agosto'},
+    {'value': 9, 'label': 'Setembro'},
+    {'value': 10, 'label': 'Outubro'},
+    {'value': 11, 'label': 'Novembro'},
+    {'value': 12, 'label': 'Dezembro'},
+]
+
+# Opções de ano (de 2000 até ano atual + 5)
+current_year = datetime.now().year
+YEAR_OPTIONS = list(range(2000, current_year + 6))
+
+# Estado dos filtros (global para a página)
+filter_state = {
+    'search': '',
+    'status': None,
+    'client': None,
+    'state': None,
+    'category': None,  # Filtro por categoria: Contencioso ou Consultivo
+    # Tipo de visualização: 'old' (antigos), 'new' (novos) ou 'future' (futuros)
+    'case_type': 'old',
+}
+
+def get_case_type(case: dict) -> str:
+    """Retorna o tipo do caso baseado no campo case_type ou is_new_case (compatibilidade)."""
+    ct = case.get('case_type')
+    if ct in CASE_TYPE_OPTIONS:
+        return ct
+    # Compatibilidade com dados antigos que usam is_new_case
+    if case.get('is_new_case', False):
+        return 'Novo'
+    return 'Antigo'
+
+def get_case_sort_key(case: dict) -> tuple:
+    """Retorna a chave de ordenação para um caso (ano, mês, nome)."""
+    year = case.get('year', '9999')
+    if isinstance(year, str):
+        year = int(year) if year.isdigit() else 9999
+    month = case.get('month', 12)
+    if month is None:
+        month = 12
+    name = case.get('name', '').lower()
+    return (year, month, name)
+
+def get_cases_by_type(case_type: str) -> list:
+    """Retorna todos os casos de um tipo específico, ordenados por data."""
+    cases_of_type = [c for c in get_cases_list() if get_case_type(c) == case_type]
+    return sorted(cases_of_type, key=get_case_sort_key)
+
+def calculate_case_number(case_type: str, year: int, month: int, name: str) -> int:
+    """
+    Calcula o número sequencial de um caso baseado na sua posição cronológica.
+    Retorna o número que o caso deve ter dentro do seu tipo.
+    """
+    # Pegar todos os casos do mesmo tipo ordenados
+    existing_cases = get_cases_by_type(case_type)
+    
+    # Criar chave de ordenação para o novo caso
+    new_case_key = (year, month, name.lower())
+    
+    # Encontrar a posição onde o novo caso se encaixa
+    position = 1
+    for existing_case in existing_cases:
+        existing_key = get_case_sort_key(existing_case)
+        if new_case_key > existing_key:
+            position += 1
+        else:
+            break
+    
+    return position
+
+def generate_case_title(case_type: str, sequence: int, name: str, year: int) -> str:
+    """Gera o título formatado do caso: X.Y - Nome / Ano"""
+    prefix = CASE_TYPE_PREFIX.get(case_type, 1)
+    return f"{prefix}.{sequence} - {name} / {year}"
+
+def renumber_cases_of_type(case_type: str):
+    """
+    Renumera todos os casos de um tipo específico baseado na ordem cronológica.
+    Atualiza os títulos e números dos casos E SALVA NO FIREBASE.
+    
+    IMPORTANTE: Esta função agora persiste as mudanças no Firebase para evitar
+    inconsistências entre o cache local e o banco de dados.
+    """
+    from ..core import save_case, invalidate_cache
+    
+    cases_of_type = get_cases_by_type(case_type)
+    prefix = CASE_TYPE_PREFIX.get(case_type, 1)
+    
+    for idx, case in enumerate(cases_of_type, start=1):
+        name = case.get('name', '')
+        year = case.get('year', '')
+        new_title = f"{prefix}.{idx} - {name} / {year}"
+        new_slug = slugify(f"{prefix}-{idx} {name} {year}")
+        
+        # Só atualiza se houve mudança (evita salvamentos desnecessários)
+        if case.get('title') != new_title or case.get('number') != idx or case.get('slug') != new_slug:
+            case['title'] = new_title
+            case['number'] = idx
+            case['slug'] = new_slug
+            # Salva no Firebase
+            save_case(case)
+    
+    # Invalida cache após renumeração
+    invalidate_cache('cases')
+
+def get_filtered_cases():
+    """Retorna casos filtrados com base nos filtros ativos, sem duplicatas."""
+    raw_cases = get_cases_list().copy()
+    
+    # DEDUPLICAÇÃO: Remove duplicatas por slug (identificador único)
+    # Mantém apenas o primeiro caso encontrado para cada slug
+    seen_slugs = set()
+    filtered = []
+    for c in raw_cases:
+        slug = c.get('slug') or c.get('_id', '')
+        if slug and slug not in seen_slugs:
+            seen_slugs.add(slug)
+            filtered.append(c)
+        elif not slug:
+            # Caso sem slug (legado), adiciona mesmo assim
+            filtered.append(c)
+    
+    # Filtro de busca livre
+    if filter_state['search']:
+        search_term = filter_state['search'].lower()
+        filtered = [c for c in filtered if 
+            search_term in c.get('title', '').lower() or
+            search_term in c.get('name', '').lower() or
+            search_term in ' '.join(c.get('clients', [])).lower() or
+            # Buscar também por sigla/apelido dos clientes
+            any(search_term in (cl.get('nickname', '') or '').lower() or 
+                search_term in (cl.get('alias', '') or '').lower()
+                for cl_name in c.get('clients', [])
+                for cl in get_clients_list() if cl.get('name') == cl_name)
+        ]
+    
+    # Filtro por status
+    if filter_state['status']:
+        filtered = [c for c in filtered if c.get('status') == filter_state['status']]
+    
+    # Filtro por cliente
+    if filter_state['client']:
+        filtered = [c for c in filtered if filter_state['client'] in c.get('clients', [])]
+    
+    # Filtro por estado (UF)
+    if filter_state['state']:
+        filtered = [c for c in filtered if c.get('state') == filter_state['state']]
+    
+    # Filtro por categoria (Contencioso ou Consultivo)
+    if filter_state['category']:
+        filtered = [c for c in filtered if c.get('category', 'Contencioso') == filter_state['category']]
+
+    # Filtro por tipo de caso (antigo, novo ou futuro)
+    view_type = filter_state.get('case_type')
+    if view_type == 'new':
+        filtered = [c for c in filtered if get_case_type(c) == 'Novo']
+    elif view_type == 'old':
+        filtered = [c for c in filtered if get_case_type(c) == 'Antigo']
+    elif view_type == 'future':
+        filtered = [c for c in filtered if get_case_type(c) == 'Futuro']
+    
+    # Ordenar por data (ano, mês, nome)
+    filtered = sorted(filtered, key=get_case_sort_key)
+    
+    return filtered
+
+@ui.refreshable
+def render_cases_list():
+    filtered_cases = get_filtered_cases()
+    
+    if not get_cases_list():
+        with ui.card().classes('w-full p-8 flex justify-center items-center bg-white'):
+            ui.label('Nenhum caso cadastrado.').classes('text-gray-400 italic')
+        return
+    
+    if not filtered_cases:
+        with ui.card().classes('w-full p-8 flex justify-center items-center bg-white'):
+            ui.label('Nenhum caso encontrado com os filtros aplicados.').classes('text-gray-400 italic')
+        return
+
+    # Adicionar CSS customizado para melhorar a aparência dos cards
+    ui.add_head_html('''
+    <style>
+    .case-card {
+        transition: all 0.2s ease-in-out;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .case-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .case-card .q-card {
+        background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    }
+    .case-title {
+        line-height: 1.3;
+        margin-bottom: 4px;
+    }
+    .case-clients {
+        line-height: 1.4;
+        min-height: 20px;
+    }
+    .case-chips {
+        gap: 6px;
+    }
+    /* Chips de categoria (Contencioso / Consultivo) com alta legibilidade
+       Mantém exatamente os tons já usados, apenas adicionando borda e leve elevação. */
+    .case-category-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 2px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
+        text-transform: none;
+    }
+    .case-category-chip--contencioso {
+        /* Tons equivalentes a bg-red-100 / text-red-800 */
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #991b1b; /* borda 1px em tom mais escuro para máximo contraste */
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.10); /* leve elevação para evitar efeito "lavado" */
+    }
+    .case-category-chip--consultivo {
+        /* Tons equivalentes a bg-green-100 / text-green-800 */
+        background-color: #dcfce7;
+        color: #166534;
+        border: 1px solid #166534; /* borda 1px em tom mais escuro para máximo contraste */
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.10); /* leve elevação para evitar efeito "lavado" */
+    }
+    .case-footer {
+        background: rgba(249, 250, 251, 0.8);
+        backdrop-filter: blur(8px);
+    }
+    .case-action-buttons .q-btn {
+        transition: all 0.15s ease;
+    }
+    .case-action-buttons .q-btn:hover {
+        transform: scale(1.1);
+    }
+    </style>
+    ''')
+    
+    with ui.grid(columns=4).classes('w-full gap-4'):
+        for case in filtered_cases:
+            with ui.card().classes('w-full p-4 shadow-md hover:shadow-xl transition-all duration-200 border case-card').style(f'border-color: {PRIMARY_COLOR}; border-width: 1px;'):
+                with ui.dialog() as delete_dialog, ui.card().classes('w-full max-w-sm p-6'):
+                    ui.label('Excluir caso').classes('text-lg font-bold mb-2 text-primary')
+                    ui.label(f'Tem certeza que deseja excluir "{case["title"]}"?').classes('text-sm text-gray-600 mb-4')
+                    ui.label('Esta ação não pode ser desfeita.').classes('text-xs text-red-500 mb-4')
+
+                    def confirm_delete_case(case_ref=case):
+                        if remove_case(case_ref):
+                            ui.notify('Caso removido!')
+                            delete_dialog.close()
+
+                    with ui.row().classes('w-full justify-end gap-2'):
+                        ui.button('Cancelar', on_click=delete_dialog.close).props('flat color=grey')
+                        ui.button('Excluir', on_click=confirm_delete_case).classes('bg-red-600 text-white')
+
+                # Estrutura organizada do card com seções bem definidas
+                with ui.column().classes('w-full gap-3'):
+                    # Seção principal: título e clientes (sempre clicável)
+                    with ui.column().classes('w-full gap-2 cursor-pointer').on('click', lambda c=case: ui.navigate.to(f'/casos/{c["slug"]}')):
+                        # Título do caso
+                        ui.label(case['title']).classes('text-lg font-bold text-gray-800 leading-tight case-title')
+
+                        # Clientes com tratamento especial para nomes longos
+                        # Exibe APENAS o display_name (apelido/nome de exibição)
+                        clients_list = get_clients_list()
+                        all_client_names = [c.get('name') or c.get('full_name', '') for c in clients_list if c.get('name') or c.get('full_name', '')]
+                        
+                        if 'clients' in case and case['clients']:
+                            # Verifica se todos os clientes estão vinculados
+                            if set(case['clients']) == set(all_client_names) and len(case['clients']) > 0:
+                                # Exibe mensagem simplificada para "Todos os Clientes"
+                                clients_text = f'✓ Todos os Clientes ({len(case["clients"])})'
+                                full_names = clients_text
+                            else:
+                                # Usa get_short_name_helper para obter display_name de cada cliente
+                                display_names = [get_short_name_helper(client_name, clients_list) for client_name in case['clients']]
+                                clients_text = ', '.join(display_names)
+                                full_names = ', '.join(case['clients'])
+                        elif 'client' in case:
+                            clients_text = get_short_name_helper(case['client'], clients_list)
+                            full_names = case['client']
+                        else:
+                            clients_text = 'Sem cliente'
+                            full_names = 'Sem cliente'
+
+                        # Limitar texto de clientes se for muito longo
+                        display_clients = clients_text if len(clients_text) <= 60 else clients_text[:57] + '...'
+                        
+                        ui.label(display_clients).classes('text-sm text-gray-600 leading-relaxed case-clients').tooltip(full_names)
+
+                    # Seção de status e categoria (chips organizados)
+                    with ui.row().classes('gap-2 flex-wrap items-center case-chips'):
+                        # Cores dos status com boa legibilidade
+                        status_color = {
+                            'Em andamento': 'text-gray-900',
+                            'Concluído': 'text-white',
+                            'Concluído com pendências': 'text-white',
+                            'Em monitoramento': 'text-white'
+                        }.get(case['status'], 'bg-gray-200 text-gray-800')
+                        
+                        status_bg = {
+                            'Em andamento': '#eab308',           # amarelo claro
+                            'Concluído': '#166534',              # verde escuro
+                            'Concluído com pendências': '#4d7c0f', # verde militar
+                            'Em monitoramento': '#ea580c'         # laranja
+                        }.get(case['status'], '#9ca3af')
+
+                        # Chip de status
+                        ui.label(case['status']).classes(
+                            f'text-xs px-3 py-1 rounded-full font-medium {status_color}'
+                        ).style(f'background-color: {status_bg}; border: 1px solid rgba(0,0,0,0.1);')
+                        
+                        # Chip de categoria (Contencioso / Consultivo) com estilos otimizados
+                        category = case.get('category', 'Contencioso')
+                        if category == 'Consultivo':
+                            chip_classes = 'case-category-chip case-category-chip--consultivo'
+                        else:
+                            # Default visual: Contencioso
+                            chip_classes = 'case-category-chip case-category-chip--contencioso'
+                        ui.label(category).classes(chip_classes)
+
+                    # Rodapé do card: informações adicionais e botões de ação
+                    with ui.row().classes('w-full justify-between items-center mt-3 pt-3 border-t border-gray-100 case-footer'):
+                        # Lado esquerdo: estado (sempre presente para manter alinhamento)
+                        with ui.row().classes('items-center gap-2 min-w-[80px]'):
+                            if case.get('state'):
+                                ui.html(get_state_flag_html(case['state'], 16), sanitize=False)
+                                ui.label(case['state']).classes('text-xs text-gray-600 font-medium')
+                            else:
+                                ui.label('---').classes('text-xs text-gray-400 font-medium')
+                        
+                        # Botões de ação no lado direito (sempre alinhados)
+                        with ui.row().classes('items-center gap-1 case-action-buttons'):
+                            ui.button(
+                                icon='open_in_new',
+                                on_click=lambda c=case: ui.navigate.to(f'/casos/{c["slug"]}')
+                            ).props('flat round dense color=primary size=sm').tooltip('Abrir caso')
+                            ui.button(
+                                icon='delete',
+                                on_click=delete_dialog.open
+                            ).props('flat round dense color=red size=sm').tooltip('Excluir caso')
+                        
+
+@ui.refreshable
+def case_view_toggle():
+    """Botões de alternância entre visualização de casos antigos, novos e futuros."""
+    current_type = filter_state.get('case_type', 'old')
+
+    def change_type(new_type: str):
+        filter_state['case_type'] = new_type
+        case_view_toggle.refresh()
+        render_cases_list.refresh()
+
+    with ui.row().classes('w-full items-center gap-3 mb-4'):
+        ui.label('Visualização:').classes('text-sm text-gray-600')
+        ui.button(
+            '🔴 Casos antigos',
+            on_click=lambda: change_type('old')
+        ).props('flat color=primary' if current_type == 'old' else 'flat color=grey-7')
+        ui.button(
+            '🔥 Casos novos',
+            on_click=lambda: change_type('new')
+        ).props('flat color=primary' if current_type == 'new' else 'flat color=grey-7')
+        ui.button(
+            '🔮 Casos futuros',
+            on_click=lambda: change_type('future')
+        ).props('flat color=primary' if current_type == 'future' else 'flat color=grey-7')
+
+def export_cases_to_pdf():
+    """Exporta todos os casos para um arquivo PDF."""
+    if not REPORTLAB_AVAILABLE:
+        ui.notify('Biblioteca reportlab não está instalada. Execute: pip install reportlab', type='negative')
+        return
+    
+    if not get_cases_list():
+        ui.notify('Nenhum caso para exportar.', type='warning')
+        return
+    
+    try:
+        # Criar buffer em memória para o PDF
+        buffer = io.BytesIO()
+        
+        # Criar documento PDF
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        story = []
+        
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor(PRIMARY_COLOR),
+            spaceAfter=30,
+            alignment=1  # Centralizado
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor(PRIMARY_COLOR),
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        normal_style = styles['Normal']
+        
+        # Título do documento
+        story.append(Paragraph('Relatório de Casos', title_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Data de geração
+        data_geracao = datetime.now().strftime('%d/%m/%Y %H:%M')
+        story.append(Paragraph(f'Gerado em: {data_geracao}', normal_style))
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Total de casos
+        story.append(Paragraph(f'Total de casos: {len(get_cases_list())}', normal_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # Ordenar casos por ano, mês e nome
+        sorted_cases = sorted(get_cases_list(), key=get_case_sort_key, reverse=True)
+        
+        # Agrupar por tipo
+        casos_antigos = [c for c in sorted_cases if get_case_type(c) == 'Antigo']
+        casos_novos = [c for c in sorted_cases if get_case_type(c) == 'Novo']
+        casos_futuros = [c for c in sorted_cases if get_case_type(c) == 'Futuro']
+        
+        # Casos Antigos
+        if casos_antigos:
+            story.append(Paragraph('🔴 Casos Antigos', heading_style))
+            for case in casos_antigos:
+                story.append(Spacer(1, 0.3*cm))
+                story.append(Paragraph(f"<b>{case.get('title', 'Sem título')}</b>", normal_style))
+                
+                # Informações do caso
+                info_lines = []
+                if case.get('number'):
+                    info_lines.append(f"<b>Número:</b> {case.get('number')}")
+                if case.get('year') and case.get('month'):
+                    month_name = MONTH_OPTIONS[case.get('month', 1) - 1]['label']
+                    info_lines.append(f"<b>Data:</b> {month_name}/{case.get('year')}")
+                if case.get('category'):
+                    info_lines.append(f"<b>Categoria:</b> {case.get('category')}")
+                if case.get('status'):
+                    info_lines.append(f"<b>Status:</b> {case.get('status')}")
+                if case.get('state'):
+                    info_lines.append(f"<b>Estado:</b> {case.get('state')}")
+                if case.get('clients'):
+                    clients_str = ', '.join(case.get('clients', []))
+                    info_lines.append(f"<b>Clientes:</b> {clients_str}")
+                
+                if info_lines:
+                    story.append(Paragraph('<br/>'.join(info_lines), normal_style))
+                
+                story.append(Spacer(1, 0.2*cm))
+            story.append(Spacer(1, 0.5*cm))
+        
+        # Casos Novos
+        if casos_novos:
+            story.append(Paragraph('🔥 Casos Novos', heading_style))
+            for case in casos_novos:
+                story.append(Spacer(1, 0.3*cm))
+                story.append(Paragraph(f"<b>{case.get('title', 'Sem título')}</b>", normal_style))
+                
+                info_lines = []
+                if case.get('number'):
+                    info_lines.append(f"<b>Número:</b> {case.get('number')}")
+                if case.get('year') and case.get('month'):
+                    month_name = MONTH_OPTIONS[case.get('month', 1) - 1]['label']
+                    info_lines.append(f"<b>Data:</b> {month_name}/{case.get('year')}")
+                if case.get('category'):
+                    info_lines.append(f"<b>Categoria:</b> {case.get('category')}")
+                if case.get('status'):
+                    info_lines.append(f"<b>Status:</b> {case.get('status')}")
+                if case.get('state'):
+                    info_lines.append(f"<b>Estado:</b> {case.get('state')}")
+                if case.get('clients'):
+                    clients_str = ', '.join(case.get('clients', []))
+                    info_lines.append(f"<b>Clientes:</b> {clients_str}")
+                
+                if info_lines:
+                    story.append(Paragraph('<br/>'.join(info_lines), normal_style))
+                
+                story.append(Spacer(1, 0.2*cm))
+            story.append(Spacer(1, 0.5*cm))
+        
+        # Casos Futuros
+        if casos_futuros:
+            story.append(Paragraph('🔮 Casos Futuros', heading_style))
+            for case in casos_futuros:
+                story.append(Spacer(1, 0.3*cm))
+                story.append(Paragraph(f"<b>{case.get('title', 'Sem título')}</b>", normal_style))
+                
+                info_lines = []
+                if case.get('number'):
+                    info_lines.append(f"<b>Número:</b> {case.get('number')}")
+                if case.get('year') and case.get('month'):
+                    month_name = MONTH_OPTIONS[case.get('month', 1) - 1]['label']
+                    info_lines.append(f"<b>Data:</b> {month_name}/{case.get('year')}")
+                if case.get('category'):
+                    info_lines.append(f"<b>Categoria:</b> {case.get('category')}")
+                if case.get('status'):
+                    info_lines.append(f"<b>Status:</b> {case.get('status')}")
+                if case.get('state'):
+                    info_lines.append(f"<b>Estado:</b> {case.get('state')}")
+                if case.get('clients'):
+                    clients_str = ', '.join(case.get('clients', []))
+                    info_lines.append(f"<b>Clientes:</b> {clients_str}")
+                
+                if info_lines:
+                    story.append(Paragraph('<br/>'.join(info_lines), normal_style))
+                
+                story.append(Spacer(1, 0.2*cm))
+            story.append(Spacer(1, 0.5*cm))
+        
+        # Construir PDF
+        doc.build(story)
+        
+        # Obter bytes do PDF
+        buffer.seek(0)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        # Criar nome do arquivo
+        filename = f'casos_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        
+        # Fazer download do PDF
+        ui.download(pdf_bytes, filename=filename, media_type='application/pdf')
+        ui.notify(f'PDF exportado com sucesso! ({len(get_cases_list())} casos)', type='positive')
+        
+    except Exception as e:
+        ui.notify(f'Erro ao exportar PDF: {str(e)}', type='negative')
+
+def renumber_all_cases():
+    """Renumera todos os casos de todos os tipos para garantir consistência."""
+    for case_type in CASE_TYPE_OPTIONS:
+        renumber_cases_of_type(case_type)
+    save_data()
+
+@ui.page('/casos')
+def casos():
+    if not is_authenticated():
+        ui.navigate.to('/login')
+        return
+    
+    # ==========================================================================
+    # OTIMIZAÇÃO: Carrega todos os dados UMA ÚNICA VEZ no início
+    # Evita múltiplas chamadas ao Firestore durante a renderização
+    # ==========================================================================
+    _cases = get_cases_list()
+    _clients = get_clients_list()
+    _opposing = get_opposing_parties_list()
+    
+    # Função auxiliar para obter sigla/apelido
+    def get_short_name(full_name: str, source_list: list) -> str:
+        """Retorna sigla/apelido ou primeiro nome"""
+        for item in source_list:
+            if item.get('name') == full_name:
+                # Prioridade: nickname > alias > primeiro nome
+                if item.get('nickname'):
+                    return item['nickname']
+                if item.get('alias'):
+                    return item['alias']
+                # Se não tem apelido, retorna primeiro nome
+                return full_name.split()[0] if full_name else full_name
+        # Se não encontrou na lista, retorna primeiro nome
+        return full_name.split()[0] if full_name else full_name
+    
+    def format_option_for_search(item: dict) -> str:
+        """Formata opção para busca: inclui nome e sigla/apelido"""
+        name = item.get('name', '')
+        nickname = item.get('nickname', '')
+        if nickname and nickname != name:
+            return f"{name} ({nickname})"
+        return name
+    
+    def get_option_value(formatted_option: str, source_list: list) -> str:
+        """Extrai o nome completo de uma opção formatada"""
+        # Remove a parte entre parênteses se existir
+        if '(' in formatted_option:
+            return formatted_option.split(' (')[0]
+        return formatted_option
+    
+    # Resetar filtros ao entrar na página para evitar confusão
+    filter_state['search'] = ''
+    filter_state['status'] = None
+    filter_state['client'] = None
+    filter_state['state'] = None
+    filter_state['category'] = None
+    filter_state['case_type'] = 'old'
+    
+    # Garantir que todos os casos estejam com numeração correta
+    renumber_all_cases()
+
+    with layout('Casos', breadcrumbs=[('Casos', None)]):
+        # --- New Case Dialog ---
+        with ui.dialog() as new_case_dialog, ui.card().classes('w-full max-w-lg p-6'):
+            ui.label('Novo Caso').classes('text-xl font-bold mb-4 text-primary')
+            
+            # Form Fields
+            case_name = ui.input('Nome do Caso').classes('w-full mb-2')
+            
+            # Ano e Mês do caso
+            with ui.row().classes('w-full gap-2 mb-2'):
+                case_year = ui.select(
+                    options=YEAR_OPTIONS,
+                    label='Ano',
+                    value=datetime.now().year,
+                    with_input=True
+                ).classes('flex-1')
+                
+                case_month = ui.select(
+                    options={m['value']: m['label'] for m in MONTH_OPTIONS},
+                    label='Mês',
+                    value=datetime.now().month
+                ).classes('flex-1')
+            
+            # Tipo do caso: Antigo, Novo ou Futuro
+            case_type_select = ui.select(
+                options=CASE_TYPE_OPTIONS,
+                label='Tipo de caso',
+                value='Antigo'
+            ).classes('w-full mb-2')
+            
+            # Categoria do caso: Contencioso ou Consultivo
+            case_category_select = ui.select(
+                options=CASE_CATEGORY_OPTIONS,
+                label='Categoria',
+                value='Contencioso',
+                with_input=True
+            ).classes('w-full mb-2')
+            
+            status_options = [
+                'Em andamento', 
+                'Concluído', 
+                'Concluído com pendências', 
+                'Em monitoramento'
+            ]
+            status = ui.select(options=status_options, label='Status', value='Em andamento').classes('w-full mb-2')
+            
+            # Estado (UF) - opcional
+            case_state = ui.select(
+                options=[None] + STATE_OPTIONS, 
+                label='Estado (UF)', 
+                value=None,
+                with_input=True
+            ).classes('w-full mb-2').props('clearable')
+            
+            # Parte Contrária
+            parte_contraria_options = {
+                'MP': 'Ministério Público',
+                'OAB': 'OAB',
+                'Defesa': 'Defesa/Réu',
+                'Autor': 'Autor/Demandante',
+                'União': 'União',
+                'Estado': 'Estado',
+                'Município': 'Município',
+                'INSS': 'INSS',
+                'Receita Federal': 'Receita Federal',
+                'Outro': 'Outro',
+                '-': 'Não especificado'
+            }
+            case_parte_contraria = ui.select(
+                options=parte_contraria_options,
+                label='Parte Contrária',
+                value='-',
+                with_input=True
+            ).classes('w-full mb-2').props('clearable')
+            
+            # Multi-client selection
+            selected_clients = []
+            all_clients_selected = {'value': False}  # Estado do checkbox "Todos os Clientes"
+            client_options = [format_option_for_search(c) for c in _clients]
+            
+            ui.label('Clientes').classes('text-sm text-gray-600 mt-2 mb-1')
+            
+            # Client selector and add button
+            with ui.row().classes('w-full gap-2 mb-2'):
+                client_select = ui.select(
+                    options=client_options, 
+                    label='Selecione cliente(s)',
+                    with_input=True
+                ).classes('flex-grow')
+                
+                def add_client():
+                    if client_select.value:
+                        # Extrair nome completo da opção formatada
+                        full_name = get_option_value(client_select.value, _clients)
+                        if full_name not in selected_clients:
+                            selected_clients.append(full_name)
+                            client_select.value = None
+                            all_clients_selected['value'] = False
+                            all_clients_checkbox.value = False
+                            client_chips_container.refresh()
+                        else:
+                            ui.notify('Cliente já adicionado!', type='warning')
+                
+                ui.button(icon='add', on_click=add_client).props('flat color=primary').classes('mt-4')
+            
+            # Checkbox "Todos os Clientes"
+            def handle_all_clients(checked):
+                """Vincula ou desvincula todos os clientes"""
+                all_clients_selected['value'] = checked
+                if checked:
+                    # Adicionar todos os clientes
+                    selected_clients.clear()
+                    for client in _clients:
+                        full_name = client.get('name') or client.get('full_name', '')
+                        if full_name and full_name not in selected_clients:
+                            selected_clients.append(full_name)
+                    total = len(selected_clients)
+                    ui.notify(f'✅ Todos os clientes foram adicionados! ({total})', type='positive')
+                else:
+                    # Remover todos os clientes
+                    selected_clients.clear()
+                    ui.notify('❌ Todos os clientes foram removidos!', type='info')
+                client_chips_container.refresh()
+            
+            all_clients_checkbox = ui.checkbox(
+                text=f'Todos os Clientes ({len(_clients)})',
+                on_change=lambda e: handle_all_clients(e.value)
+            ).classes('mt-2').style('font-size: 14px; font-weight: 500;')
+            
+            # Container for selected client chips
+            @ui.refreshable
+            def client_chips_container():
+                if all_clients_selected['value'] and selected_clients:
+                    # Mostra badge especial quando "Todos os Clientes" está marcado
+                    with ui.card().classes('px-4 py-2 flex items-center gap-2 mb-2').style(
+                        f'background-color: {PRIMARY_COLOR}; color: white; border-radius: 16px; font-weight: bold;'
+                    ):
+                        ui.icon('check_circle', size='sm').classes('text-white')
+                        ui.label(f'Todos os Clientes ({len(selected_clients)})').classes('text-sm')
+                elif selected_clients:
+                    with ui.row().classes('w-full gap-2 flex-wrap'):
+                        for client_name in selected_clients:
+                            short_name = get_short_name(client_name, _clients)
+                            with ui.card().classes('px-3 py-1 flex items-center gap-2').style(
+                                f'background-color: {PRIMARY_COLOR}; color: white; border-radius: 16px;'
+                            ):
+                                ui.label(short_name).classes('text-sm')
+                                
+                                def remove_client(name=client_name):
+                                    selected_clients.remove(name)
+                                    all_clients_selected['value'] = False
+                                    all_clients_checkbox.value = False
+                                    client_chips_container.refresh()
+                                
+                                ui.button(icon='close', on_click=remove_client).props(
+                                    'flat dense round size=xs color=white'
+                                ).classes('ml-1')
+                else:
+                    ui.label('Nenhum cliente selecionado').classes('text-sm text-gray-400 italic')
+            
+            client_chips_container()
+            
+            ui.space().classes('mb-4')
+            
+            def save_case():
+                if not case_name.value or not case_year.value:
+                    ui.notify('Nome e Ano são obrigatórios!', type='warning')
+                    return
+                # Validação de cliente removida para flexibilidade, descomente se necessário
+                # if not selected_clients:
+                #    ui.notify('Adicione pelo menos um cliente!', type='warning')
+                #    return
+                
+                # Determinar tipo e número baseado na posição cronológica
+                selected_type = case_type_select.value
+                year_int = int(case_year.value)
+                month_int = case_month.value or 1
+                year_str = str(year_int)
+                
+                # Calcular número sequencial baseado na posição cronológica
+                case_num = calculate_case_number(selected_type, year_int, month_int, case_name.value)
+                prefix = CASE_TYPE_PREFIX.get(selected_type, 1)
+                
+                # Gerar título no formato X.Y - Nome / Ano
+                formatted_title = f"{prefix}.{case_num} - {case_name.value} / {year_str}"
+                # Inclui prefixo e número no slug para garantir unicidade
+                slug = slugify(f"{prefix}-{case_num} {case_name.value} {year_str}")
+                
+                new_case = {
+                    'title': formatted_title,
+                    'name': case_name.value,
+                    'year': year_str,
+                    'month': month_int,
+                    'number': case_num,
+                    'slug': slug,
+                    'status': status.value,
+                    'state': case_state.value,
+                    'parte_contraria': case_parte_contraria.value or '-',
+                    'parte_contraria_nome': parte_contraria_options.get(case_parte_contraria.value or '-', ''),
+                    'clients': selected_clients.copy(),
+                    # Tipo de caso: Antigo, Novo ou Futuro
+                    'case_type': selected_type,
+                    # Categoria: Contencioso ou Consultivo
+                    'category': case_category_select.value,
+                    # Manter is_new_case para compatibilidade retroativa
+                    'is_new_case': selected_type == 'Novo',
+                    'processes': [],
+                    'links': [],
+                    'objectives': '',
+                    'legal_considerations': '',
+                    'technical_considerations': '',
+                    'theses': [],
+                    'swot_s': [''] * 10, 'swot_w': [''] * 10, 'swot_o': [''] * 10, 'swot_t': [''] * 10,
+                    'strategy_observations': '',
+                    'next_actions': '',
+                    'maps': [],
+                    'map_notes': ''
+                }
+                
+                from ..core import save_case
+                save_case(new_case)
+                
+                # Renumerar todos os casos do tipo para manter a ordem cronológica
+                renumber_cases_of_type(selected_type)
+                
+                # sync_processes_cases removido para performance - caso novo não tem processos
+                save_data()
+                ui.notify(f'Caso criado com sucesso!')
+                render_cases_list.refresh()
+                new_case_dialog.close()
+                # Reset fields
+                case_name.value = ''
+                case_year.value = datetime.now().year
+                case_month.value = datetime.now().month
+                case_type_select.value = 'Antigo'
+                case_category_select.value = 'Contencioso'
+                status.value = 'Em andamento'
+                case_state.value = None
+                selected_clients.clear()
+                client_chips_container.refresh()
+
+            with ui.row().classes('w-full justify-end gap-2'):
+                ui.button('Cancelar', on_click=new_case_dialog.close).props('flat color=grey')
+                ui.button('Salvar', on_click=save_case).classes('bg-primary text-white')
+
+        # Main Content
+        with ui.row().classes('w-full justify-between items-center mb-6'):
+            ui.label('Visão Geral').classes('text-lg text-gray-500')
+            with ui.row().classes('gap-2'):
+                ui.button(icon='picture_as_pdf', on_click=export_cases_to_pdf).props('flat dense').classes('text-gray-600').tooltip('Exportar todos os casos em PDF')
+                ui.button('Novo Caso', icon='add', on_click=new_case_dialog.open).classes('bg-primary text-white shadow-md')
+
+        # Alternância entre visualização de casos antigos e novos (em cards)
+        case_view_toggle()
+
+        # Seção de Filtros
+        with ui.card().classes('w-full p-4 mb-4 bg-gray-50'):
+            with ui.row().classes('w-full gap-4 items-end flex-wrap'):
+                # Busca livre
+                def on_search_change(e):
+                    filter_state['search'] = e.value if e.value else ''
+                    render_cases_list.refresh()
+                
+                ui.input(
+                    'Buscar caso...',
+                    on_change=on_search_change
+                ).props('outlined dense clearable').classes('flex-grow min-w-[200px]').style('max-width: 400px')
+                
+                # Filtro por status
+                status_options = ['Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento']
+                
+                def on_status_change(e):
+                    filter_state['status'] = e.value if e.value else None
+                    render_cases_list.refresh()
+                
+                ui.select(
+                    options=[None] + status_options,
+                    label='Status',
+                    value=None,
+                    on_change=on_status_change
+                ).props('outlined dense clearable').classes('min-w-[180px]').bind_value_to(filter_state, 'status')
+                
+                # Filtro por cliente
+                all_clients = [c['name'] for c in _clients]
+                
+                def on_client_change(e):
+                    filter_state['client'] = e.value if e.value else None
+                    render_cases_list.refresh()
+                
+                ui.select(
+                    options=[None] + all_clients,
+                    label='Cliente',
+                    value=None,
+                    on_change=on_client_change,
+                    with_input=True
+                ).props('outlined dense clearable').classes('min-w-[200px]').bind_value_to(filter_state, 'client')
+                
+                # Filtro por estado (UF)
+                def on_state_change(e):
+                    filter_state['state'] = e.value if e.value else None
+                    render_cases_list.refresh()
+                
+                ui.select(
+                    options=[None] + STATE_OPTIONS,
+                    label='Estado (UF)',
+                    value=None,
+                    on_change=on_state_change,
+                    with_input=True
+                ).props('outlined dense clearable').classes('min-w-[150px]').bind_value_to(filter_state, 'state')
+                
+                # Filtro por categoria (Contencioso ou Consultivo)
+                def on_category_filter_change(e):
+                    filter_state['category'] = e.value if e.value else None
+                    render_cases_list.refresh()
+                
+                ui.select(
+                    options=[None] + CASE_CATEGORY_OPTIONS,
+                    label='Categoria',
+                    value=None,
+                    on_change=on_category_filter_change,
+                    with_input=True
+                ).props('outlined dense clearable').classes('min-w-[150px]').bind_value_to(filter_state, 'category')
+                
+                # Botão limpar filtros
+                def clear_filters():
+                    filter_state['search'] = ''
+                    filter_state['status'] = None
+                    filter_state['client'] = None
+                    filter_state['state'] = None
+                    filter_state['category'] = None
+                    render_cases_list.refresh()
+                
+                ui.button('Limpar', icon='clear', on_click=clear_filters).props('flat color=grey').classes('ml-auto')
+
+        # Grid de cards (respeita o tipo selecionado: antigos x novos)
+        render_cases_list()
+
+@ui.page('/casos/{case_slug}')
+def case_detail(case_slug: str):
+    # ==========================================================================
+    # OTIMIZAÇÃO: Carrega dados UMA ÚNICA VEZ no início da página
+    # ==========================================================================
+    _clients = get_clients_list()
+    _opposing = get_opposing_parties_list()
+    
+    # Funções auxiliares para obter sigla/apelido
+    def get_short_name(full_name: str, source_list: list) -> str:
+        """Retorna sigla/apelido ou primeiro nome"""
+        for item in source_list:
+            if item.get('name') == full_name:
+                # Prioridade: nickname > alias > primeiro nome
+                if item.get('nickname'):
+                    return item['nickname']
+                if item.get('alias'):
+                    return item['alias']
+                # Se não tem apelido, retorna primeiro nome
+                return full_name.split()[0] if full_name else full_name
+        # Se não encontrou na lista, retorna primeiro nome
+        return full_name.split()[0] if full_name else full_name
+    
+    def format_option_for_search(item: dict) -> str:
+        """Formata opção para busca: inclui nome e sigla/apelido"""
+        name = item.get('name', '')
+        nickname = item.get('nickname', '')
+        if nickname and nickname != name:
+            return f"{name} ({nickname})"
+        return name
+    
+    def get_option_value(formatted_option: str, source_list: list) -> str:
+        """Extrai o nome completo de uma opção formatada"""
+        # Remove a parte entre parênteses se existir
+        if '(' in formatted_option:
+            return formatted_option.split(' (')[0]
+        return formatted_option
+    
+    case = next((c for c in get_cases_list() if c.get('slug') == case_slug), None)
+    if not case:
+        ui.label('Caso não encontrado.').classes('text-xl text-red-500 p-8')
+        return
+
+    # Sistema de salvamento automático com debounce
+    import asyncio
+    autosave_state = {'timer': None, 'is_saving': False, 'refresh_callbacks': []}
+    
+    def register_autosave_refresh(callback):
+        """Registra um callback para ser chamado quando o estado de salvamento mudar"""
+        autosave_state['refresh_callbacks'].append(callback)
+    
+    def refresh_all_indicators():
+        """Atualiza todos os indicadores de salvamento registrados"""
+        for callback in autosave_state['refresh_callbacks']:
+            try:
+                callback.refresh()
+            except:
+                pass
+    
+    async def autosave_with_debounce(delay: float = 2.0):
+        """Salva após um delay, cancelando salvamentos anteriores pendentes."""
+        if autosave_state['timer']:
+            autosave_state['timer'].cancel()
+        
+        async def delayed_save():
+            await asyncio.sleep(delay)
+            autosave_state['is_saving'] = True
+            save_indicator.refresh()
+            refresh_all_indicators()
+            
+            # Pequeno delay para mostrar o indicador
+            await asyncio.sleep(0.3)
+            
+            # Salva o caso no Firestore
+            try:
+                from ..core import save_case
+                save_case(case)
+            except Exception as e:
+                print(f'Erro no auto-save: {e}')
+            
+            save_data()  # Mantém para compatibilidade
+            render_cases_list.refresh()
+            
+            autosave_state['is_saving'] = False
+            save_indicator.refresh()
+            refresh_all_indicators()
+        
+        autosave_state['timer'] = asyncio.create_task(delayed_save())
+    
+    def trigger_autosave():
+        """Dispara o salvamento automático."""
+        asyncio.create_task(autosave_with_debounce())
+
+    # CSS customizado para tabela de processos
+    ui.add_css('''
+        .processes-table {
+            width: 100% !important;
+        }
+        .processes-table th, .processes-table td {
+            padding: 10px 12px !important;
+            font-size: 13px !important;
+        }
+        .processes-table th {
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            background-color: #f9fafb !important;
+        }
+        .processes-table tbody tr:nth-child(odd) {
+            background-color: #ffffff !important;
+        }
+        .processes-table tbody tr:nth-child(even) {
+            background-color: #e5e7eb !important; /* cinza mais forte para telas de baixa qualidade */
+        }
+        .processes-table tbody tr {
+            border-bottom: 1px solid #111827 !important; /* linhas escuras entre processos */
+        }
+        .processes-table tbody tr:hover {
+            background-color: #f3f4f6 !important;
+        }
+    ''')
+
+    with layout(f'Caso: {case["title"]}', breadcrumbs=[('Casos', '/casos'), (case['title'], None)]):
+        # Indicador de salvamento automático
+        @ui.refreshable
+        def save_indicator():
+            with ui.row().classes('fixed top-4 right-4 z-50'):
+                if autosave_state['is_saving']:
+                    with ui.card().classes('px-4 py-2 bg-yellow-100 border border-yellow-400 rounded-lg shadow-lg flex items-center gap-2'):
+                        ui.spinner('dots', size='sm').classes('text-yellow-600')
+                        ui.label('Salvando...').classes('text-yellow-700 text-sm font-medium')
+        
+        save_indicator()
+        
+        with ui.dialog() as delete_case_dialog, ui.card().classes('w-full max-w-md p-6'):
+            ui.label('Excluir caso').classes('text-xl font-bold mb-3 text-primary')
+            ui.label(f'Confirmar exclusão de "{case["title"]}"?').classes('text-sm text-gray-600 mb-4')
+            ui.label('Esta ação é permanente.').classes('text-xs text-red-500 mb-4')
+
+            def confirm_delete_current_case(target_case=case):
+                if remove_case(target_case):
+                    ui.notify('Caso removido!')
+                    delete_case_dialog.close()
+                    ui.navigate.to('/casos')
+
+            with ui.row().classes('w-full justify-end gap-2'):
+                ui.button('Cancelar', on_click=delete_case_dialog.close).props('flat color=grey')
+                ui.button('Excluir', on_click=confirm_delete_current_case).classes('bg-red-600 text-white')
+
+        # HEADER: Título + Botão Excluir lado a lado
+        with ui.row().classes('w-full justify-between items-center mb-6').style('padding-bottom: 16px; border-bottom: 2px solid #2d4a3f;'):
+            ui.label(f'Caso: {case["title"]}').classes('text-2xl font-bold').style('color: #333;')
+            ui.button('🗑️ Excluir Caso', on_click=delete_case_dialog.open).classes('bg-red-600 text-white').props('dense')
+
+        with ui.tabs().classes('w-full bg-white').props('align=left no-caps') as tabs:
+            basic_tab = ui.tab('Dados Básicos')
+            proc_tab = ui.tab('Processos')
+            calc_tab = ui.tab('Cálculos')
+            report_tab = ui.tab('Relatório Geral do Caso')
+            vistorias_tab = ui.tab('Vistorias')
+            strategy_tab = ui.tab('Estratégia Geral')
+            next_actions_tab = ui.tab('Próximas Ações')
+            slack_tab = ui.tab('Slack')
+            links_tab = ui.tab('Links Úteis')
+        
+        with ui.tab_panels(tabs, value=basic_tab).classes('w-full p-6 bg-white rounded shadow-sm'):
+            # Tab 1: Dados Básicos
+            with ui.tab_panel(basic_tab).classes('w-full'):
+                # ========== DADOS BÁSICOS CLEAN ==========
+                
+                # Campo oculto para atualizar o título automaticamente
+                title_display = ui.input(value=case['title']).classes('hidden')
+                
+                # Função para renumerar e atualizar título
+                def update_case_numbering():
+                    old_type = get_case_type(case)
+                    new_type = edit_case_type.value
+                    
+                    # Se mudou de tipo, renumerar ambos os tipos
+                    if old_type != new_type:
+                        renumber_cases_of_type(old_type)
+                    renumber_cases_of_type(new_type)
+                    
+                    # Atualizar exibição do título
+                    title_display.value = case.get('title', '')
+                    trigger_autosave()  # Salva no Firebase
+                
+                # Ano e Mês do caso
+                def on_year_change(e):
+                    case['year'] = str(e.value) if e.value else case.get('year')
+                    update_case_numbering()
+                
+                def on_month_change(e):
+                    case['month'] = e.value
+                    update_case_numbering()
+                
+                # Converter ano para inteiro se for string
+                current_year_value = case.get('year')
+                if isinstance(current_year_value, str) and current_year_value.isdigit():
+                    current_year_value = int(current_year_value)
+                
+                # ========== LINHA 1: Ano + Mês + Status + Tipo ==========
+                with ui.row().style('gap: 40px; width: 100%; margin-bottom: 24px;'):
+                    with ui.column().style('min-width: 100px;'):
+                        ui.label('ANO').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        edit_year = ui.select(
+                            options=YEAR_OPTIONS,
+                            value=current_year_value,
+                            with_input=True,
+                            on_change=on_year_change
+                        ).classes('w-full').props('dense outlined')
+                    
+                    with ui.column().style('min-width: 140px;'):
+                        ui.label('MÊS').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        edit_month = ui.select(
+                            options={m['value']: m['label'] for m in MONTH_OPTIONS},
+                            value=case.get('month'),
+                            on_change=on_month_change
+                        ).classes('w-full').props('dense outlined')
+                    
+                    with ui.column().style('min-width: 180px;'):
+                        ui.label('STATUS').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        
+                        def on_status_change(e):
+                            case['status'] = e.value
+                            trigger_autosave()
+                        
+                        status_options = ['Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento']
+                        edit_status = ui.select(
+                            status_options, 
+                            value=case.get('status'),
+                            on_change=on_status_change
+                        ).classes('w-full').props('dense outlined')
+                    
+                    with ui.column().style('min-width: 120px;'):
+                        ui.label('TIPO').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        
+                        def on_case_type_change(e):
+                            old_type = get_case_type(case)
+                            case['case_type'] = e.value
+                            case['is_new_case'] = e.value == 'Novo'
+                            # Renumerar tipo antigo e novo
+                            renumber_cases_of_type(old_type)
+                            renumber_cases_of_type(e.value)
+                            # Atualizar exibição do título
+                            title_display.value = case.get('title', '')
+                            trigger_autosave()  # Salva no Firebase
+                        
+                        initial_case_type = get_case_type(case)
+                        edit_case_type = ui.select(
+                            CASE_TYPE_OPTIONS,
+                            value=initial_case_type,
+                            on_change=on_case_type_change
+                        ).classes('w-full').props('dense outlined')
+                
+                # ========== LINHA 2: Categoria + Estado + Parte Contrária ==========
+                with ui.row().style('gap: 40px; width: 100%; margin-bottom: 24px;'):
+                    with ui.column().style('min-width: 140px;'):
+                        ui.label('CATEGORIA').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        
+                        def on_category_change(e):
+                            case['category'] = e.value
+                            trigger_autosave()
+                        
+                        # Categoria do caso: Contencioso ou Consultivo
+                        initial_category = case.get('category')
+                        if not initial_category:
+                            initial_category = 'Contencioso'
+                            case['category'] = 'Contencioso'
+                        
+                        edit_category = ui.select(
+                            CASE_CATEGORY_OPTIONS,
+                            value=initial_category,
+                            with_input=True,
+                            on_change=on_category_change
+                        ).classes('w-full').props('dense outlined')
+                    
+                    with ui.column().style('min-width: 180px;'):
+                        ui.label('ESTADO').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        
+                        def on_state_edit_change(e):
+                            case['state'] = e.value
+                            trigger_autosave()
+                        
+                        edit_state = ui.select(
+                            options=[None] + STATE_OPTIONS, 
+                            value=case.get('state'),
+                            with_input=True,
+                            on_change=on_state_edit_change
+                        ).classes('w-full').props('dense outlined clearable')
+                    
+                    with ui.column().style('min-width: 200px;'):
+                        ui.label('PARTE CONTRÁRIA').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 6px;')
+                        
+                        def on_parte_contraria_change(e):
+                            parte_contraria_options_dict = {
+                                'MP': 'Ministério Público',
+                                'OAB': 'OAB',
+                                'Defesa': 'Defesa/Réu',
+                                'Autor': 'Autor/Demandante',
+                                'União': 'União',
+                                'Estado': 'Estado',
+                                'Município': 'Município',
+                                'INSS': 'INSS',
+                                'Receita Federal': 'Receita Federal',
+                                'Outro': 'Outro',
+                                '-': 'Não especificado'
+                            }
+                            case['parte_contraria'] = e.value or '-'
+                            case['parte_contraria_nome'] = parte_contraria_options_dict.get(e.value or '-', '')
+                            trigger_autosave()
+                        
+                        parte_contraria_options = {
+                            'MP': 'Ministério Público',
+                            'OAB': 'OAB',
+                            'Defesa': 'Defesa/Réu',
+                            'Autor': 'Autor/Demandante',
+                            'União': 'União',
+                            'Estado': 'Estado',
+                            'Município': 'Município',
+                            'INSS': 'INSS',
+                            'Receita Federal': 'Receita Federal',
+                            'Outro': 'Outro',
+                            '-': 'Não especificado'
+                        }
+                        
+                        edit_parte_contraria = ui.select(
+                            options=parte_contraria_options,
+                            value=case.get('parte_contraria', '-'),
+                            with_input=True,
+                            on_change=on_parte_contraria_change
+                        ).classes('w-full').props('dense outlined clearable')
+                
+                # ========== SEPARADOR ==========
+                ui.separator().style('margin: 20px 0;')
+                
+                # ========== CLIENTES (clean e compacto) ==========
+                # Multi-client editing
+                if 'clients' not in case and 'client' in case:
+                    case['clients'] = [case['client']] if case.get('client') else []
+                elif 'clients' not in case:
+                    case['clients'] = []
+                
+                case_clients = case.get('clients', []).copy()
+                edit_all_clients_selected = {'value': False}  # Estado do checkbox "Todos os Clientes"
+                client_options = [format_option_for_search(c) for c in _clients]
+                
+                ui.label('CLIENTES').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 8px;')
+                
+                # Seletor de cliente compacto
+                with ui.row().style('gap: 8px; width: 100%; align-items: center; margin-bottom: 12px;'):
+                    edit_client_select = ui.select(
+                        options=client_options, 
+                        label='Adicionar cliente',
+                        with_input=True
+                    ).props('dense outlined').style('max-width: 300px;')
+                    
+                    def add_case_client():
+                        if edit_client_select.value:
+                            # Extrair nome completo da opção formatada
+                            full_name = get_option_value(edit_client_select.value, _clients)
+                            if full_name not in case_clients:
+                                case_clients.append(full_name)
+                                case['clients'] = case_clients.copy()
+                                edit_client_select.value = None
+                                edit_all_clients_selected['value'] = False
+                                edit_all_clients_checkbox.value = False
+                                case_client_chips.refresh()
+                                trigger_autosave()
+                            else:
+                                ui.notify('Cliente já adicionado!', type='warning')
+                    
+                    ui.button(icon='add', on_click=add_case_client).props('flat dense color=primary')
+                    
+                    # Checkbox "Todos os Clientes" inline
+                    def handle_edit_all_clients(checked):
+                        """Vincula ou desvincula todos os clientes"""
+                        edit_all_clients_selected['value'] = checked
+                        if checked:
+                            # Adicionar todos os clientes
+                            case_clients.clear()
+                            for client in _clients:
+                                full_name = client.get('name') or client.get('full_name', '')
+                                if full_name and full_name not in case_clients:
+                                    case_clients.append(full_name)
+                            case['clients'] = case_clients.copy()
+                            total = len(case_clients)
+                            ui.notify(f'✅ Todos os clientes foram adicionados! ({total})', type='positive')
+                        else:
+                            # Remover todos os clientes
+                            case_clients.clear()
+                            case['clients'] = []
+                            ui.notify('❌ Todos os clientes foram removidos!', type='info')
+                        case_client_chips.refresh()
+                        trigger_autosave()
+                    
+                    # Verifica se todos os clientes estão selecionados ao abrir
+                    all_client_names = [c.get('name') or c.get('full_name', '') for c in _clients if c.get('name') or c.get('full_name', '')]
+                    if set(case_clients) == set(all_client_names) and len(case_clients) > 0:
+                        edit_all_clients_selected['value'] = True
+                    
+                    edit_all_clients_checkbox = ui.checkbox(
+                        text=f'Todos ({len(_clients)})',
+                        value=edit_all_clients_selected['value'],
+                        on_change=lambda e: handle_edit_all_clients(e.value)
+                    ).style('font-size: 13px;')
+                
+                @ui.refreshable
+                def case_client_chips():
+                    if edit_all_clients_selected['value'] and case_clients:
+                        # Mostra texto especial quando "Todos os Clientes" está marcado
+                        ui.label(f'🌐 Interesse de Todos os Clientes ({len(case_clients)})').style(
+                            'color: #0c5460; font-size: 14px; font-weight: 500; margin-top: 4px;'
+                        )
+                    elif case_clients:
+                        # Exibe nomes dos clientes em texto corrido, separados por vírgula
+                        clientes_nomes = [get_short_name(name, _clients) for name in case_clients]
+                        clientes_texto = ', '.join(clientes_nomes)
+                        
+                        with ui.row().style('gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 4px;'):
+                            ui.label(clientes_texto).style('color: #333; font-size: 14px; font-weight: 500;')
+                    else:
+                        ui.label('-').style('color: #ccc; font-size: 14px; margin-top: 4px;')
+                
+                case_client_chips()
+
+
+            # Tab 2: Processos
+            with ui.tab_panel(proc_tab).classes('w-full'):
+                # ===== CONSTANTES E HELPERS PARA ÁREA DO DIREITO (APENAS NA ABA PROCESSOS) =====
+                # Opções padronizadas de área do direito
+                PROCESS_AREA_OPTIONS = ['Administrativo', 'Criminal', 'Civil', 'Tributário', 'Técnicos/projetos']
+                
+                # Mapeamento de área → cor (hex)
+                PROCESS_AREA_COLORS = {
+                    'Administrativo': '#6b7280',      # gray
+                    'Criminal': '#dc2626',            # red
+                    'Civil': '#2563eb',               # blue
+                    'Tributário': '#7c3aed',           # purple
+                    'Técnicos/projetos': '#22c55e'     # light green
+                }
+                
+                # Mapeamento para normalizar valores antigos
+                AREA_NORMALIZATION_MAP = {
+                    'Ambiental': 'Administrativo',
+                    'Cível': 'Civil',
+                    'Penal': 'Criminal',
+                    'Trabalhista': 'Administrativo',
+                    'Empresarial': 'Civil',
+                    'Consumidor': 'Civil',
+                    'Outro': 'Administrativo',
+                    'Técnico/projetos': 'Técnicos/projetos',
+                    'Técnicos/projetos': 'Técnicos/projetos',
+                }
+                
+                def normalize_process_area(area: str) -> str:
+                    """Normaliza área antiga para valor canônico"""
+                    if not area or area == '-':
+                        return 'Administrativo'  # padrão
+                    area = area.strip()
+                    # Verifica se já é um valor canônico
+                    if area in PROCESS_AREA_OPTIONS:
+                        return area
+                    # Tenta normalizar
+                    normalized = AREA_NORMALIZATION_MAP.get(area, 'Administrativo')
+                    return normalized
+                
+                def get_process_area_style(area: str) -> str:
+                    """Retorna estilo CSS para badge de área"""
+                    normalized_area = normalize_process_area(area)
+                    color = PROCESS_AREA_COLORS.get(normalized_area, '#6b7280')
+                    return f'background-color: {color}; color: white;'
+                
+                # Funções auxiliares para formatação (usa as funções do escopo superior)
+                def get_short_clients(clients: list) -> str:
+                    """Retorna lista de clientes abreviados ou mensagem simplificada se todos"""
+                    if not clients:
+                        return '-'
+                    
+                    # Verifica se todos os clientes estão vinculados
+                    all_client_names = [c.get('name') or c.get('full_name', '') for c in _clients if c.get('name') or c.get('full_name', '')]
+                    if set(clients) == set(all_client_names) and len(clients) > 0:
+                        return f'✓ Todos ({len(clients)})'
+                    
+                    short_names = [get_short_name(c, _clients) for c in clients]
+                    return ', '.join(short_names)
+                
+                def get_short_opposing(opposing: list) -> str:
+                    """Retorna lista de partes contrárias abreviadas"""
+                    if not opposing:
+                        return '-'
+                    short_names = [get_short_name(op, _opposing) for op in opposing]
+                    return ', '.join(short_names)
+                
+                # Container para a tabela de processos
+                processes_container = ui.column().classes('w-full')
+                
+                # Definir render_linked_processes ANTES de ser referenciado
+                @ui.refreshable
+                def render_linked_processes():
+                    """Renderiza a tabela de processos vinculados com dados sempre atualizados do Firestore"""
+                    processes_container.clear()
+                    
+                    try:
+                        # Busca processos diretamente do Firestore (sem cache)
+                        # Usa case_slug (fonte da verdade) em vez de título
+                        case_slug = case.get('slug')
+                        linked_processes = get_processes_by_case(case_slug=case_slug, case_title=case.get('title'))
+                        
+                        with processes_container:
+                            if not linked_processes:
+                                with ui.card().classes('w-full p-8 flex justify-center items-center bg-gray-50'):
+                                    ui.label('Nenhum processo vinculado a este caso.').classes('text-gray-400 italic')
+                            else:
+                                # Preparar dados para a tabela
+                                table_rows = []
+                                for process in linked_processes:
+                                    # Usar parte_contraria do processo, ou herdar do caso se não tiver
+                                    parte_contraria = process.get('parte_contraria') or case.get('parte_contraria', '-')
+                                    
+                                    table_rows.append({
+                                        '_id': process.get('_id', ''),
+                                        'title': process.get('title', ''),
+                                        'number': process.get('number', '-'),
+                                        'area': process.get('area', '-'),
+                                        'clients': get_short_clients(process.get('clients', [])),
+                                        'opposing': parte_contraria if parte_contraria and parte_contraria != '-' else '-',
+                                        'status': process.get('status', 'Em andamento'),
+                                        'link': process.get('link', '')
+                                    })
+                                
+                                # Definir colunas da tabela
+                                columns = [
+                                    {
+                                        'name': 'number',
+                                        'label': 'Número',
+                                        'field': 'number',
+                                        'align': 'left',
+                                        'sortable': True
+                                    },
+                                    {
+                                        'name': 'title',
+                                        'label': 'Título',
+                                        'field': 'title',
+                                        'align': 'left',
+                                        'sortable': True
+                                    },
+                                    {
+                                        'name': 'area',
+                                        'label': 'Área',
+                                        'field': 'area',
+                                        'align': 'center',
+                                        'sortable': True
+                                    },
+                                    {
+                                        'name': 'clients',
+                                        'label': 'Clientes',
+                                        'field': 'clients',
+                                        'align': 'left'
+                                    },
+                                    {
+                                        'name': 'opposing',
+                                        'label': 'Parte Contrária',
+                                        'field': 'opposing',
+                                        'align': 'left'
+                                    },
+                                    {
+                                        'name': 'status',
+                                        'label': 'Status',
+                                        'field': 'status',
+                                        'align': 'center',
+                                        'sortable': True
+                                    },
+                                    {
+                                        'name': 'actions',
+                                        'label': 'Ações',
+                                        'field': 'actions',
+                                        'align': 'center'
+                                    }
+                                ]
+                                
+                                # Criar tabela
+                                processes_table = ui.table(
+                                    columns=columns,
+                                    rows=table_rows,
+                                    row_key='_id',
+                                    pagination={'rowsPerPage': 10}
+                                ).classes('w-full processes-table')
+                                
+                                # Slot para título (clicável para editar)
+                                processes_table.add_slot('body-cell-title', '''
+                                    <q-td :props="props">
+                                        <span 
+                                            @click="$parent.$emit('edit', props.row._id)" 
+                                            class="text-primary cursor-pointer hover:underline font-medium"
+                                        >
+                                            {{ props.value }}
+                                        </span>
+                                    </q-td>
+                                ''')
+                                
+                                # Slot para número com hiperlink
+                                processes_table.add_slot('body-cell-number', '''
+                                    <q-td :props="props">
+                                        <a 
+                                            v-if="props.row.link && props.value !== '-'" 
+                                            :href="props.row.link" 
+                                            target="_blank" 
+                                            class="text-blue-600 hover:text-blue-800 hover:underline"
+                                        >
+                                            {{ props.value }}
+                                        </a>
+                                        <span v-else class="text-gray-600">{{ props.value }}</span>
+                                    </q-td>
+                                ''')
+                                
+                                # Slot para área (com normalização e cores padronizadas)
+                                processes_table.add_slot('body-cell-area', '''
+                                    <q-td :props="props">
+                                        <q-badge 
+                                            v-if="props.value && props.value !== '-'"
+                                            :style="(function() {
+                                                var area = props.value || '';
+                                                var normalized = '';
+                                                if (area === 'Administrativo' || area === 'Criminal' || area === 'Civil' || area === 'Tributário' || area === 'Técnicos/projetos') {
+                                                    normalized = area;
+                                                } else if (area === 'Cível') {
+                                                    normalized = 'Civil';
+                                                } else if (area === 'Penal') {
+                                                    normalized = 'Criminal';
+                                                } else if (area === 'Técnico/projetos') {
+                                                    normalized = 'Técnicos/projetos';
+                                                } else {
+                                                    normalized = 'Administrativo';
+                                                }
+                                                var colors = {
+                                                    'Administrativo': '#6b7280',
+                                                    'Criminal': '#dc2626',
+                                                    'Civil': '#2563eb',
+                                                    'Tributário': '#7c3aed',
+                                                    'Técnicos/projetos': '#22c55e'
+                                                };
+                                                return 'background-color: ' + (colors[normalized] || '#6b7280') + '; color: white;';
+                                            })()"
+                                            class="text-white px-2 py-1"
+                                        >
+                                            {{ (function() {
+                                                var area = props.value || '';
+                                                if (area === 'Cível') return 'Civil';
+                                                if (area === 'Penal') return 'Criminal';
+                                                if (area === 'Técnico/projetos') return 'Técnicos/projetos';
+                                                if (area === 'Administrativo' || area === 'Criminal' || area === 'Civil' || area === 'Tributário' || area === 'Técnicos/projetos') return area;
+                                                return 'Administrativo';
+                                            })() }}
+                                        </q-badge>
+                                        <span v-else class="text-gray-400">-</span>
+                                    </q-td>
+                                ''')
+                                
+                                # Slot para status com cores customizadas
+                                processes_table.add_slot('body-cell-status', '''
+                                    <q-td :props="props">
+                                        <q-badge 
+                                            :style="props.value === 'Em andamento' ? 'background-color: #eab308; color: #111827;' : 
+                                                    props.value === 'Concluído' ? 'background-color: #166534; color: #ffffff;' : 
+                                                    props.value === 'Concluído com pendências' ? 'background-color: #4d7c0f; color: #ffffff;' : 
+                                                    props.value === 'Em monitoramento' ? 'background-color: #ea580c; color: #ffffff;' : 
+                                                    'background-color: #9ca3af; color: #111827;'"
+                                            class="text-white px-3 py-1"
+                                            style="border: 1px solid rgba(0,0,0,0.1);"
+                                        >
+                                            {{ props.value }}
+                                        </q-badge>
+                                    </q-td>
+                                ''')
+                                
+                                # Slot para ações
+                                processes_table.add_slot('body-cell-actions', '''
+                                    <q-td :props="props">
+                                        <q-btn 
+                                            @click="$parent.$emit('edit', props.row._id)" 
+                                            icon="edit" 
+                                            size="sm" 
+                                            flat 
+                                            round 
+                                            dense
+                                            class="text-blue-600"
+                                        ></q-btn>
+                                        <q-btn 
+                                            @click="$parent.$emit('unlink', props.row._id)" 
+                                            icon="link_off" 
+                                            size="sm" 
+                                            flat 
+                                            round 
+                                            dense
+                                            class="text-orange-600"
+                                        ></q-btn>
+                                        <q-btn 
+                                            @click="$parent.$emit('delete', props.row._id)" 
+                                            icon="delete" 
+                                            size="sm" 
+                                            flat 
+                                            round 
+                                            dense
+                                            class="text-red-600"
+                                        ></q-btn>
+                                    </q-td>
+                                ''')
+                                
+                                # Handlers de eventos
+                                async def handle_edit(process_id: str):
+                                    await open_edit_process_from_case(process_id)
+                                
+                                async def handle_unlink(process_id: str):
+                                    await unlink_process(process_id)
+                                
+                                async def handle_delete(process_id: str):
+                                    await delete_process_from_case(process_id)
+                                
+                                processes_table.on('edit', lambda e: handle_edit(e.args))
+                                processes_table.on('unlink', lambda e: handle_unlink(e.args))
+                                processes_table.on('delete', lambda e: handle_delete(e.args))
+                    
+                    except Exception as e:
+                        print(f"Erro ao carregar processos vinculados: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        with processes_container:
+                            with ui.card().classes('w-full p-8 flex flex-col justify-center items-center bg-red-50 border border-red-200'):
+                                ui.label('Erro ao carregar processos.').classes('text-red-600 font-semibold mb-2')
+                                ui.label(f'Detalhes: {str(e)}').classes('text-red-500 text-sm')
+                                ui.button('Tentar novamente', icon='refresh', on_click=render_linked_processes.refresh).props('color=red outline')
+                
+                # Diálogo para vincular processo existente (definido DEPOIS de render_linked_processes)
+                with ui.dialog() as link_process_dialog, ui.card().classes('w-full max-w-2xl p-6'):
+                    ui.label('Vincular Processo ao Caso').classes('text-lg font-bold mb-4')
+                    
+                    # Lista de processos disponíveis (todos os processos)
+                    # Usa case_slug (fonte da verdade) em vez de título
+                    all_processes = get_processes_list()  # Precisa dados frescos para vinculação
+                    case_slug = case.get('slug')
+                    linked_process_ids = {p.get('_id') for p in get_processes_by_case(case_slug=case_slug, case_title=case.get('title'))}
+                    available_processes = [
+                        {'label': f"{p.get('title', 'Sem título')} - {p.get('number', 'Sem número')}", 'value': p.get('_id')}
+                        for p in all_processes if p.get('_id') not in linked_process_ids
+                    ]
+                    
+                    if not available_processes:
+                        ui.label('Todos os processos já estão vinculados a este caso.').classes('text-gray-500 italic')
+                    else:
+                        process_select = ui.select(
+                            options=available_processes,
+                            label='Selecione o processo',
+                            with_input=True
+                        ).classes('w-full mb-4').props('dense outlined')
+                        
+                        async def link_selected_process():
+                            """Vincula um processo ao caso usando case_ids (fonte da verdade)"""
+                            selected_id = process_select.value
+                            if not selected_id:
+                                ui.notify('Selecione um processo para vincular.', type='warning')
+                                return
+                            
+                            try:
+                                db = get_db()
+                                case_slug = case.get('slug')
+                                
+                                if not case_slug:
+                                    ui.notify('Caso não possui slug válido. Não é possível vincular.', type='negative')
+                                    return
+                                
+                                doc_ref = db.collection('processes').document(selected_id)
+                                doc = doc_ref.get()
+                                
+                                if not doc.exists:
+                                    ui.notify('Processo não encontrado no Firestore. Pode ter sido excluído.', type='negative')
+                                    link_process_dialog.close()
+                                    render_linked_processes.refresh()
+                                    return
+                                
+                                process_data = doc.to_dict()
+                                case_ids = process_data.get('case_ids', [])
+                                
+                                # Usa case_ids (fonte da verdade) em vez de cases (títulos)
+                                if case_slug not in case_ids:
+                                    case_ids.append(case_slug)
+                                    await run.io_bound(doc_ref.update, {'case_ids': case_ids})
+                                    # save_process sincroniza automaticamente
+                                    from ..core import save_process
+                                    process_data['case_ids'] = case_ids
+                                    save_process(process_data, doc_id=selected_id)
+                                    ui.notify('Processo vinculado com sucesso!', type='positive')
+                                    link_process_dialog.close()
+                                    render_linked_processes.refresh()
+                                else:
+                                    ui.notify('Processo já está vinculado a este caso.', type='info')
+                                    link_process_dialog.close()
+                                    render_linked_processes.refresh()
+                            except Exception as e:
+                                print(f'Erro ao vincular processo {selected_id}: {e}')
+                                import traceback
+                                traceback.print_exc()
+                                ui.notify(f'Erro ao vincular processo. Verifique sua conexão e tente novamente.', type='negative')
+                        
+                        with ui.row().classes('w-full justify-end gap-2 mt-4'):
+                            ui.button('Cancelar', on_click=link_process_dialog.close).props('flat')
+                            ui.button('Vincular', icon='link', on_click=link_selected_process).props('color=primary')
+                
+                # ===== MODAL DE NOVO/EDITAR PROCESSO (DENTRO DA ABA PROCESSOS) =====
+                process_form_state = {'is_editing': False, 'edit_id': None}
+                process_modal_tab = {'current': 'dados_gerais'}  # Estado da aba atual
+                
+                # Variáveis globais para os campos do formulário (definidas ANTES de serem usadas)
+                process_form_fields = {
+                    'title_input': None,
+                    'area_select': None,
+                    'type_select': None,
+                    'status_select': None,
+                    'client_select': None,
+                    'number_input': None,
+                    'link_input': None,
+                    'client_options': []
+                }
+                
+                with ui.dialog() as edit_process_dialog, ui.card().classes('w-full max-w-6xl p-0 overflow-hidden').style('height: 85vh;'):
+                    # Cabeçalho
+                    with ui.row().classes('w-full items-center justify-between px-6 pt-6 pb-4'):
+                        dialog_title = ui.label('Novo Processo').classes('text-xl font-bold text-gray-800')
+                        error_message = ui.label('').classes('text-red-600 font-semibold text-sm')
+                        error_message.visible = False
+                    ui.separator()
+                    
+                    # Container principal: sidebar + conteúdo
+                    with ui.row().classes('w-full m-0').style('height: calc(85vh - 120px); overflow: hidden;'):
+                        # ===== SIDEBAR ESQUERDA COM ABAS =====
+                        with ui.column().classes('w-56 bg-gray-50 border-r border-gray-200 p-0 flex-shrink-0').style('height: 100%; overflow-y: auto;'):
+                            def set_process_tab(tab_name: str):
+                                process_modal_tab['current'] = tab_name
+                                refresh_process_tab_content()
+                                render_sidebar_tabs.refresh()
+                            
+                            sidebar_tabs_container = ui.column().classes('w-full gap-1 p-3')
+                            
+                            @ui.refreshable
+                            def render_sidebar_tabs():
+                                sidebar_tabs_container.clear()
+                                
+                                with sidebar_tabs_container:
+                                    # Aba: Dados gerais
+                                    is_active = process_modal_tab['current'] == 'dados_gerais'
+                                    btn_style = f'background-color: {PRIMARY_COLOR}; color: white;' if is_active else 'background-color: white; color: #374151; border: 1px solid #e5e7eb;'
+                                    btn = ui.button('Dados gerais', icon='description', on_click=lambda: set_process_tab('dados_gerais'))
+                                    btn.classes('w-full justify-start text-left').style(btn_style)
+                                    
+                                    # Aba: Estratégia
+                                    is_active = process_modal_tab['current'] == 'estrategia'
+                                    btn_style = f'background-color: {PRIMARY_COLOR}; color: white;' if is_active else 'background-color: white; color: #374151; border: 1px solid #e5e7eb;'
+                                    with ui.row().classes('w-full items-center gap-2'):
+                                        btn = ui.button('Estratégia', icon='lightbulb', on_click=lambda: set_process_tab('estrategia'))
+                                        btn.classes('flex-1 justify-start text-left').style(btn_style)
+                                    
+                                    # Aba: Chave/acesso
+                                    is_active = process_modal_tab['current'] == 'chave_acesso'
+                                    btn_style = f'background-color: {PRIMARY_COLOR}; color: white;' if is_active else 'background-color: white; color: #374151; border: 1px solid #e5e7eb;'
+                                    with ui.row().classes('w-full items-center gap-2'):
+                                        btn = ui.button('Chave/acesso', icon='key', on_click=lambda: set_process_tab('chave_acesso'))
+                                        btn.classes('flex-1 justify-start text-left').style(btn_style)
+                            
+                            render_sidebar_tabs()
+                        
+                        # ===== CONTEÚDO PRINCIPAL (ÁREA DIREITA) =====
+                        content_container = ui.column().classes('flex-1 p-6').style('height: 100%; overflow-y: auto; background-color: #f8fafc;')
+                        
+                        @ui.refreshable
+                        def refresh_process_tab_content():
+                            content_container.clear()
+                            
+                            with content_container:
+                                if process_modal_tab['current'] == 'dados_gerais':
+                                    # ===== ABA: DADOS GERAIS =====
+                                    with ui.column().classes('w-full gap-4'):
+                                        ui.label('Dados Gerais do Processo').classes('text-lg font-semibold text-gray-700 mb-2')
+                                        
+                                        with ui.row().classes('w-full gap-3'):
+                                            process_form_fields['title_input'] = ui.input('Título do processo *', placeholder='Ex: ACP - Município de ...').props('dense outlined clearable').classes('w-full')
+                                        
+                                        with ui.row().classes('w-full gap-3'):
+                                            # Área do Direito: apenas as 5 opções padronizadas
+                                            process_form_fields['area_select'] = ui.select(
+                                                PROCESS_AREA_OPTIONS, 
+                                                label='Área do direito *', 
+                                                clearable=False,
+                                                value='Administrativo'
+                                            ).props('dense outlined').classes('flex-1')
+                                            
+                                            process_form_fields['type_select'] = ui.select(
+                                                ['Existente', 'Futuro'], 
+                                                label='Tipo *', 
+                                                value='Existente'
+                                            ).props('dense outlined').classes('w-56')
+                                        
+                                        with ui.row().classes('w-full gap-3'):
+                                            status_options = ['Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento']
+                                            process_form_fields['status_select'] = ui.select(
+                                                status_options, 
+                                                label='Status *', 
+                                                value='Em andamento'
+                                            ).props('dense outlined').classes('flex-1')
+                                            
+                                            # Cliente - usa a mesma lógica do New Case modal
+                                            process_form_fields['client_options'] = get_client_options_for_select()
+                                            
+                                            process_form_fields['client_select'] = ui.select(
+                                                options=process_form_fields['client_options'], 
+                                                label='Cliente *', 
+                                                with_input=True, 
+                                                clearable=False
+                                            ).props('dense outlined use-input fill-input').classes('flex-1')
+                                        
+                                        with ui.row().classes('w-full gap-3'):
+                                            process_form_fields['number_input'] = ui.input('Número do processo *', placeholder='0000000-00.0000.0.00.0000').props('dense outlined clearable').classes('flex-1')
+                                            process_form_fields['link_input'] = ui.input('Link do processo', placeholder='URL do processo no tribunal').props('dense outlined clearable').classes('flex-1')
+                                        
+                                        # Campo de Estado (herdado do caso - somente leitura)
+                                        with ui.row().classes('w-full gap-2 items-center'):
+                                            process_form_fields['state_input'] = ui.input(
+                                                'Estado (UF)', 
+                                                placeholder='Herdado do caso vinculado'
+                                            ).props('dense outlined readonly').classes('flex-1').style('background-color: #f3f4f6;')
+                                            
+                                            ui.icon('info').classes('text-gray-400').tooltip('O estado é automaticamente herdado do caso vinculado')
+                                
+                                elif process_modal_tab['current'] == 'estrategia':
+                                    # ===== ABA: ESTRATÉGIA (EM DESENVOLVIMENTO) =====
+                                    with ui.column().classes('w-full items-center justify-center').style('height: 100%; min-height: 400px;'):
+                                        ui.icon('construction', size='64px').classes('text-gray-400 mb-4')
+                                        ui.label('Estratégia').classes('text-2xl font-bold text-gray-500 mb-2')
+                                        ui.label('Esta funcionalidade está em desenvolvimento.').classes('text-gray-400')
+                                
+                                elif process_modal_tab['current'] == 'chave_acesso':
+                                    # ===== ABA: CHAVE/ACESSO (EM DESENVOLVIMENTO) =====
+                                    with ui.column().classes('w-full items-center justify-center').style('height: 100%; min-height: 400px;'):
+                                        ui.icon('construction', size='64px').classes('text-gray-400 mb-4')
+                                        ui.label('Chave/Acesso').classes('text-2xl font-bold text-gray-500 mb-2')
+                                        ui.label('Esta funcionalidade está em desenvolvimento.').classes('text-gray-400')
+                        
+                        # Renderiza conteúdo inicial
+                        refresh_process_tab_content()
+                    
+                    def set_process_error(message: str = ''):
+                        error_message.text = message or ''
+                        error_message.visible = bool(message)
+                        error_message.update()
+                    
+                    def reset_process_form():
+                        dialog_title.text = 'Novo Processo'
+                        set_process_error('')
+                        process_modal_tab['current'] = 'dados_gerais'
+                        refresh_process_tab_content()
+                        render_sidebar_tabs.refresh()
+                        
+                        # Aguarda um pouco para os campos serem criados
+                        def _reset_fields():
+                            if process_form_fields['title_input']:
+                                process_form_fields['title_input'].value = ''
+                            if process_form_fields['type_select']:
+                                process_form_fields['type_select'].value = 'Existente'
+                            if process_form_fields['status_select']:
+                                process_form_fields['status_select'].value = 'Em andamento'
+                            if process_form_fields['area_select']:
+                                process_form_fields['area_select'].value = 'Administrativo'
+                            if process_form_fields['client_select']:
+                                process_form_fields['client_select'].value = None
+                            if process_form_fields['number_input']:
+                                process_form_fields['number_input'].value = ''
+                            if process_form_fields['link_input']:
+                                process_form_fields['link_input'].value = ''
+                            # Estado herdado do caso (exibe estado do caso atual automaticamente)
+                            if process_form_fields.get('state_input'):
+                                case_state = case.get('state', '')
+                                process_form_fields['state_input'].value = case_state or ''
+                        
+                        ui.timer(0.1, _reset_fields, once=True)
+                    
+                    def fill_process_form(process: dict):
+                        dialog_title.text = 'Editar Processo'
+                        set_process_error('')
+                        process_modal_tab['current'] = 'dados_gerais'
+                        refresh_process_tab_content()
+                        render_sidebar_tabs.refresh()
+                        
+                        # Aguarda um pouco para os campos serem criados
+                        def _fill_fields():
+                            if process_form_fields['title_input']:
+                                process_form_fields['title_input'].value = process.get('title', '')
+                            if process_form_fields['type_select']:
+                                process_form_fields['type_select'].value = process.get('tipo') or process.get('process_type') or 'Existente'
+                            if process_form_fields['status_select']:
+                                process_form_fields['status_select'].value = process.get('status') or 'Em andamento'
+                            
+                            # Normalizar área para valor canônico
+                            if process_form_fields['area_select']:
+                                area_value = process.get('area_direito') or process.get('area') or 'Administrativo'
+                                normalized_area = normalize_process_area(area_value)
+                                process_form_fields['area_select'].value = normalized_area
+                            
+                            # Cliente - converte ID para nome formatado para exibição
+                            if process_form_fields['client_select']:
+                                client_id = process.get('cliente_id') or process.get('client_id')
+                                if not client_id:
+                                    # Fallback: tenta obter do campo 'client' ou 'clients'
+                                    clients_field = process.get('clients') or []
+                                    client_name = clients_field[0] if clients_field else process.get('client')
+                                    if client_name:
+                                        # Se já é um nome, busca o formato formatado
+                                        all_clients = _clients + _opposing
+                                        for c in all_clients:
+                                            if c.get('name', '') == client_name:
+                                                formatted = format_client_option_for_select(c)
+                                                process_form_fields['client_select'].value = formatted
+                                                break
+                                        else:
+                                            process_form_fields['client_select'].value = client_name
+                                    else:
+                                        process_form_fields['client_select'].value = None
+                                else:
+                                    # Converte ID para nome formatado
+                                    client_name = get_client_name_by_id(client_id)
+                                    if client_name:
+                                        all_clients = _clients + _opposing
+                                        for c in all_clients:
+                                            if c.get('name', '') == client_name:
+                                                formatted = format_client_option_for_select(c)
+                                                process_form_fields['client_select'].value = formatted
+                                                break
+                                        else:
+                                            process_form_fields['client_select'].value = client_name
+                                    else:
+                                        process_form_fields['client_select'].value = None
+                            
+                            if process_form_fields['number_input']:
+                                process_form_fields['number_input'].value = process.get('numero_processo') or process.get('number') or ''
+                            if process_form_fields['link_input']:
+                                process_form_fields['link_input'].value = process.get('link_processo') or process.get('link') or ''
+                            # Estado herdado do caso
+                            if process_form_fields.get('state_input'):
+                                process_state = process.get('state', '')
+                                # Se processo não tem estado, usa o do caso atual
+                                if not process_state:
+                                    process_state = case.get('state', '')
+                                process_form_fields['state_input'].value = process_state or ''
+                        
+                        ui.timer(0.1, _fill_fields, once=True)
+                    
+                    def collect_process_form_data() -> dict:
+                        # Garante que estamos na aba dados_gerais
+                        if process_modal_tab['current'] != 'dados_gerais':
+                            return None
+                        
+                        # O valor selecionado é uma string formatada (ex: "Nome (Apelido)")
+                        # Precisamos extrair o nome e converter para ID
+                        selected_option = process_form_fields['client_select'].value if process_form_fields['client_select'] else None
+                        client_id = None
+                        client_name = ''
+                        
+                        if selected_option:
+                            # Extrai o nome completo da opção formatada
+                            client_name = extract_client_name_from_formatted_option(selected_option)
+                            # Converte nome para ID
+                            client_id = get_client_id_by_name(client_name) or client_name
+                        
+                        # Garantir que área está normalizada
+                        area_value = process_form_fields['area_select'].value if process_form_fields['area_select'] else 'Administrativo'
+                        normalized_area = normalize_process_area(area_value)
+                        
+                        return {
+                            'title': (process_form_fields['title_input'].value or '').strip() if process_form_fields['title_input'] else '',
+                            'titulo': (process_form_fields['title_input'].value or '').strip() if process_form_fields['title_input'] else '',
+                            'area_direito': normalized_area,
+                            'area': normalized_area,
+                            'tipo': process_form_fields['type_select'].value or 'Existente' if process_form_fields['type_select'] else 'Existente',
+                            'process_type': process_form_fields['type_select'].value or 'Existente' if process_form_fields['type_select'] else 'Existente',
+                            'status': process_form_fields['status_select'].value or '' if process_form_fields['status_select'] else '',
+                            'cliente_id': client_id,
+                            'client_id': client_id,
+                            'client': client_name or client_id,
+                            'clients': [client_name or client_id] if client_id else [],
+                            'numero_processo': (process_form_fields['number_input'].value or '').strip() if process_form_fields['number_input'] else '',
+                            'number': (process_form_fields['number_input'].value or '').strip() if process_form_fields['number_input'] else '',
+                            'link_processo': (process_form_fields['link_input'].value or '').strip() if process_form_fields['link_input'] else '',
+                            'link': (process_form_fields['link_input'].value or '').strip() if process_form_fields['link_input'] else '',
+                        }
+                    
+                    async def save_process_from_case():
+                        set_process_error('')
+                        
+                        # Garante que estamos na aba dados_gerais
+                        if process_modal_tab['current'] != 'dados_gerais':
+                            set_process_error('Por favor, preencha os dados gerais antes de salvar.')
+                            process_modal_tab['current'] = 'dados_gerais'
+                            refresh_process_tab_content()
+                            render_sidebar_tabs.refresh()
+                            return
+                        
+                        process_data = collect_process_form_data()
+                        
+                        if not process_data or not process_data.get('title'):
+                            set_process_error('Título é obrigatório.')
+                            return
+                        if not process_data['number']:
+                            set_process_error('Número do processo é obrigatório.')
+                            return
+                        if not process_data['area']:
+                            set_process_error('Área do direito é obrigatória.')
+                            return
+                        if not process_data['tipo']:
+                            set_process_error('Tipo é obrigatório.')
+                            return
+                        if not process_data['status']:
+                            set_process_error('Status é obrigatório.')
+                            return
+                        if not process_data['cliente_id']:
+                            set_process_error('Selecione um cliente.')
+                            return
+                        if process_data['link'] and not (process_data['link'].startswith('http://') or process_data['link'].startswith('https://')):
+                            set_process_error('Informe um link válido (http ou https).')
+                            return
+                        
+                        try:
+                            is_editing = process_form_state['is_editing']
+                            edit_id = process_form_state['edit_id']
+                            
+                            # Se está editando, preserva case_ids
+                            if is_editing and edit_id:
+                                def _merge_update():
+                                    db = get_db()
+                                    doc_ref = db.collection('processes').document(edit_id)
+                                    snap = doc_ref.get()
+                                    current = snap.to_dict() if snap.exists else {}
+                                    # Preserva case_ids
+                                    case_ids = current.get('case_ids', [])
+                                    process_data['case_ids'] = case_ids
+                                    current.update(process_data)
+                                    save_process_core(current, doc_id=edit_id)
+                                await run.io_bound(_merge_update)
+                                ui.notify('Processo atualizado!', type='positive')
+                            else:
+                                # Novo processo: vincula automaticamente ao caso atual
+                                case_slug = case.get('slug')
+                                if case_slug:
+                                    process_data['case_ids'] = [case_slug]
+                                await run.io_bound(save_process_core, process_data)
+                                ui.notify('Processo cadastrado e vinculado!', type='positive')
+                            
+                            await run.io_bound(sync_processes_cases)
+                            edit_process_dialog.close()
+                            render_linked_processes.refresh()
+                        except Exception as e:
+                            print(f'Erro ao salvar processo: {e}')
+                            import traceback
+                            traceback.print_exc()
+                            set_process_error(f'Erro ao salvar: {e}')
+                            ui.notify('Erro ao salvar o processo. Confira os dados e tente novamente.', type='negative')
+                    
+                    async def delete_process_from_modal():
+                        if not process_form_state['is_editing'] or not process_form_state['edit_id']:
+                            set_process_error('Apenas processos existentes podem ser excluídos.')
+                            return
+                        
+                        try:
+                            await run.io_bound(delete_process_core, process_form_state['edit_id'])
+                            await run.io_bound(sync_processes_cases)
+                            ui.notify('Processo excluído!', type='positive')
+                            edit_process_dialog.close()
+                            render_linked_processes.refresh()
+                        except Exception as e:
+                            print(f'Erro ao excluir processo: {e}')
+                            import traceback
+                            traceback.print_exc()
+                            set_process_error(f'Erro ao excluir: {e}')
+                            ui.notify('Erro ao excluir o processo.', type='negative')
+                    
+                    with ui.row().classes('absolute bottom-0 right-0 p-4 gap-2 z-10'):
+                        delete_process_button = ui.button('EXCLUIR', icon='delete', on_click=delete_process_from_modal).props('color=red').classes('font-bold')
+                        ui.button('SALVAR', icon='save', on_click=save_process_from_case).props('color=primary').classes('font-bold')
+                    delete_process_button.visible = False
+                
+                # Cabeçalho com botões (definido DEPOIS de render_linked_processes e do diálogo)
+                with ui.row().classes('w-full justify-between items-center mb-4'):
+                    ui.label('Processos vinculados').classes('text-lg font-bold')
+                    with ui.row().classes('gap-2'):
+                        ui.button('Atualizar', icon='refresh', on_click=render_linked_processes.refresh).props('flat size=sm').tooltip('Recarregar processos do Firestore')
+                        def open_new_process():
+                            reset_process_form()
+                            process_form_state['is_editing'] = False
+                            process_form_state['edit_id'] = None
+                            delete_process_button.visible = False
+                            edit_process_dialog.open()
+                        
+                        ui.button('Novo Processo', icon='add', on_click=open_new_process).props('color=primary size=sm')
+                        ui.button('Vincular Processo', icon='link', on_click=lambda: link_process_dialog.open()).props('color=primary size=sm outline')
+                
+                # Funções para manipular processos
+                async def open_edit_process_from_case(process_id: str):
+                    """Abre edição de processo em modal local"""
+                    try:
+                        db = get_db()
+                        doc = db.collection('processes').document(process_id).get()
+                        if not doc.exists:
+                            ui.notify('Processo não encontrado.', type='negative')
+                            return
+                        
+                        process_to_edit = doc.to_dict()
+                        process_to_edit['_id'] = doc.id
+                        
+                        fill_process_form(process_to_edit)
+                        process_form_state['is_editing'] = True
+                        process_form_state['edit_id'] = process_id
+                        delete_process_button.visible = True
+                        edit_process_dialog.open()
+                    except Exception as e:
+                        print(f'Erro ao abrir edição de processo: {e}')
+                        import traceback
+                        traceback.print_exc()
+                        ui.notify(f'Erro ao abrir processo: {e}', type='negative')
+                
+                async def unlink_process(process_id: str):
+                    """Desvincula um processo do caso atual usando case_ids (fonte da verdade)"""
+                    if not process_id:
+                        ui.notify('ID do processo não fornecido.', type='warning')
+                        return
+                    
+                    try:
+                        db = get_db()
+                        case_slug = case.get('slug')
+                        
+                        if not case_slug:
+                            ui.notify('Caso não possui slug válido.', type='warning')
+                            return
+                        
+                        doc_ref = db.collection('processes').document(process_id)
+                        doc = doc_ref.get()
+                        
+                        if not doc.exists:
+                            ui.notify('Processo não encontrado no Firestore. Pode ter sido excluído.', type='negative')
+                            render_linked_processes.refresh()
+                            return
+                        
+                        process_data = doc.to_dict()
+                        case_ids = process_data.get('case_ids', [])
+                        
+                        # Usa case_ids (fonte da verdade) em vez de cases (títulos)
+                        if case_slug in case_ids:
+                            case_ids.remove(case_slug)
+                            # Atualiza usando save_process para garantir sincronização
+                            from ..core import save_process
+                            process_data['case_ids'] = case_ids
+                            await run.io_bound(save_process, process_data, process_id)
+                            ui.notify('Processo desvinculado com sucesso!', type='positive')
+                            render_linked_processes.refresh()
+                        else:
+                            ui.notify('Processo já não está vinculado a este caso.', type='info')
+                            render_linked_processes.refresh()
+                    except Exception as e:
+                        print(f'Erro ao desvincular processo {process_id}: {e}')
+                        import traceback
+                        traceback.print_exc()
+                        ui.notify(f'Erro ao desvincular processo. Tente novamente ou atualize a página.', type='negative')
+                
+                async def delete_process_from_case(process_id: str):
+                    """Exclui um processo (mesma lógica do módulo principal)"""
+                    if not process_id:
+                        ui.notify('ID do processo não fornecido.', type='warning')
+                        return
+                    
+                    # Confirmação antes de excluir
+                    try:
+                        db = get_db()
+                        doc = db.collection('processes').document(process_id).get()
+                        if not doc.exists:
+                            ui.notify('Processo não encontrado. Pode ter sido excluído.', type='warning')
+                            render_linked_processes.refresh()
+                            return
+                        
+                        process_title = doc.to_dict().get('title', 'processo')
+                    except Exception as e:
+                        process_title = 'processo'
+                    
+                    # Diálogo de confirmação
+                    with ui.dialog() as confirm_dialog, ui.card().classes('p-6'):
+                        ui.label(f'Confirma a exclusão do processo "{process_title}"?').classes('text-lg font-semibold mb-4')
+                        ui.label('Esta ação não pode ser desfeita.').classes('text-red-600 mb-4')
+                        
+                        async def confirm_delete():
+                            try:
+                                await run.io_bound(delete_process_core, process_id)
+                                # sync removido para performance - delete_process já limpa referências
+                                ui.notify('Processo excluído com sucesso!', type='positive')
+                                confirm_dialog.close()
+                                render_linked_processes.refresh()
+                            except Exception as e:
+                                print(f'Erro ao excluir processo {process_id}: {e}')
+                                import traceback
+                                traceback.print_exc()
+                                ui.notify(f'Erro ao excluir processo. Tente novamente ou atualize a página.', type='negative')
+                                confirm_dialog.close()
+                        
+                        with ui.row().classes('w-full justify-end gap-2'):
+                            ui.button('Cancelar', on_click=confirm_dialog.close).props('flat')
+                            ui.button('Excluir', icon='delete', on_click=confirm_delete).props('color=red')
+                        
+                        confirm_dialog.open()
+                
+                # Renderiza a tabela inicial
+                render_linked_processes()
+
+            # Tab 3: Cálculos
+            with ui.tab_panel(calc_tab).classes('w-full'):
+                with ui.row().classes('w-full items-center justify-between mb-4'):
+                    ui.label('Cálculos').classes('text-lg font-bold')
+                    ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+                
+                # Inicializar lista de cálculos se não existir
+                if 'calculations' not in case:
+                    case['calculations'] = []
+                
+                # Dialog para editar/preencher cálculo com planilha
+                with ui.dialog() as edit_calc_dialog, ui.card().classes('w-full max-w-7xl p-6').style('max-height: 95vh; overflow-y: auto;'):
+                    edit_state = {'is_editing': False, 'edit_index': None, 'calc_type': None}
+                    
+                    # Container para planilha
+                    spreadsheet_table_container = ui.column().classes('w-full')
+                    
+                    def render_spreadsheet():
+                        """Renderiza a planilha baseada no tipo de cálculo"""
+                        if edit_state['edit_index'] is None:
+                            return
+                        
+                        spreadsheet_table_container.clear()
+                        calc = case['calculations'][edit_state['edit_index']]
+                        calc_type = edit_state['calc_type']
+                        
+                        with spreadsheet_table_container:
+                            if calc_type == 'Área Total':
+                                # Áreas Afetadas
+                                rows = calc.get('area_rows', [])
+                                
+                                ui.label('Áreas Afetadas').classes('text-lg font-semibold mb-4')
+                                
+                                # Lista de áreas afetadas
+                                areas_list_container = ui.column().classes('w-full gap-3 mb-4')
+                                
+                                def render_areas_list():
+                                    areas_list_container.clear()
+                                    calc = case['calculations'][edit_state['edit_index']]
+                                    rows = calc.get('area_rows', [])
+                                    
+                                    with areas_list_container:
+                                        if not rows:
+                                            ui.label('Nenhuma área afetada cadastrada. Clique em "Adicionar Área Afetada" para começar.').classes('text-gray-400 italic text-center py-4')
+                                        
+                                        for row_idx, row in enumerate(rows):
+                                            with ui.card().classes('w-full p-4 border shadow-sm'):
+                                                with ui.row().classes('w-full items-start gap-3'):
+                                                    # Descrição
+                                                    with ui.column().classes('flex-1'):
+                                                        desc_input = ui.input(
+                                                            'Descrição da área afetada',
+                                                            value=row.get('description', ''),
+                                                            placeholder='Ex: Área de preservação permanente'
+                                                        ).classes('w-full').props('outlined')
+                                                        
+                                                        def update_desc(idx=row_idx):
+                                                            calc = case['calculations'][edit_state['edit_index']]
+                                                            if 'area_rows' not in calc:
+                                                                calc['area_rows'] = []
+                                                            if idx < len(calc['area_rows']):
+                                                                calc['area_rows'][idx]['description'] = desc_input.value or ''
+                                                                trigger_autosave()
+                                                        
+                                                        desc_input.on('update:model-value', lambda: update_desc())
+                                                    
+                                                    # Hectares
+                                                    with ui.column().classes('w-40'):
+                                                        hectares_input = ui.number(
+                                                            'Hectares',
+                                                            value=row.get('hectares', 0.0),
+                                                            format='%.2f'
+                                                        ).classes('w-full').props('outlined')
+                                                        
+                                                        def update_hectares(idx=row_idx):
+                                                            calc = case['calculations'][edit_state['edit_index']]
+                                                            if 'area_rows' not in calc:
+                                                                calc['area_rows'] = []
+                                                            if idx < len(calc['area_rows']):
+                                                                calc['area_rows'][idx]['hectares'] = hectares_input.value or 0.0
+                                                                trigger_autosave()
+                                                                render_areas_list()
+                                                        
+                                                        hectares_input.on('update:model-value', lambda: update_hectares())
+                                                    
+                                                    # Status
+                                                    with ui.column().classes('w-48'):
+                                                        status_options = ['Perdido', 'Em discussão', 'Pendente', 'Recuperado']
+                                                        status_select = ui.select(
+                                                            options=status_options,
+                                                            label='Status',
+                                                            value=row.get('status', 'Pendente')
+                                                        ).classes('w-full').props('outlined')
+                                                        
+                                                        def update_status(idx=row_idx):
+                                                            calc = case['calculations'][edit_state['edit_index']]
+                                                            if 'area_rows' not in calc:
+                                                                calc['area_rows'] = []
+                                                            if idx < len(calc['area_rows']):
+                                                                calc['area_rows'][idx]['status'] = status_select.value or 'Pendente'
+                                                                trigger_autosave()
+                                                        
+                                                        status_select.on('update:model-value', lambda: update_status())
+                                                    
+                                                    # Botão remover
+                                                    def remove_area(idx=row_idx):
+                                                        calc = case['calculations'][edit_state['edit_index']]
+                                                        if 'area_rows' in calc and idx < len(calc['area_rows']):
+                                                            calc['area_rows'].pop(idx)
+                                                            trigger_autosave()
+                                                            render_areas_list()
+                                                    
+                                                    ui.button(
+                                                        icon='delete',
+                                                        on_click=remove_area
+                                                    ).props('flat round dense color=red').tooltip('Remover área')
+                                
+                                render_areas_list()
+                                
+                                # Botão para adicionar área
+                                def add_area_row():
+                                    calc = case['calculations'][edit_state['edit_index']]
+                                    if 'area_rows' not in calc:
+                                        calc['area_rows'] = []
+                                    calc['area_rows'].append({
+                                        'description': '',
+                                        'hectares': 0.0,
+                                        'status': 'Pendente'
+                                    })
+                                    trigger_autosave()
+                                    render_areas_list()
+                                
+                                with ui.row().classes('w-full justify-center mb-4'):
+                                    ui.button(
+                                        '+ Adicionar Área Afetada',
+                                        icon='add',
+                                        on_click=add_area_row
+                                    ).classes('bg-green-600 text-white px-6 py-2')
+                                
+                                # Total
+                                if rows:
+                                    total_hectares = sum(r.get('hectares', 0.0) for r in rows)
+                                    with ui.card().classes('w-full p-4 mt-4 bg-green-50 border-2 border-green-300'):
+                                        with ui.row().classes('w-full items-center justify-between'):
+                                            ui.label('Total de Áreas Afetadas:').classes('font-semibold text-gray-700 text-lg')
+                                            ui.label(f'{total_hectares:,.2f} hectares').classes('font-bold text-green-700 text-xl')
+                                
+                            else:  # Financeiro
+                                # Planilha Financeira
+                                rows = calc.get('finance_rows', [])
+                                
+                                # Cabeçalho
+                                with ui.row().classes('w-full bg-gray-100 p-2 font-semibold text-sm border-b'):
+                                    ui.label('Descrição do Prejuízo').classes('flex-1')
+                                    ui.label('Valor (R$)').classes('w-40 text-center')
+                                    ui.label('Status').classes('w-40 text-center')
+                                    ui.label('Ações').classes('w-20 text-center')
+                                
+                                # Linhas
+                                for row_idx, row in enumerate(rows):
+                                    with ui.row().classes('w-full p-1 border-b items-center hover:bg-gray-50'):
+                                        desc_input = ui.input('', value=row.get('description', '')).classes('flex-1').props('dense outlined')
+                                        value_input = ui.number('', value=row.get('value', 0.0), format='%.2f').classes('w-40').props('dense outlined')
+                                        
+                                        status_options = ['Confirmado', 'Estimado', 'Em análise', 'Recuperado']
+                                        status_select = ui.select(
+                                            options=status_options,
+                                            value=row.get('status', 'Em análise')
+                                        ).classes('w-40').props('dense outlined')
+                                        
+                                        def update_row(idx=row_idx, desc=desc_input, value=value_input, status=status_select):
+                                            calc = case['calculations'][edit_state['edit_index']]
+                                            if 'finance_rows' not in calc:
+                                                calc['finance_rows'] = []
+                                            if idx < len(calc['finance_rows']):
+                                                calc['finance_rows'][idx] = {
+                                                    'description': desc.value or '',
+                                                    'value': value.value or 0.0,
+                                                    'status': status.value or 'Em análise'
+                                                }
+                                                trigger_autosave()
+                                        
+                                        desc_input.on('update:model-value', lambda: update_row())
+                                        value_input.on('update:model-value', lambda: update_row())
+                                        status_select.on('update:model-value', lambda: update_row())
+                                        
+                                        def remove_row(idx=row_idx):
+                                            calc = case['calculations'][edit_state['edit_index']]
+                                            if 'finance_rows' in calc and idx < len(calc['finance_rows']):
+                                                calc['finance_rows'].pop(idx)
+                                                trigger_autosave()
+                                                render_spreadsheet()
+                                        
+                                        ui.button(icon='delete', on_click=remove_row).props('flat round dense color=red size=sm').classes('w-20').tooltip('Remover')
+                                
+                                # Total
+                                total_value = sum(r.get('value', 0.0) for r in rows)
+                                with ui.row().classes('w-full p-2 bg-gray-50 font-semibold border-t-2'):
+                                    ui.label('Total:').classes('flex-1')
+                                    ui.label(f'R$ {total_value:,.2f}').classes('w-40 text-center text-blue-700')
+                                    ui.space().classes('w-40')
+                                    ui.space().classes('w-20')
+                                
+                                def add_finance_row():
+                                    calc = case['calculations'][edit_state['edit_index']]
+                                    if 'finance_rows' not in calc:
+                                        calc['finance_rows'] = []
+                                    calc['finance_rows'].append({
+                                        'description': '',
+                                        'value': 0.0,
+                                        'status': 'Em análise'
+                                    })
+                                    trigger_autosave()
+                                    render_spreadsheet()
+                                
+                                ui.button('+ Adicionar Linha', icon='add', on_click=add_finance_row).classes('bg-blue-600 text-white mt-2').props('flat')
+                    
+                    # Renderizar planilha
+                    render_spreadsheet()
+                    
+                    with ui.row().classes('w-full justify-end gap-2 mt-4'):
+                        ui.button('Fechar', on_click=edit_calc_dialog.close).props('flat color=grey')
+                
+                # Dialog minimalista para escolher tipo
+                with ui.dialog() as choose_type_dialog, ui.card().classes('w-full max-w-xs p-4'):
+                    with ui.column().classes('w-full gap-2'):
+                        ui.button(
+                            'Área',
+                            icon='square_foot',
+                            on_click=lambda: (add_calculation('Área Total'), choose_type_dialog.close())
+                        ).classes('w-full bg-green-600 text-white py-2')
+                        
+                        ui.button(
+                            'Financeiro',
+                            icon='attach_money',
+                            on_click=lambda: (add_calculation('Financeiro'), choose_type_dialog.close())
+                        ).classes('w-full bg-blue-600 text-white py-2')
+                
+                def add_calculation(calc_type):
+                    """Adiciona um novo cálculo"""
+                    calc_data = {
+                        'type': calc_type,
+                        'title': f'Cálculo {calc_type}',
+                        'created_at': datetime.now().isoformat()
+                    }
+                    
+                    if calc_type == 'Área Total':
+                        calc_data['area_rows'] = []
+                    else:  # Financeiro
+                        calc_data['finance_rows'] = []
+                    
+                    case['calculations'].append(calc_data)
+                    trigger_autosave()
+                    render_calculations_list.refresh()
+                    # Abre automaticamente o dialog de edição
+                    open_edit_dialog(len(case['calculations']) - 1)
+                
+                def open_edit_dialog(index):
+                    calc = case['calculations'][index]
+                    edit_state['calc_type'] = calc.get('type', 'Área Total')
+                    edit_state['is_editing'] = True
+                    edit_state['edit_index'] = index
+                    
+                    # Garantir que as estruturas existem
+                    if calc.get('type') == 'Área Total':
+                        if 'area_rows' not in calc:
+                            calc['area_rows'] = []
+                    else:
+                        if 'finance_rows' not in calc:
+                            calc['finance_rows'] = []
+                    
+                    render_spreadsheet()
+                    edit_calc_dialog.open()
+                
+                def delete_calculation(index):
+                    case['calculations'].pop(index)
+                    trigger_autosave()
+                    render_calculations_list.refresh()
+                    ui.notify('Cálculo excluído!')
+                
+                @ui.refreshable
+                def render_calculations_list():
+                    # Botão de adicionar cálculo
+                    with ui.row().classes('w-full justify-end mb-4'):
+                        ui.button('Adicionar Cálculo', icon='add', on_click=choose_type_dialog.open).classes('bg-primary text-white')
+                    
+                    if not case.get('calculations'):
+                        with ui.card().classes('w-full p-8 text-center'):
+                            ui.label('Nenhum cálculo cadastrado ainda.').classes('text-gray-500')
+                    else:
+                        for idx, calc in enumerate(case.get('calculations', [])):
+                            with ui.card().classes('w-full p-3 mb-2 hover:shadow-md transition-shadow'):
+                                with ui.row().classes('w-full items-center justify-between'):
+                                    with ui.row().classes('items-center gap-3 flex-grow'):
+                                        # Ícone
+                                        if calc.get('type') == 'Área Total':
+                                            ui.icon('square_foot', size='md').classes('text-green-600')
+                                        else:
+                                            ui.icon('attach_money', size='md').classes('text-blue-600')
+                                        
+                                        # Título e tipo
+                                        with ui.column().classes('flex-grow'):
+                                            ui.label(calc.get('title', 'Sem título')).classes('text-base font-semibold')
+                                            
+                                            # Resumo minimalista
+                                            if calc.get('type') == 'Área Total':
+                                                rows = calc.get('area_rows', [])
+                                                if rows:
+                                                    total = sum(r.get('hectares', 0.0) for r in rows)
+                                                    ui.label(f'{len(rows)} área(s) • {total:,.2f} ha').classes('text-xs text-gray-500')
+                                                else:
+                                                    ui.label('Planilha vazia').classes('text-xs text-gray-400 italic')
+                                            else:
+                                                rows = calc.get('finance_rows', [])
+                                                if rows:
+                                                    total = sum(r.get('value', 0.0) for r in rows)
+                                                    ui.label(f'{len(rows)} item(ns) • R$ {total:,.2f}').classes('text-xs text-gray-500')
+                                                else:
+                                                    ui.label('Planilha vazia').classes('text-xs text-gray-400 italic')
+                                    
+                                    # Botões de ação
+                                    with ui.row().classes('gap-1'):
+                                        ui.button(
+                                            icon='edit',
+                                            on_click=lambda i=idx: open_edit_dialog(i)
+                                        ).props('flat round dense color=primary').tooltip('Editar')
+                                        ui.button(
+                                            icon='delete',
+                                            on_click=lambda i=idx: delete_calculation(i)
+                                        ).props('flat round dense color=red').tooltip('Excluir')
+                
+                render_calculations_list()
+
+            # Tab 4: Relatório Geral do Caso
+            with ui.tab_panel(report_tab).classes('w-full gap-4'):
+                # Variável reativa para o conteúdo do relatório (permite edição)
+                report_value = {'content': case.get('general_report', '')}
+                
+                # Indicador de salvamento automático (definido antes para ser usado no callback)
+                @ui.refreshable
+                def report_save_indicator():
+                    if autosave_state.get('is_saving', False):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.spinner('dots', size='xs').classes('text-yellow-600')
+                            ui.label('Salvando...').classes('text-xs text-yellow-600 italic')
+                    else:
+                        ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+                
+                # Cabeçalho com título e controles
+                with ui.row().classes('w-full items-center justify-between mb-4'):
+                    with ui.column().classes('flex-grow'):
+                        ui.label('Relatório Geral do Caso').classes('text-lg font-bold')
+                    with ui.row().classes('items-center gap-3'):
+                        report_save_indicator()
+                        # Registra o indicador para atualização automática
+                        register_autosave_refresh(report_save_indicator)
+                        
+                        # Botão de salvamento manual
+                        async def manual_save_report():
+                            """Salva manualmente o relatório no Firestore"""
+                            try:
+                                autosave_state['is_saving'] = True
+                                report_save_indicator.refresh()
+                                
+                                from ..core import save_case
+                                # Lê o valor atual (a variável reativa é atualizada pelos callbacks)
+                                current_value = report_value['content']
+                                
+                                # Atualiza tanto o caso quanto a variável reativa
+                                case['general_report'] = current_value
+                                report_value['content'] = current_value
+                                
+                                # Salva no Firestore
+                                save_case(case)
+                                
+                                await asyncio.sleep(0.3)  # Pequeno delay para mostrar o indicador
+                                
+                                autosave_state['is_saving'] = False
+                                report_save_indicator.refresh()
+                                
+                                ui.notify('Relatório salvo com sucesso!', type='positive', timeout=2000)
+                            except Exception as e:
+                                print(f'Erro ao salvar relatório: {e}')
+                                import traceback
+                                traceback.print_exc()
+                                autosave_state['is_saving'] = False
+                                report_save_indicator.refresh()
+                                ui.notify(f'Erro ao salvar: {str(e)}', type='negative', timeout=3000)
+                        
+                        ui.button(
+                            'Salvar',
+                            icon='save',
+                            on_click=manual_save_report
+                        ).classes('bg-primary text-white px-4 py-2').props('dense')
+                
+                # Textarea simples e direto - pronto para uso imediato
+                def on_textarea_change(e):
+                    """Callback para textarea"""
+                    try:
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        report_value['content'] = new_value
+                        case['general_report'] = new_value
+                        trigger_autosave()
+                        report_save_indicator.refresh()
+                    except Exception as err:
+                        print(f'Erro no callback do textarea: {err}')
+                
+                # Textarea direto, sem container extra - já aparece pronto para digitar
+                report_textarea = ui.textarea(
+                    value=report_value['content'],
+                    placeholder='Digite o relatório geral do caso aqui...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    on_change=on_textarea_change
+                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                    
+
+            # Tab 5: Vistorias
+            with ui.tab_panel(vistorias_tab).classes('w-full gap-4'):
+                # Variável reativa para o conteúdo das vistorias (permite edição)
+                vistorias_value = {'content': case.get('vistorias', '')}
+                
+                # Indicador de salvamento automático
+                @ui.refreshable
+                def vistorias_save_indicator():
+                    if autosave_state.get('is_saving', False):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.spinner('dots', size='xs').classes('text-yellow-600')
+                            ui.label('Salvando...').classes('text-xs text-yellow-600 italic')
+                    else:
+                        ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+                
+                # Cabeçalho com título e controles
+                with ui.row().classes('w-full items-center justify-between mb-4'):
+                    with ui.column().classes('flex-grow'):
+                        ui.label('Vistorias').classes('text-lg font-bold')
+                    with ui.row().classes('items-center gap-3'):
+                        vistorias_save_indicator()
+                        # Registra o indicador para atualização automática
+                        register_autosave_refresh(vistorias_save_indicator)
+                        
+                        # Botão de salvamento manual
+                        async def manual_save_vistorias():
+                            """Salva manualmente as vistorias no Firestore"""
+                            try:
+                                autosave_state['is_saving'] = True
+                                vistorias_save_indicator.refresh()
+                                
+                                from ..core import save_case
+                                # Lê o valor atual (a variável reativa é atualizada pelos callbacks)
+                                current_value = vistorias_value['content']
+                                
+                                # Atualiza tanto o caso quanto a variável reativa
+                                case['vistorias'] = current_value
+                                vistorias_value['content'] = current_value
+                                
+                                # Salva no Firestore
+                                save_case(case)
+                                
+                                await asyncio.sleep(0.3)  # Pequeno delay para mostrar o indicador
+                                
+                                autosave_state['is_saving'] = False
+                                vistorias_save_indicator.refresh()
+                                
+                                ui.notify('Vistorias salvas com sucesso!', type='positive', timeout=2000)
+                            except Exception as e:
+                                print(f'Erro ao salvar vistorias: {e}')
+                                import traceback
+                                traceback.print_exc()
+                                autosave_state['is_saving'] = False
+                                vistorias_save_indicator.refresh()
+                                ui.notify(f'Erro ao salvar: {str(e)}', type='negative', timeout=3000)
+                        
+                        ui.button(
+                            'Salvar',
+                            icon='save',
+                            on_click=manual_save_vistorias
+                        ).classes('bg-primary text-white px-4 py-2').props('dense')
+                
+                # Textarea simples e direto - pronto para uso imediato
+                def on_vistorias_change(e):
+                    """Callback para textarea"""
+                    try:
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        vistorias_value['content'] = new_value
+                        case['vistorias'] = new_value
+                        trigger_autosave()
+                        vistorias_save_indicator.refresh()
+                    except Exception as err:
+                        print(f'Erro no callback do textarea: {err}')
+                
+                # Textarea direto, sem container extra - já aparece pronto para digitar
+                vistorias_textarea = ui.textarea(
+                    value=vistorias_value['content'],
+                    placeholder='Digite as informações das vistorias aqui...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    on_change=on_vistorias_change
+                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+            # Tab 6: Estratégia Geral
+            with ui.tab_panel(strategy_tab).classes('w-full gap-4'):
+                with ui.row().classes('w-full items-center justify-between mb-2'):
+                    ui.label('Estratégia Geral').classes('text-lg font-bold')
+                    ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+                
+                with ui.expansion('Objetivos do caso', icon='flag').classes('w-full border rounded bg-gray-50'):
+                    def on_objectives_change(e):
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        case['objectives'] = new_value
+                        trigger_autosave()
+                    
+                    ui.textarea(
+                        value=case.get('objectives', ''),
+                        placeholder='Descreva os objetivos do caso...',
+                        on_change=on_objectives_change
+                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+                with ui.expansion('Considerações Jurídicas', icon='gavel').classes('w-full border rounded bg-gray-50'):
+                    def on_legal_considerations_change(e):
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        case['legal_considerations'] = new_value
+                        trigger_autosave()
+                    
+                    ui.textarea(
+                        value=case.get('legal_considerations', ''),
+                        placeholder='Descreva as considerações jurídicas do caso...',
+                        on_change=on_legal_considerations_change
+                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+                with ui.expansion('Considerações Técnicas', icon='science').classes('w-full border rounded bg-gray-50'):
+                    def on_technical_considerations_change(e):
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        case['technical_considerations'] = new_value
+                        trigger_autosave()
+                    
+                    ui.textarea(
+                        value=case.get('technical_considerations', ''),
+                        placeholder='Descreva as considerações técnicas do caso...',
+                        on_change=on_technical_considerations_change
+                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+                with ui.expansion('Teses a serem utilizadas', icon='gavel').classes('w-full border rounded bg-gray-50'):
+                    # Inicializar lista de teses se não existir
+                    if 'theses' not in case or not isinstance(case.get('theses'), list):
+                        case['theses'] = []
+                    
+                    # Dialog para adicionar/editar tese
+                    with ui.dialog() as thesis_dialog, ui.card().classes('w-full max-w-4xl p-6').style('max-height: 90vh; overflow-y: auto;'):
+                        dialog_title = ui.label('Adicionar Tese').classes('text-xl font-bold mb-4 text-primary')
+                        
+                        edit_state = {'is_editing': False, 'edit_index': None}
+                        
+                        thesis_name = ui.input('Qual é a tese?').classes('w-full mb-4').props('outlined')
+                        thesis_description = ui.textarea('Breve descrição da tese').classes('w-full mb-4').props('outlined rows=3')
+                        
+                        # Probabilidade (muito alta/alta/média/baixa/muito baixa)
+                        probability_options = ['Muito alta', 'Alta', 'Média', 'Baixa', 'Muito baixa']
+                        thesis_probability = ui.select(
+                            options=probability_options,
+                            label='Probabilidade de chance da tese dar certo',
+                            value='Média'
+                        ).classes('w-full mb-4').props('outlined')
+                        
+                        thesis_observations = ui.textarea('Observações').classes('w-full mb-4').props('outlined rows=3')
+                        
+                        status_options = [
+                            'Apresentada e em discussão perante os órgãos',
+                            'Rejeitada',
+                            'Aguardando o momento certo para apresentar a tese'
+                        ]
+                        thesis_status = ui.select(
+                            options=status_options,
+                            label='Status da tese',
+                            value='Aguardando o momento certo para apresentar a tese'
+                        ).classes('w-full mb-4').props('outlined')
+                        
+                        def save_thesis():
+                            if not thesis_name.value:
+                                ui.notify('O nome da tese é obrigatório!', type='warning')
+                                return
+                            
+                            thesis_data = {
+                                'name': thesis_name.value,
+                                'description': thesis_description.value or '',
+                                'probability': thesis_probability.value or 'Média',
+                                'observations': thesis_observations.value or '',
+                                'status': thesis_status.value or 'Aguardando o momento certo para apresentar a tese'
+                            }
+                            
+                            if edit_state['is_editing']:
+                                case['theses'][edit_state['edit_index']] = thesis_data
+                                ui.notify('Tese atualizada!')
+                            else:
+                                case['theses'].append(thesis_data)
+                                ui.notify('Tese adicionada!')
+                            
+                            trigger_autosave()
+                            render_theses_list.refresh()
+                            thesis_dialog.close()
+                        
+                        def reset_form():
+                            thesis_name.value = ''
+                            thesis_description.value = ''
+                            thesis_probability.value = 'Média'
+                            thesis_observations.value = ''
+                            thesis_status.value = 'Aguardando o momento certo para apresentar a tese'
+                            edit_state['is_editing'] = False
+                            edit_state['edit_index'] = None
+                        
+                        with ui.row().classes('w-full justify-end gap-2 mt-4'):
+                            ui.button('Cancelar', on_click=thesis_dialog.close).props('flat color=grey')
+                            ui.button('Salvar', on_click=save_thesis).classes('bg-primary text-white')
+                    
+                    def open_add_dialog():
+                        dialog_title.text = 'Adicionar Tese'
+                        reset_form()
+                        thesis_dialog.open()
+                    
+                    def open_edit_dialog(index):
+                        thesis = case['theses'][index]
+                        dialog_title.text = 'Editar Tese'
+                        thesis_name.value = thesis.get('name', '')
+                        thesis_description.value = thesis.get('description', '')
+                        # Compatibilidade: se probability for número, converter para texto
+                        prob_value = thesis.get('probability', 'Média')
+                        if isinstance(prob_value, (int, float)):
+                            # Converter número antigo para texto (mapeamento aproximado)
+                            if prob_value >= 80:
+                                prob_value = 'Muito alta'
+                            elif prob_value >= 60:
+                                prob_value = 'Alta'
+                            elif prob_value >= 40:
+                                prob_value = 'Média'
+                            elif prob_value >= 20:
+                                prob_value = 'Baixa'
+                            else:
+                                prob_value = 'Muito baixa'
+                        thesis_probability.value = prob_value if prob_value in probability_options else 'Média'
+                        thesis_observations.value = thesis.get('observations', '')
+                        thesis_status.value = thesis.get('status', 'Aguardando o momento certo para apresentar a tese')
+                        edit_state['is_editing'] = True
+                        edit_state['edit_index'] = index
+                        thesis_dialog.open()
+                    
+                    def delete_thesis(index):
+                        case['theses'].pop(index)
+                        trigger_autosave()
+                        render_theses_list.refresh()
+                        ui.notify('Tese excluída!')
+                    
+                    @ui.refreshable
+                    def render_theses_list():
+                        with ui.column().classes('w-full gap-3'):
+                            with ui.row().classes('w-full justify-end mb-2'):
+                                ui.button('Adicionar Tese', icon='add', on_click=open_add_dialog).classes('bg-primary text-white')
+                            
+                            if not case.get('theses'):
+                                with ui.card().classes('w-full p-8 text-center bg-gray-50'):
+                                    ui.label('Nenhuma tese cadastrada ainda.').classes('text-gray-500')
+                            else:
+                                for idx, thesis in enumerate(case.get('theses', [])):
+                                    with ui.card().classes('w-full p-4 border-l-4').style(f'border-left-color: {PRIMARY_COLOR}'):
+                                        with ui.row().classes('w-full items-start justify-between mb-2'):
+                                            with ui.column().classes('flex-grow gap-2'):
+                                                ui.label(thesis.get('name', 'Sem nome')).classes('text-lg font-bold text-gray-800')
+                                                
+                                                if thesis.get('description'):
+                                                    ui.label(thesis.get('description')).classes('text-sm text-gray-600')
+                                                
+                                                # Probabilidade
+                                                probability = thesis.get('probability', 'Média')
+                                                # Compatibilidade: se probability for número, converter para texto
+                                                if isinstance(probability, (int, float)):
+                                                    if probability >= 80:
+                                                        probability = 'Muito alta'
+                                                    elif probability >= 60:
+                                                        probability = 'Alta'
+                                                    elif probability >= 40:
+                                                        probability = 'Média'
+                                                    elif probability >= 20:
+                                                        probability = 'Baixa'
+                                                    else:
+                                                        probability = 'Muito baixa'
+                                                
+                                                probability_colors = {
+                                                    'Muito alta': 'bg-green-100 text-green-800 border-green-300',
+                                                    'Alta': 'bg-green-50 text-green-700 border-green-200',
+                                                    'Média': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                                                    'Baixa': 'bg-orange-100 text-orange-800 border-orange-300',
+                                                    'Muito baixa': 'bg-red-100 text-red-800 border-red-300'
+                                                }
+                                                prob_color = probability_colors.get(probability, 'bg-gray-100 text-gray-800 border-gray-300')
+                                                
+                                                with ui.row().classes('w-full items-center gap-2 mt-2'):
+                                                    ui.label('Probabilidade:').classes('text-xs text-gray-500')
+                                                    ui.label(probability).classes(f'text-xs px-2 py-1 rounded-full border font-semibold {prob_color}')
+                                                    
+                                                if thesis.get('observations'):
+                                                    with ui.card().classes('w-full p-2 mt-2 bg-gray-50'):
+                                                        ui.label('Observações:').classes('text-xs font-semibold text-gray-600 mb-1')
+                                                        ui.label(thesis.get('observations')).classes('text-sm text-gray-700')
+                                                
+                                                # Status
+                                                status = thesis.get('status', 'Aguardando o momento certo para apresentar a tese')
+                                                status_colors = {
+                                                    'Apresentada e em discussão perante os órgãos': 'bg-blue-100 text-blue-800 border-blue-300',
+                                                    'Rejeitada': 'bg-red-100 text-red-800 border-red-300',
+                                                    'Aguardando o momento certo para apresentar a tese': 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                                }
+                                                status_color = status_colors.get(status, 'bg-gray-100 text-gray-800 border-gray-300')
+                                                ui.label(status).classes(f'text-xs px-2 py-1 rounded-full border w-fit mt-2 {status_color}')
+                                            
+                                            with ui.row().classes('gap-2'):
+                                                ui.button(
+                                                    icon='edit',
+                                                    on_click=lambda i=idx: open_edit_dialog(i)
+                                                ).props('flat round dense color=primary').tooltip('Editar')
+                                                ui.button(
+                                                    icon='delete',
+                                                    on_click=lambda i=idx: delete_thesis(i)
+                                                ).props('flat round dense color=red').tooltip('Excluir')
+                                    
+                                    if idx < len(case.get('theses', [])) - 1:
+                                        ui.separator().classes('my-2')
+                    
+                    render_theses_list()
+
+                with ui.expansion('Matriz SWOT do caso', icon='grid_view').classes('w-full border rounded bg-gray-50'):
+                    with ui.column().classes('w-full p-4 items-center'):
+                        ui.label('Clique abaixo para abrir a Matriz SWOT detalhada').classes('text-gray-500 mb-2')
+                        ui.button('Abrir Matriz SWOT', icon='open_in_new', on_click=lambda: ui.navigate.to(f'/casos/{case_slug}/matriz-swot')).classes('bg-primary text-white w-full')
+
+                with ui.expansion('Observações', icon='note').classes('w-full border rounded bg-gray-50'):
+                    def on_strategy_observations_change(e):
+                        new_value = e.value if hasattr(e, 'value') else str(e)
+                        case['strategy_observations'] = new_value
+                        trigger_autosave()
+                    
+                    ui.textarea(
+                        value=case.get('strategy_observations', ''),
+                        placeholder='Adicione observações gerais sobre a estratégia do caso...',
+                        on_change=on_strategy_observations_change
+                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+            # Tab 7: Próximas Ações
+            with ui.tab_panel(next_actions_tab).classes('w-full'):
+                with ui.row().classes('w-full items-center justify-between mb-4'):
+                    ui.label('Próximas Ações').classes('text-lg font-bold')
+                    ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+                
+                def on_next_actions_change(e):
+                    new_value = e.value if hasattr(e, 'value') else str(e)
+                    case['next_actions'] = new_value
+                    trigger_autosave()
+                
+                ui.textarea(
+                    value=case.get('next_actions', ''),
+                    placeholder='Descreva as próximas ações a serem realizadas neste caso...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    on_change=on_next_actions_change
+                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+
+            # Tab 8: Slack
+            with ui.tab_panel(slack_tab).classes('w-full'):
+                ui.label('Slack').classes('text-lg font-bold mb-4')
+                with ui.card().classes('w-full p-8 flex flex-col items-center justify-center bg-gray-50'):
+                    ui.label('No futuro, o Slack do escritório será adicionado neste local.').classes('text-gray-500 italic text-center')
+
+            # Tab 9: Links Úteis
+            with ui.tab_panel(links_tab).classes('w-full'):
+                ui.label('Links Úteis').classes('text-lg font-bold mb-4')
+                
+                if not isinstance(case.get('links'), list):
+                    case['links'] = []
+                
+                edit_state = {'is_editing': False, 'edit_index': None}
+                
+                with ui.dialog() as add_link_dialog, ui.card().classes('w-full max-w-md p-6'):
+                    dialog_title = ui.label('Adicionar Link').classes('text-xl font-bold mb-4 text-primary')
+                    
+                    link_title = ui.input('Título do Link').classes('w-full mb-2').props('outlined')
+                    link_url = ui.input('URL do Link').classes('w-full mb-2').props('outlined')
+                    
+                    link_type_options = [
+                        'Google Drive',
+                        'NotebookLM',
+                        'Ayoa',
+                        'Slack',
+                        'Outros'
+                    ]
+                    link_type = ui.select(options=link_type_options, label='Tipo do Link', value='Outros').classes('w-full mb-4')
+                    
+                    def save_link():
+                        if not link_title.value or not link_url.value:
+                            ui.notify('Título e URL são obrigatórios!', type='warning')
+                            return
+                        
+                        link_data = {
+                            'title': link_title.value,
+                            'url': link_url.value,
+                            'type': link_type.value
+                        }
+                        
+                        if edit_state['is_editing']:
+                            case['links'][edit_state['edit_index']] = link_data
+                            ui.notify('Link atualizado!')
+                        else:
+                            case['links'].append(link_data)
+                            ui.notify('Link adicionado!')
+                        
+                        # CRÍTICO: Salvar no Firebase
+                        from ..core import save_case
+                        save_case(case)
+                        
+                        save_data()
+                        render_links_list.refresh()
+                        add_link_dialog.close()
+                        link_title.value = ''
+                        link_url.value = ''
+                        link_type.value = 'Outros'
+                        edit_state['is_editing'] = False
+                        edit_state['edit_index'] = None
+                    
+                    with ui.row().classes('w-full justify-end gap-2'):
+                        ui.button('Cancelar', on_click=add_link_dialog.close).props('flat color=grey')
+                        ui.button('Salvar', on_click=save_link).classes('bg-primary text-white')
+                
+                def open_add_dialog():
+                    dialog_title.text = 'Adicionar Link'
+                    link_title.value = ''
+                    link_url.value = ''
+                    link_type.value = 'Outros'
+                    edit_state['is_editing'] = False
+                    edit_state['edit_index'] = None
+                    add_link_dialog.open()
+                
+                def open_edit_dialog(idx, link):
+                    dialog_title.text = 'Editar Link'
+                    link_title.value = link['title']
+                    link_url.value = link['url']
+                    link_type.value = link.get('type', 'Outros')
+                    edit_state['is_editing'] = True
+                    edit_state['edit_index'] = idx
+                    add_link_dialog.open()
+                
+                with ui.row().classes('w-full justify-end mb-4'):
+                    ui.button('Adicionar Link', icon='add_link', on_click=open_add_dialog).classes('bg-primary text-white')
+                
+                @ui.refreshable
+                def render_links_list():
+                    if not case.get('links'):
+                        with ui.card().classes('w-full p-8 flex justify-center items-center bg-gray-50'):
+                            ui.label('Nenhum link cadastrado.').classes('text-gray-400 italic')
+                        return
+                    
+                    def render_logo(link_type):
+                        if link_type == 'Google Drive':
+                            ui.html('''
+                                <svg width="24" height="24" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                                    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                                    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                                    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                                    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                                    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                                </svg>
+                            ''', sanitize=False).classes('flex-shrink-0')
+                        elif link_type == 'NotebookLM':
+                            ui.html('''
+                                <svg width="24" height="24" viewBox="0 0 106 80" xmlns="http://www.w3.org/2000/svg">
+                                  <g fill="#4285F4">
+                                    <path d="M52.96.1C23.71.1,0,23.61,0,52.62v25.15h9.76v-2.51c0-11.77,9.61-21.31,21.48-21.31s21.48,9.54,21.48,21.31v2.51h9.76v-2.51c0-17.11-13.99-30.98-31.24-30.98-6.72,0-12.94,2.1-18.03,5.69,5.33-10.51,16.31-17.73,28.99-17.73,17.91,0,32.43,14.41,32.43,32.16v13.36h9.76v-13.36c0-23.11-18.89-41.85-42.19-41.85-10.48,0-20.06,3.79-27.44,10.06,7.25-13.59,21.63-22.84,38.21-22.84,23.86,0,43.2,19.18,43.2,42.84v25.15h9.76v-25.15C105.92,23.61,82.21.1,52.96.1Z"/>
+                                  </g>
+                                </svg>
+                            ''', sanitize=False).classes('flex-shrink-0')
+                        elif link_type == 'Ayoa':
+                            ui.html('''
+                                <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="11" fill="#FD4556"/>
+                                    <text x="12" y="16" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="bold">A</text>
+                                </svg>
+                            ''', sanitize=False).classes('flex-shrink-0')
+                        elif link_type == 'Slack':
+                            ui.html('''
+                                <svg width="24" height="24" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+                                    <g fill="none">
+                                        <path d="M19.712.133a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386h5.376V5.52A5.381 5.381 0 0 0 19.712.133m0 14.365H5.376A5.381 5.381 0 0 0 0 19.884a5.381 5.381 0 0 0 5.376 5.387h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386" fill="#36c5f0"/>
+                                        <path d="M53.76 19.884a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386v5.387h5.376a5.381 5.381 0 0 0 5.376-5.387m-14.336 0V5.52A5.381 5.381 0 0 0 34.048.133a5.381 5.381 0 0 0-5.376 5.387v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387" fill="#2eb67d"/>
+                                        <path d="M34.048 54a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386h-5.376v5.386A5.381 5.381 0 0 0 34.048 54m0-14.365h14.336a5.381 5.381 0 0 0 5.376-5.386 5.381 5.381 0 0 0-5.376-5.387H34.048a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386" fill="#ecb22e"/>
+                                        <path d="M0 34.249a5.381 5.381 0 0 0 5.376 5.386 5.381 5.381 0 0 0 5.376-5.386v-5.387H5.376A5.381 5.381 0 0 0 0 34.25m14.336 0v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387V34.25a5.381 5.381 0 0 0-5.376-5.387 5.381 5.381 0 0 0-5.376 5.387" fill="#e01e5a"/>
+                                    </g>
+                                </svg>
+                            ''', sanitize=False).classes('flex-shrink-0')
+                        else:
+                            ui.html(f'''
+                                <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="{PRIMARY_COLOR}" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                                </svg>
+                            ''', sanitize=False).classes('flex-shrink-0')
+                    
+                    with ui.column().classes('w-full gap-2'):
+                        for idx, link in enumerate(case.get('links', [])):
+                            link_type = link.get('type', 'Outros')
+                            
+                            with ui.card().classes('w-full p-3 hover:shadow-md transition-shadow duration-200 border-l-4').style(f'border-left-color: {PRIMARY_COLOR}'):
+                                with ui.row().classes('w-full items-center gap-3 justify-between'):
+                                    with ui.row().classes('items-center gap-3 flex-grow'):
+                                        render_logo(link_type)
+                                        ui.link(link['title'], link['url'], new_tab=True).classes('text-base font-medium text-gray-800 hover:text-primary hover:underline no-underline')
+                                    
+                                    with ui.row().classes('gap-1'):
+                                        ui.button(icon='edit', on_click=lambda i=idx, l=link: open_edit_dialog(i, l)).props('flat round dense').classes('text-gray-600').tooltip('Editar link')
+                                        
+                                        def delete_link(index=idx):
+                                            case['links'].pop(index)
+                                            
+                                            # CRÍTICO: Salvar no Firebase
+                                            from ..core import save_case
+                                            save_case(case)
+                                            
+                                            save_data()
+                                            ui.notify('Link removido!')
+                                            render_links_list.refresh()
+                                        
+                                        ui.button(icon='delete', on_click=delete_link).props('flat round dense').classes('text-red-500').tooltip('Remover link')
+                
+                render_links_list()
+
+
+@ui.page('/casos/{case_slug}/matriz-swot')
+def case_swot(case_slug: str):
+    case = next((c for c in get_cases_list() if c.get('slug') == case_slug), None)
+    if not case:
+        ui.label('Caso não encontrado.').classes('text-xl text-red-500 p-8')
+        return
+
+    # Inicializar listas se não existirem (migração de string para lista)
+    for key in ['swot_s', 'swot_w', 'swot_o', 'swot_t']:
+        if key not in case:
+            case[key] = [''] * 10
+        elif isinstance(case[key], str):
+            # Migrar string antiga para lista com 10 linhas
+            old_value = case[key].strip()
+            if old_value:
+                case[key] = [old_value] + [''] * 9
+            else:
+                case[key] = [''] * 10
+        elif isinstance(case[key], list):
+            # Garantir que sempre há 10 linhas
+            while len(case[key]) < 10:
+                case[key].append('')
+            case[key] = case[key][:10]  # Limitar a 10 linhas
+
+    # Sistema de salvamento automático com debounce
+    import asyncio
+    swot_autosave_state = {'timer': None, 'is_saving': False}
+    
+    async def swot_autosave_with_debounce(delay: float = 2.0):
+        """Salva após um delay, cancelando salvamentos anteriores pendentes."""
+        if swot_autosave_state['timer']:
+            swot_autosave_state['timer'].cancel()
+        
+        async def delayed_save():
+            await asyncio.sleep(delay)
+            swot_autosave_state['is_saving'] = True
+            swot_save_indicator.refresh()
+            
+            await asyncio.sleep(0.3)
+            save_data()
+            
+            swot_autosave_state['is_saving'] = False
+            swot_save_indicator.refresh()
+        
+        swot_autosave_state['timer'] = asyncio.create_task(delayed_save())
+    
+    def swot_trigger_autosave():
+        asyncio.create_task(swot_autosave_with_debounce())
+
+    def create_swot_section(title: str, icon: str, color: str, bg_color: str, border_color: str, field_key: str):
+        """Cria uma seção SWOT com 10 linhas fixas editáveis"""
+        with ui.card().classes(f'w-full h-full p-6 {bg_color} flex flex-col border-l-4 {border_color} overflow-auto'):
+            with ui.row().classes('items-center gap-2 mb-3 flex-shrink-0'):
+                ui.icon(icon, size='md').classes(f'text-{color}-600')
+                ui.label(title).classes(f'text-xl font-bold text-{color}-800')
+            
+            # Garantir que sempre há exatamente 10 linhas
+            lines = case.get(field_key, [])
+            while len(lines) < 10:
+                lines.append('')
+            case[field_key] = lines[:10]  # Limitar a 10 linhas
+            
+            def update_line(idx: int, value: str):
+                """Atualiza uma linha específica"""
+                lines = case.get(field_key, [])
+                # Garantir que sempre há 10 linhas
+                while len(lines) < 10:
+                    lines.append('')
+                if idx < 10:
+                    lines[idx] = value
+                    case[field_key] = lines[:10]  # Limitar a 10 linhas
+                    swot_trigger_autosave()
+            
+            def make_on_change(idx: int):
+                """Factory function para criar callback com índice correto"""
+                return lambda val: update_line(idx, val)
+            
+            with ui.column().classes('w-full gap-2 flex-grow'):
+                for idx in range(10):
+                    line_value = lines[idx] if idx < len(lines) else ''
+                    with ui.row().classes('w-full gap-2 items-start'):
+                        # Textarea com suporte a atalhos de teclado
+                        textarea = ui.textarea(
+                            value=line_value,
+                            placeholder='Digite aqui... (Ctrl+B: negrito, Ctrl+I: itálico)',
+                            on_change=make_on_change(idx)
+                        ).classes('flex-grow bg-white rounded shadow-sm swot-textarea').props('rows=2')
+    
+    # Adicionar CSS e JavaScript para suporte a atalhos de teclado
+    ui.add_head_html('''
+    <style>
+    .swot-textarea {
+        font-family: inherit;
+    }
+    </style>
+    <script>
+    (function() {
+        let observer = null;
+        let isInitialized = false;
+        
+        function setupKeyboardShortcuts(textareaElement) {
+            try {
+                if (!textareaElement || textareaElement.dataset.shortcutsSetup === 'true') {
+                    return;
+                }
+                
+                textareaElement.addEventListener('keydown', function(e) {
+                    try {
+                        // Ctrl+B ou Cmd+B para negrito
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                            e.preventDefault();
+                            const start = this.selectionStart || 0;
+                            const end = this.selectionEnd || 0;
+                            const selected = this.value.substring(start, end);
+                            if (selected) {
+                                this.value = this.value.substring(0, start) + 
+                                            '**' + selected + '**' + 
+                                            this.value.substring(end);
+                                this.selectionStart = start + 2;
+                                this.selectionEnd = end + 2;
+                            } else {
+                                this.value = this.value.substring(0, start) + '****' + this.value.substring(end);
+                                this.selectionStart = start + 2;
+                                this.selectionEnd = start + 2;
+                            }
+                            const inputEvent = new Event('input', { bubbles: true });
+                            this.dispatchEvent(inputEvent);
+                        }
+                        // Ctrl+I ou Cmd+I para itálico
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                            e.preventDefault();
+                            const start = this.selectionStart || 0;
+                            const end = this.selectionEnd || 0;
+                            const selected = this.value.substring(start, end);
+                            if (selected) {
+                                this.value = this.value.substring(0, start) + 
+                                            '*' + selected + '*' + 
+                                            this.value.substring(end);
+                                this.selectionStart = start + 1;
+                                this.selectionEnd = end + 1;
+                            } else {
+                                this.value = this.value.substring(0, start) + '**' + this.value.substring(end);
+                                this.selectionStart = start + 1;
+                                this.selectionEnd = start + 1;
+                            }
+                            const inputEvent = new Event('input', { bubbles: true });
+                            this.dispatchEvent(inputEvent);
+                        }
+                    } catch (err) {
+                        console.error('Erro ao processar atalho:', err);
+                    }
+                });
+                
+                textareaElement.dataset.shortcutsSetup = 'true';
+            } catch (err) {
+                console.error('Erro ao configurar atalhos:', err);
+            }
+        }
+        
+        function initSwotShortcuts() {
+            try {
+                const textareas = document.querySelectorAll('.swot-textarea');
+                textareas.forEach(function(ta) {
+                    setupKeyboardShortcuts(ta);
+                });
+            } catch (err) {
+                console.error('Erro ao inicializar atalhos:', err);
+            }
+        }
+        
+        function startObserver() {
+            if (observer) {
+                return;
+            }
+            try {
+                observer = new MutationObserver(function() {
+                    initSwotShortcuts();
+                });
+                observer.observe(document.body, { 
+                    childList: true, 
+                    subtree: true 
+                });
+            } catch (err) {
+                console.error('Erro ao iniciar observer:', err);
+            }
+        }
+        
+        if (!isInitialized) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    initSwotShortcuts();
+                    startObserver();
+                    isInitialized = true;
+                });
+            } else {
+                initSwotShortcuts();
+                startObserver();
+                isInitialized = true;
+            }
+        }
+    })();
+    </script>
+    ''')
+
+    with layout(f'Matriz SWOT: {case["title"]}', breadcrumbs=[('Casos', '/casos'), (case['title'], f'/casos/{case_slug}'), ('Matriz SWOT', None)]):
+        # Indicador de salvamento automático
+        @ui.refreshable
+        def swot_save_indicator():
+            with ui.row().classes('fixed top-4 right-4 z-50'):
+                if swot_autosave_state['is_saving']:
+                    with ui.card().classes('px-4 py-2 bg-yellow-100 border border-yellow-400 rounded-lg shadow-lg flex items-center gap-2'):
+                        ui.spinner('dots', size='sm').classes('text-yellow-600')
+                        ui.label('Salvando...').classes('text-yellow-700 text-sm font-medium')
+        
+        swot_save_indicator()
+        
+        with ui.row().classes('w-full items-center justify-between mb-2'):
+            ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
+            ui.label('💡 Atalhos: Ctrl+B (negrito), Ctrl+I (itálico)').classes('text-xs text-gray-500 italic')
+        
+        with ui.grid(columns=2).classes('w-full h-[80vh] gap-4'):
+            create_swot_section(
+                'Forças (Strengths)',
+                'check_circle',
+                'green',
+                'bg-green-50',
+                'border-green-500',
+                'swot_s'
+            )
+            
+            create_swot_section(
+                'Fraquezas (Weaknesses)',
+                'warning',
+                'red',
+                'bg-red-50',
+                'border-red-500',
+                'swot_w'
+            )
+            
+            create_swot_section(
+                'Oportunidades (Opportunities)',
+                'trending_up',
+                'blue',
+                'bg-blue-50',
+                'border-blue-500',
+                'swot_o'
+            )
+            
+            create_swot_section(
+                'Ameaças (Threats)',
+                'report_problem',
+                'orange',
+                'bg-orange-50',
+                'border-orange-500',
+                'swot_t'
+            )

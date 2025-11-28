@@ -1,0 +1,11 @@
+#!/bin/bash
+# Script para iniciar o servidor TAQUES ERP
+
+# Obtém o diretório onde este script está localizado
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Vai para o diretório do projeto
+cd "$SCRIPT_DIR"
+
+echo "🚀 Iniciando servidor TAQUES ERP..."
+python3 -m mini_erp.main

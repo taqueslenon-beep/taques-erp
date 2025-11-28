@@ -1,0 +1,5 @@
+nicegui
+reportlab
+firebase-admin
+watchfiles
+

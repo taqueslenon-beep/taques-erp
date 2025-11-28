@@ -1,0 +1,9 @@
+#!/bin/bash
+# Script para abrir o TAQUES ERP no navegador
+
+# Obtém o diretório onde este script está localizado
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Executa o open_browser.py a partir do diretório do projeto
+cd "$SCRIPT_DIR"
+python3 "$SCRIPT_DIR/open_browser.py"

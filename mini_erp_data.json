@@ -1,0 +1,680 @@
+{
+    "cases": [
+        {
+            "title": "1.1 - Contagem / 2008",
+            "name": "Contagem",
+            "year": "2008",
+            "number": 1,
+            "status": "Em andamento",
+            "slug": "1-1-contagem-2008",
+            "observations": "<b>TESTE</b><div>12USKAAKS</div>",
+            "processes": [
+                "ACP - CONTAGEM 2008"
+            ],
+            "links": [
+                {
+                    "title": "Google Drive",
+                    "url": "https://drive.google.com/drive/folders/1wa4UlfTt14eirO9QTEoMQun33kBr5mNS?hl=pt-br",
+                    "type": "Google Drive"
+                },
+                {
+                    "title": "NotebookLM",
+                    "url": "https://drive.google.com/drive/folders/1wa4UlfTt14eirO9QTEoMQun33kBr5mNS?hl=pt-br",
+                    "type": "NotebookLM"
+                },
+                {
+                    "title": "Slack",
+                    "url": "http://localhost:3000/",
+                    "type": "Slack"
+                }
+            ],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "maps": [],
+            "clients": [
+                "Jocel Imóveis Ltda"
+            ],
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 9,
+            "state": "Santa Catarina",
+            "calculations": [
+                {
+                    "type": "Área Total",
+                    "title": "Cálculo Área Total",
+                    "created_at": "2025-11-27T16:25:41.637632",
+                    "area_rows": []
+                }
+            ],
+            "category": "Contencioso",
+            "theses": []
+        },
+        {
+            "title": "1.2 - Rio da Areia do Meio  / 2016",
+            "name": "Rio da Areia do Meio ",
+            "year": "2016",
+            "number": 2,
+            "slug": "1-2-rio-da-areia-do-meio-2016",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Luciane Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [
+                "AÇÃO PENAL - 16,56 + 0,72 HA - LUCIANE + REFLORESTA"
+            ],
+            "links": [
+                {
+                    "title": "NotebookLM",
+                    "url": "239039023",
+                    "type": "NotebookLM"
+                }
+            ],
+            "objectives": "<b>1 - SALVAR CARLOS</b><div><b><br></b></div>",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 1,
+            "category": "Contencioso",
+            "calculations": [],
+            "theses": []
+        },
+        {
+            "title": "1.3 - Rio Negrinho / 2020",
+            "name": "Rio Negrinho",
+            "year": "2020",
+            "number": 3,
+            "slug": "1-3-rio-negrinho-2020",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Jhonny Schmidmeier",
+                "Jocel Imóveis Ltda"
+            ],
+            "processes": [
+                "AÇÃO PENAL - JHONNY - RIO NEGRINHO 2020",
+                "INQUÉRITO POLICIAL - JHONNY E JOCEL - RIO NEGRINHO 2020",
+                "EXECUÇÃO DE ANPP - JOCEL IMÓVEL - RIO NEGRINHO 2020"
+            ],
+            "links": [
+                {
+                    "title": "Canal no Slack",
+                    "url": "2901-=2091-20=",
+                    "type": "Slack"
+                },
+                {
+                    "title": "NotebookLM",
+                    "url": "QSQWSQWQWQW",
+                    "type": "NotebookLM"
+                }
+            ],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 1,
+            "category": "Contencioso",
+            "calculations": [],
+            "theses": [
+                {
+                    "name": "teste",
+                    "description": "teste",
+                    "probability": "Média",
+                    "observations": "",
+                    "status": "Rejeitada"
+                }
+            ]
+        },
+        {
+            "title": "1.4 - Campo do Tenente  / 2020",
+            "name": "Campo do Tenente ",
+            "year": "2020",
+            "number": 4,
+            "slug": "1-4-campo-do-tenente-2020",
+            "status": "Em andamento",
+            "state": "Paraná",
+            "clients": [
+                "Jhonny Schmidmeier"
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 2,
+            "category": "Contencioso",
+            "calculations": []
+        },
+        {
+            "title": "1.5 - Bituva  / 2020",
+            "name": "Bituva ",
+            "year": "2020",
+            "number": 5,
+            "slug": "1-5-bituva-2020",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Luciane Schmidmeier",
+                "Jhonny Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 8
+        },
+        {
+            "title": "1.6 - Paraguaçu/Moema / 2021",
+            "name": "Paraguaçu/Moema",
+            "year": "2021",
+            "number": 6,
+            "slug": "1-6-paraguacumoema-2021",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Jhonny Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 5
+        },
+        {
+            "title": "1.7 - Werka  / 2022",
+            "name": "Werka ",
+            "year": "2022",
+            "month": 4,
+            "number": 7,
+            "slug": "1-7-werka-2022",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Carlos Schmidmeier ",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": ""
+        },
+        {
+            "title": "1.8 - Lapa / 2022",
+            "name": "Lapa",
+            "year": "2022",
+            "number": 8,
+            "slug": "1-8-lapa-2022",
+            "status": "Em andamento",
+            "state": "Paraná",
+            "clients": [
+                "Refloresta Empreendimentos Ltda EPP ",
+                "Carlos Schmidmeier "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 6
+        },
+        {
+            "title": "1.9 - Distrito  / 2022",
+            "name": "Distrito ",
+            "year": "2022",
+            "number": 9,
+            "slug": "1-9-distrito-2022",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Luciane Schmidmeier",
+                "Carlos Schmidmeier ",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 9
+        },
+        {
+            "title": "1.10 - Grein II  / 2022",
+            "name": "Grein II ",
+            "year": "2022",
+            "number": 10,
+            "slug": "1-10-grein-ii-2022",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Carlos Schmidmeier ",
+                "Luciane Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 9
+        },
+        {
+            "title": "1.11 - Leonel II / 2022",
+            "name": "Leonel II",
+            "year": "2022",
+            "number": 11,
+            "slug": "1-11-leonel-ii-2022",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Carlos Schmidmeier ",
+                "Luciane Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 9
+        },
+        {
+            "title": "1.12 - Rio Negrinho / 2023",
+            "name": "Rio Negrinho",
+            "year": "2023",
+            "month": 6,
+            "number": 12,
+            "slug": "1-12-rio-negrinho-2023",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Luciane Schmidmeier"
+            ],
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": ""
+        },
+        {
+            "title": "1.13 - Roseira  / 2023",
+            "name": "Roseira ",
+            "year": "2023",
+            "number": 13,
+            "slug": "1-13-roseira-2023",
+            "status": "Em andamento",
+            "state": "Paraná",
+            "clients": [
+                "Jhonny Schmidmeier"
+            ],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 11
+        },
+        {
+            "title": "1.14 - Lapa / 2024",
+            "name": "Lapa",
+            "year": "2024",
+            "number": 14,
+            "slug": "1-14-lapa-2024",
+            "status": "Em andamento",
+            "state": "Paraná",
+            "clients": [],
+            "processes": [],
+            "links": [],
+            "objectives": "",
+            "swot_s": "",
+            "swot_w": "",
+            "swot_o": "",
+            "swot_t": "",
+            "observations": "",
+            "maps": [],
+            "map_notes": "",
+            "case_type": "Antigo",
+            "is_new_case": false,
+            "month": 4,
+            "category": "Contencioso",
+            "theses": [],
+            "calculations": []
+        },
+        {
+            "title": "2.1 - VIZINHO do Ademir Schadeck - Compra de imóvel para compensação ambiental (CAD) / 2025",
+            "name": "VIZINHO do Ademir Schadeck - Compra de imóvel para compensação ambiental (CAD)",
+            "year": "2025",
+            "month": 9,
+            "number": 1,
+            "slug": "2-1-vizinho-do-ademir-schadeck-compra-de-imovel-para-compensacao-ambiental-cad-2025",
+            "status": "Em andamento",
+            "state": "Santa Catarina",
+            "clients": [
+                "Carlos Schmidmeier ",
+                "Luciane Schmidmeier",
+                "Jhonny Schmidmeier"
+            ],
+            "case_type": "Novo",
+            "is_new_case": true,
+            "processes": [],
+            "links": [
+                {
+                    "title": "drive",
+                    "url": "http://localhost:8081/",
+                    "type": "Google Drive"
+                }
+            ],
+            "objectives": "<br>",
+            "swot_s": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "swot_w": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "swot_o": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "swot_t": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "maps": [],
+            "map_notes": "",
+            "category": "Contencioso",
+            "calculations": [],
+            "theses": [],
+            "strategy_observations": "",
+            "next_actions": ""
+        }
+    ],
+    "processes": [
+        {
+            "title": "ACP - CONTAGEM 2008",
+            "number": "",
+            "system": null,
+            "link": "",
+            "nucleo": "Ambiental",
+            "area": null,
+            "status": "Em andamento",
+            "result": null,
+            "process_type": "Existente",
+            "clients": [
+                "Jocel Imóveis Ltda"
+            ],
+            "opposing_parties": [],
+            "other_parties": [],
+            "cases": [
+                "1.1 - Contagem / 2008"
+            ],
+            "strategy_objectives": "",
+            "legal_thesis": "",
+            "strategy_observations": "",
+            "scenarios": [],
+            "protocols": [],
+            "access_lawyer": false,
+            "access_technicians": false,
+            "access_client": false,
+            "access_lawyer_comment": "",
+            "access_technicians_comment": "",
+            "access_client_comment": ""
+        },
+        {
+            "title": "AÇÃO PENAL - 16,56 + 0,72 HA - LUCIANE + REFLORESTA",
+            "number": "",
+            "system": "",
+            "link": "",
+            "nucleo": "",
+            "area": "",
+            "status": "Em andamento",
+            "result": null,
+            "process_type": "Existente",
+            "clients": [
+                "Luciane Schmidmeier",
+                "Refloresta Empreendimentos Ltda EPP "
+            ],
+            "opposing_parties": [],
+            "others": [],
+            "cases": [
+                "1.2 - Rio da Areia do Meio  / 2016"
+            ],
+            "strategy_objectives": "",
+            "legal_thesis": "",
+            "strategy_observations": "",
+            "scenarios": [],
+            "protocols": [],
+            "slack_channel": "",
+            "access_lawyer": false,
+            "access_technicians": false,
+            "access_client": false,
+            "access_lawyer_comment": "",
+            "access_technicians_comment": "",
+            "access_client_comment": ""
+        },
+        {
+            "title": "AÇÃO PENAL - JHONNY - RIO NEGRINHO 2020",
+            "number": "",
+            "system": "",
+            "link": "",
+            "nucleo": "",
+            "area": "",
+            "status": "Em andamento",
+            "result": null,
+            "process_type": "Existente",
+            "clients": [
+                "Jhonny Schmidmeier",
+                "Jocel Imóveis Ltda"
+            ],
+            "opposing_parties": [],
+            "others": [],
+            "cases": [
+                "1.3 - Rio Negrinho / 2020"
+            ],
+            "strategy_objectives": "",
+            "legal_thesis": "",
+            "strategy_observations": "",
+            "scenarios": [],
+            "protocols": [],
+            "slack_channel": "",
+            "access_lawyer": false,
+            "access_technicians": false,
+            "access_client": false,
+            "access_lawyer_comment": "",
+            "access_technicians_comment": "",
+            "access_client_comment": ""
+        },
+        {
+            "title": "INQUÉRITO POLICIAL - JHONNY E JOCEL - RIO NEGRINHO 2020",
+            "number": "",
+            "system": "",
+            "link": "",
+            "nucleo": "",
+            "area": "",
+            "status": "Em andamento",
+            "result": null,
+            "process_type": "Existente",
+            "clients": [
+                "Jhonny Schmidmeier",
+                "Jocel Imóveis Ltda"
+            ],
+            "opposing_parties": [],
+            "others": [],
+            "cases": [
+                "1.3 - Rio Negrinho / 2020"
+            ],
+            "strategy_objectives": "",
+            "legal_thesis": "",
+            "strategy_observations": "",
+            "scenarios": [],
+            "protocols": [],
+            "slack_channel": "",
+            "access_lawyer": false,
+            "access_technicians": false,
+            "access_client": false,
+            "access_lawyer_comment": "",
+            "access_technicians_comment": "",
+            "access_client_comment": ""
+        },
+        {
+            "title": "EXECUÇÃO DE ANPP - JOCEL IMÓVEL - RIO NEGRINHO 2020",
+            "number": "",
+            "system": "",
+            "link": "",
+            "nucleo": "",
+            "area": "",
+            "status": "Em andamento",
+            "result": null,
+            "process_type": "Existente",
+            "clients": [
+                "Jocel Imóveis Ltda"
+            ],
+            "opposing_parties": [],
+            "others": [],
+            "cases": [
+                "1.3 - Rio Negrinho / 2020"
+            ],
+            "strategy_objectives": "",
+            "legal_thesis": "",
+            "strategy_observations": "",
+            "scenarios": [],
+            "protocols": [],
+            "slack_channel": "",
+            "access_lawyer": false,
+            "access_technicians": false,
+            "access_client": false,
+            "access_lawyer_comment": "",
+            "access_technicians_comment": "",
+            "access_client_comment": ""
+        }
+    ],
+    "clients": [],
+    "opposing_parties": [],
+    "users": [],
+    "benefits": [],
+    "agreements": [],
+    "convictions": []
+}
