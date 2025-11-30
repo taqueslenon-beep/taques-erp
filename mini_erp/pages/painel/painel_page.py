@@ -88,6 +88,18 @@ def painel():
                     def content_area():
                         current_tab = active_tab['value']
                         
+                        # Callback para refresh quando resultado muda
+                        def on_result_change():
+                            # Recarrega dados e atualiza a view
+                            nonlocal ds
+                            ds = create_data_service(
+                                get_cases_list,
+                                get_processes_list,
+                                get_clients_list,
+                                get_opposing_parties_list,
+                            )
+                            content_area.refresh()
+                        
                         # Mapeia cada aba para sua função de renderização
                         tab_renderers = {
                             'totais': lambda: render_tab_totais(ds, PRIMARY_COLOR),
@@ -95,7 +107,7 @@ def painel():
                             'categoria': lambda: render_tab_categoria(ds),
                             'temporal': lambda: render_tab_temporal(ds),
                             'status': lambda: render_tab_status(ds),
-                            'resultado': lambda: render_tab_resultado(),
+                            'resultado': lambda: render_tab_resultado(ds, on_result_change),
                             'cliente': lambda: render_tab_cliente(ds, PRIMARY_COLOR),
                             'parte': lambda: render_tab_parte(ds),
                             'area': lambda: render_tab_area(ds),

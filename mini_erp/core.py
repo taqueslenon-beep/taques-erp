@@ -137,7 +137,12 @@ def normalize_entity_type_value(value: Optional[str]) -> str:
 
 
 def _get_collection(collection_name: str) -> List[Dict[str, Any]]:
-    """Obtém dados de uma coleção do Firestore com cache thread-safe."""
+    """
+    Obtém dados de uma coleção do Firestore com cache thread-safe.
+    
+    Para a coleção 'processes', filtra automaticamente processos deletados
+    (isDeleted=True) para não exibi-los no frontend.
+    """
     import time
     
     now = time.time()
@@ -162,6 +167,14 @@ def _get_collection(collection_name: str) -> List[Dict[str, Any]]:
             for doc in docs:
                 item = doc.to_dict()
                 item['_id'] = doc.id  # Guarda o ID do documento
+                
+                # Filtra processos deletados (soft delete)
+                # Apenas para coleção 'processes'
+                if collection_name == 'processes':
+                    # Ignora processos marcados como deletados
+                    if item.get('isDeleted') is True:
+                        continue
+                
                 items.append(item)
             
             # Atualiza cache
@@ -233,6 +246,135 @@ def get_processes_list() -> List[Dict[str, Any]]:
     return _get_collection('processes')
 
 
+def get_child_processes(parent_id: str) -> List[Dict[str, Any]]:
+    """
+    Busca todos os processos filhos diretos de um processo pai.
+    
+    Args:
+        parent_id: ID do processo pai
+        
+    Returns:
+        Lista de processos que têm este parent_id
+    """
+    if not parent_id:
+        return []
+    try:
+        db = get_db()
+        query = db.collection('processes').where('parent_id', '==', parent_id)
+        docs = query.stream()
+        children = []
+        for doc in docs:
+            process = doc.to_dict()
+            process['_id'] = doc.id
+            
+            # Filtra processos deletados (soft delete)
+            if process.get('isDeleted') is True:
+                continue
+            
+            children.append(process)
+        return children
+    except Exception as e:
+        print(f"[ERROR] Erro ao buscar filhos do processo {parent_id}: {e}")
+        return []
+
+
+def get_root_processes() -> List[Dict[str, Any]]:
+    """
+    Busca todos os processos raiz (sem pai).
+    
+    Returns:
+        Lista de processos onde parent_id é None ou não existe
+    """
+    try:
+        all_processes = get_processes_list()
+        # Filtra apenas processos sem pai
+        roots = [p for p in all_processes if not p.get('parent_id')]
+        return roots
+    except Exception as e:
+        print(f"[ERROR] Erro ao buscar processos raiz: {e}")
+        return []
+
+
+def build_process_tree(processes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Organiza uma lista de processos em estrutura hierárquica para exibição.
+    Retorna lista ordenada com processos pai seguidos de seus filhos (indentados).
+    
+    Args:
+        processes: Lista de todos os processos
+        
+    Returns:
+        Lista ordenada: pai1, filho1.1, neto1.1.1, filho1.2, pai2, filho2.1...
+        Cada processo recebe '_display_depth' indicando nível de indentação.
+    """
+    if not processes:
+        return []
+    
+    # Criar índice por ID para busca rápida
+    by_id = {p.get('_id'): p for p in processes if p.get('_id')}
+    
+    # Mapear filhos por parent_id
+    children_map = {}  # parent_id -> [children]
+    roots = []
+    orphans = []  # Filhos cujo pai não está na lista (foi filtrado)
+    
+    for p in processes:
+        parent_id = p.get('parent_id')
+        if not parent_id:
+            # Processo raiz
+            p['_display_depth'] = 0
+            roots.append(p)
+        elif parent_id in by_id:
+            # Filho com pai presente na lista
+            if parent_id not in children_map:
+                children_map[parent_id] = []
+            children_map[parent_id].append(p)
+        else:
+            # Órfão: pai foi filtrado, mostrar como raiz
+            p['_display_depth'] = 0
+            p['_is_orphan'] = True  # Marcar para possível indicação visual
+            orphans.append(p)
+    
+    # Função para ordenar por data (mais recentes primeiro)
+    def sort_key(x):
+        # Tenta usar data_abertura, senão usa título
+        date = x.get('data_abertura') or ''
+        title = x.get('title') or ''
+        # Inverter para ordem decrescente
+        return (date, title)
+    
+    # Ordenar raízes por data (mais recentes primeiro)
+    roots.sort(key=sort_key, reverse=True)
+    orphans.sort(key=sort_key, reverse=True)
+    
+    # Função recursiva para adicionar filhos
+    def add_with_children(process: Dict, depth: int, result: List[Dict]):
+        process['_display_depth'] = depth
+        result.append(process)
+        
+        # Buscar e ordenar filhos
+        proc_id = process.get('_id')
+        children = children_map.get(proc_id, [])
+        children.sort(key=sort_key, reverse=True)
+        
+        # Adicionar cada filho recursivamente
+        for child in children:
+            add_with_children(child, depth + 1, result)
+    
+    # Construir lista final
+    result = []
+    
+    # Primeiro: raízes com seus filhos
+    for root in roots:
+        add_with_children(root, 0, result)
+    
+    # Depois: órfãos (filhos cujo pai não está na lista)
+    for orphan in orphans:
+        add_with_children(orphan, 0, result)
+    
+    return result
+
+
 def get_clients_list() -> List[Dict[str, Any]]:
     """
     Obtém lista de clientes do Firestore.
@@ -287,20 +429,158 @@ def get_all_people_for_opposing_parties() -> List[Dict[str, Any]]:
     return people
 
 
+# Cache para nomes de exibição (thread-safe)
+_display_name_cache = {}
+_display_name_cache_timestamp = {}
+DISPLAY_NAME_CACHE_DURATION = 300  # 5 minutos
+
+def get_display_name_by_id(person_id: str, person_type: str = None) -> str:
+    """
+    Função centralizada para obter nome de exibição por ID da pessoa.
+    
+    Esta é a função principal que deve ser usada em todos os módulos.
+    Implementa cache thread-safe para otimizar performance.
+    
+    Args:
+        person_id: ID da pessoa (campo _id no Firestore)
+        person_type: Tipo da pessoa ('client', 'opposing_party') - opcional para otimização
+    
+    Returns:
+        Nome de exibição da pessoa ou "Sem identificação" se não encontrada
+    
+    Prioridade de exibição:
+        1. nickname (se existir e não vazio)
+        2. display_name (se existir e não vazio) 
+        3. full_name (fallback)
+        4. name (compatibilidade com dados antigos)
+        5. "Sem identificação" (se pessoa não encontrada)
+    """
+    import time
+    
+    if not person_id:
+        return "Sem identificação"
+    
+    # Verifica cache
+    cache_key = f"{person_id}_{person_type or 'any'}"
+    now = time.time()
+    
+    if cache_key in _display_name_cache and cache_key in _display_name_cache_timestamp:
+        if now - _display_name_cache_timestamp[cache_key] < DISPLAY_NAME_CACHE_DURATION:
+            return _display_name_cache[cache_key]
+    
+    # Busca pessoa no Firestore
+    with _cache_lock:
+        # Verifica cache novamente dentro do lock
+        if cache_key in _display_name_cache and cache_key in _display_name_cache_timestamp:
+            if now - _display_name_cache_timestamp[cache_key] < DISPLAY_NAME_CACHE_DURATION:
+                return _display_name_cache[cache_key]
+        
+        try:
+            person = None
+            
+            # Otimização: se tipo especificado, busca apenas na coleção específica
+            if person_type == 'client':
+                clients = get_clients_list()
+                person = next((c for c in clients if c.get('_id') == person_id), None)
+            elif person_type == 'opposing_party':
+                opposing = get_opposing_parties_list()
+                person = next((o for o in opposing if o.get('_id') == person_id), None)
+            else:
+                # Busca em ambas as coleções
+                clients = get_clients_list()
+                person = next((c for c in clients if c.get('_id') == person_id), None)
+                
+                if not person:
+                    opposing = get_opposing_parties_list()
+                    person = next((o for o in opposing if o.get('_id') == person_id), None)
+            
+            if person:
+                display_name = get_display_name(person)
+                # Atualiza cache
+                _display_name_cache[cache_key] = display_name
+                _display_name_cache_timestamp[cache_key] = time.time()
+                return display_name
+            else:
+                # Pessoa não encontrada - cache resultado negativo por menos tempo
+                not_found = "Sem identificação"
+                _display_name_cache[cache_key] = not_found
+                _display_name_cache_timestamp[cache_key] = time.time() - DISPLAY_NAME_CACHE_DURATION + 60  # Cache por apenas 1 minuto
+                return not_found
+                
+        except Exception as e:
+            print(f"Erro ao buscar nome de exibição para {person_id}: {e}")
+            return "Sem identificação"
+
+
 def get_display_name(item: Dict[str, Any]) -> str:
     """
-    Retorna o nome para exibição seguindo a prioridade:
-    1. nickname (se existir)
-    2. display_name (se existir)
-    3. full_name (fallback, ou 'name' para compatibilidade)
+    Retorna o nome para exibição de um item (dicionário de pessoa).
     
-    Usado para exibição em UI, dropdowns, etc.
+    Esta função trabalha com o objeto pessoa já carregado.
+    Para buscar por ID, use get_display_name_by_id().
+    
+    Prioridade de exibição:
+        1. nickname (se existir e não vazio)
+        2. nome_exibicao (campo padronizado, se existir e não vazio)
+        3. display_name (compatibilidade, se existir e não vazio)
+        4. full_name (fallback)
+        5. name (compatibilidade com dados antigos)
+        6. string vazia (se nenhum campo disponível)
+    
+    Args:
+        item: Dicionário com dados da pessoa
+    
+    Returns:
+        Nome de exibição da pessoa
     """
-    if item.get('nickname'):
-        return item['nickname']
-    if item.get('display_name'):
-        return item['display_name']
-    return item.get('full_name') or item.get('name', '')
+    if not item:
+        return ""
+    
+    # Prioridade 1: nickname
+    nickname = item.get('nickname', '').strip()
+    if nickname:
+        return nickname
+    
+    # Prioridade 2: nome_exibicao (campo padronizado)
+    nome_exibicao = item.get('nome_exibicao', '').strip()
+    if nome_exibicao:
+        return nome_exibicao
+    
+    # Prioridade 3: display_name (compatibilidade)
+    display_name = item.get('display_name', '').strip()
+    if display_name:
+        return display_name
+    
+    # Prioridade 4: full_name
+    full_name = item.get('full_name', '').strip()
+    if full_name:
+        return full_name
+    
+    # Prioridade 5: name (compatibilidade)
+    name = item.get('name', '').strip()
+    if name:
+        return name
+    
+    return ""
+
+
+def invalidate_display_name_cache(person_id: str = None):
+    """
+    Invalida o cache de nomes de exibição.
+    
+    Args:
+        person_id: ID específico para invalidar. Se None, limpa todo o cache.
+    """
+    if person_id:
+        # Remove entradas específicas da pessoa
+        keys_to_remove = [k for k in _display_name_cache.keys() if k.startswith(f"{person_id}_")]
+        for key in keys_to_remove:
+            _display_name_cache.pop(key, None)
+            _display_name_cache_timestamp.pop(key, None)
+    else:
+        # Limpa todo o cache
+        _display_name_cache.clear()
+        _display_name_cache_timestamp.clear()
 
 
 def get_full_name(item: Dict[str, Any]) -> str:
@@ -452,6 +732,11 @@ def get_convictions_list() -> List[Dict[str, Any]]:
     return _get_collection('convictions')
 
 
+def get_protocols_list() -> List[Dict[str, Any]]:
+    """Obtém lista de protocolos independentes do Firestore."""
+    return _get_collection('protocols')
+
+
 def validate_case_process_integrity() -> Dict[str, Any]:
     """
     Valida integridade das referências entre casos e processos.
@@ -553,6 +838,11 @@ def get_processes_paged(
     db = get_db()
     query = db.collection('processes')
 
+    # Filtra processos deletados (soft delete)
+    # Firestore não suporta != diretamente, então filtramos depois
+    # Mas podemos usar where('isDeleted', '==', False) ou None
+    # Para evitar problemas, vamos filtrar depois da query
+    
     # Aplica filtros
     if search_term:
         # Este é um filtro simples de "começa com".
@@ -596,6 +886,10 @@ def get_processes_paged(
         for doc in docs:
             process = doc.to_dict()
             process['_id'] = doc.id
+            
+            # Filtra processos deletados (soft delete)
+            if process.get('isDeleted') is True:
+                continue
             
             # Adiciona cor da área
             area = process.get('area_direito') or process.get('area', '')
@@ -1154,6 +1448,52 @@ def save_process(process: Dict[str, Any], doc_id: str = None, sync: bool = False
         if 'state' not in process:
             process['state'] = None
     
+    # Hierarquia de processos - Suporte para múltiplos processos pai
+    # Migração: parent_id (antigo) → parent_ids (novo)
+    parent_ids = process.get('parent_ids', [])
+    
+    # Compatibilidade: se tem parent_id antigo mas não tem parent_ids, migra
+    old_parent_id = process.get('parent_id')
+    if old_parent_id and not parent_ids:
+        parent_ids = [old_parent_id]
+        process['parent_ids'] = parent_ids
+    
+    # Garantir que parent_ids é uma lista
+    if not isinstance(parent_ids, list):
+        parent_ids = [parent_ids] if parent_ids else []
+        process['parent_ids'] = parent_ids
+    
+    # Remover valores None ou vazios
+    parent_ids = [pid for pid in parent_ids if pid]
+    process['parent_ids'] = parent_ids
+    
+    # Calcular depth baseado no maior depth dos processos pai
+    if not parent_ids:
+        # Processo raiz
+        process['depth'] = 0
+        # Mantém compatibilidade com campo antigo
+        process['parent_id'] = None
+    else:
+        # Processo com pais - calcula depth baseado no maior depth dos pais
+        max_parent_depth = -1
+        for parent_id in parent_ids:
+            try:
+                parent_doc = db.collection('processes').document(parent_id).get()
+                if parent_doc.exists:
+                    parent_data = parent_doc.to_dict()
+                    parent_depth = parent_data.get('depth', 0) or 0
+                    max_parent_depth = max(max_parent_depth, parent_depth)
+                else:
+                    print(f"[WARN] Processo pai {parent_id} não encontrado")
+            except Exception as e:
+                print(f"[WARN] Erro ao buscar processo pai {parent_id}: {e}")
+        
+        # Depth = maior depth dos pais + 1
+        process['depth'] = max_parent_depth + 1 if max_parent_depth >= 0 else 1
+        
+        # Compatibilidade: mantém parent_id com o primeiro pai (para funções legadas)
+        process['parent_id'] = parent_ids[0] if parent_ids else None
+    
     # Salva processo
     _save_to_collection('processes', process, doc_id)
     
@@ -1221,6 +1561,20 @@ def save_client(
     
     client = normalize_client_documents(client)
     
+    # Garante que nome_exibicao seja preenchido (obrigatório)
+    if not client.get('nome_exibicao', '').strip():
+        # Se nome_exibicao vazio, usa display_name ou full_name como fallback
+        client['nome_exibicao'] = (
+            client.get('display_name', '').strip() or 
+            client.get('full_name', '').strip() or 
+            client.get('name', '').strip() or 
+            'Sem nome'
+        )
+    
+    # Mantém display_name sincronizado para compatibilidade
+    if not client.get('display_name', '').strip():
+        client['display_name'] = client['nome_exibicao']
+    
     # Mantém campos antigos para compatibilidade (podem ser removidos futuramente)
     if 'full_name' in client:
         client['name'] = client['full_name']
@@ -1235,12 +1589,18 @@ def save_client(
     # Usa _id se existir, senão gera do nome
     doc_id = client.get('_id') or client.get('full_name', client.get('name', '')).replace('/', '-').replace(' ', '-').lower()[:100]
     _save_to_collection('clients', client, doc_id)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
 
 
 def delete_client(client: Dict[str, Any]):
     """Remove um cliente do Firestore."""
     doc_id = client.get('_id') or client.get('name', '').replace('/', '-').replace(' ', '-').lower()[:100]
     _delete_from_collection('clients', doc_id)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
 
 
 def save_opposing_party(opposing: Dict[str, Any] = None, *, full_name: str = None, cpf_cnpj: str = None,
@@ -1295,6 +1655,20 @@ def save_opposing_party(opposing: Dict[str, Any] = None, *, full_name: str = Non
     
     opposing['entity_type'] = normalize_entity_type_value(opposing.get('entity_type'))
     
+    # Garante que nome_exibicao seja preenchido (obrigatório)
+    if not opposing.get('nome_exibicao', '').strip():
+        # Se nome_exibicao vazio, usa display_name ou full_name como fallback
+        opposing['nome_exibicao'] = (
+            opposing.get('display_name', '').strip() or 
+            opposing.get('full_name', '').strip() or 
+            opposing.get('name', '').strip() or 
+            'Sem nome'
+        )
+    
+    # Mantém display_name sincronizado para compatibilidade
+    if not opposing.get('display_name', '').strip():
+        opposing['display_name'] = opposing['nome_exibicao']
+    
     # Timestamps usando SERVER_TIMESTAMP do Firestore
     if 'created_at' not in opposing or opposing.get('created_at') is None:
         opposing['created_at'] = SERVER_TIMESTAMP
@@ -1303,12 +1677,144 @@ def save_opposing_party(opposing: Dict[str, Any] = None, *, full_name: str = Non
     # Usa _id se existir, senão gera do nome
     doc_id = opposing.get('_id') or opposing.get('full_name', opposing.get('name', '')).replace('/', '-').replace(' ', '-').lower()[:100]
     _save_to_collection('opposing_parties', opposing, doc_id)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
 
 
 def delete_opposing_party(opposing: Dict[str, Any]):
     """Remove um outro envolvido do Firestore."""
     doc_id = opposing.get('_id') or opposing.get('name', '').replace('/', '-').replace(' ', '-').lower()[:100]
     _delete_from_collection('opposing_parties', doc_id)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
+
+
+# =============================================================================
+# FUNÇÕES DE PROTOCOLOS INDEPENDENTES
+# =============================================================================
+
+def save_protocol(protocol: Dict[str, Any], doc_id: str = None):
+    """
+    Salva um protocolo independente no Firestore.
+    
+    Protocolos podem ser vinculados a múltiplos casos e processos.
+    
+    Schema:
+    - title: string (título/descrição do protocolo)
+    - date: string (data do protocolo)
+    - number: string (número do protocolo)
+    - system: string (sistema onde foi protocolado)
+    - link: string (link/URL externo do protocolo)
+    - observations: string (observações)
+    - case_ids: array de slugs de casos vinculados
+    - process_ids: array de _ids de processos vinculados
+    - created_at: timestamp
+    - updated_at: timestamp
+    
+    Args:
+        protocol: Dicionário com dados do protocolo
+        doc_id: ID do documento (opcional, será gerado se não fornecido)
+    """
+    from google.cloud.firestore import SERVER_TIMESTAMP
+    
+    # Garante arrays vazios se não existirem
+    if 'case_ids' not in protocol:
+        protocol['case_ids'] = []
+    if 'process_ids' not in protocol:
+        protocol['process_ids'] = []
+    
+    # Timestamps
+    if 'created_at' not in protocol or protocol.get('created_at') is None:
+        protocol['created_at'] = SERVER_TIMESTAMP
+    protocol['updated_at'] = SERVER_TIMESTAMP
+    
+    # Gera doc_id se não fornecido
+    if not doc_id:
+        doc_id = protocol.get('_id')
+    if not doc_id:
+        # Gera ID único baseado em timestamp e título
+        import time
+        timestamp = int(time.time() * 1000)
+        title_slug = (protocol.get('title', '') or 'protocolo').replace('/', '-').replace(' ', '-').lower()[:50]
+        doc_id = f"{title_slug}-{timestamp}"
+    
+    _save_to_collection('protocols', protocol, doc_id)
+    
+    # Invalida cache
+    invalidate_cache('protocols')
+
+
+def delete_protocol(doc_id: str):
+    """
+    Remove um protocolo do Firestore.
+    
+    Args:
+        doc_id: ID do documento do protocolo
+    """
+    _delete_from_collection('protocols', doc_id)
+    invalidate_cache('protocols')
+
+
+def get_protocols_by_process(process_id: str) -> List[Dict[str, Any]]:
+    """
+    Busca todos os protocolos vinculados a um processo específico.
+    
+    Args:
+        process_id: _id do processo no Firestore
+    
+    Returns:
+        Lista de protocolos vinculados ao processo
+    """
+    if not process_id:
+        return []
+    
+    try:
+        db = get_db()
+        query = db.collection('protocols').where('process_ids', 'array_contains', process_id)
+        docs = query.stream()
+        
+        protocols = []
+        for doc in docs:
+            protocol = doc.to_dict()
+            protocol['_id'] = doc.id
+            protocols.append(protocol)
+        
+        return protocols
+    except Exception as e:
+        print(f"Erro ao buscar protocolos do processo {process_id}: {e}")
+        return []
+
+
+def get_protocols_by_case(case_slug: str) -> List[Dict[str, Any]]:
+    """
+    Busca todos os protocolos vinculados a um caso específico.
+    
+    Args:
+        case_slug: Slug do caso
+    
+    Returns:
+        Lista de protocolos vinculados ao caso
+    """
+    if not case_slug:
+        return []
+    
+    try:
+        db = get_db()
+        query = db.collection('protocols').where('case_ids', 'array_contains', case_slug)
+        docs = query.stream()
+        
+        protocols = []
+        for doc in docs:
+            protocol = doc.to_dict()
+            protocol['_id'] = doc.id
+            protocols.append(protocol)
+        
+        return protocols
+    except Exception as e:
+        print(f"Erro ao buscar protocolos do caso {case_slug}: {e}")
+        return []
 
 
 def save_user(user: Dict[str, Any]):
@@ -1605,10 +2111,10 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             menu_item('Casos', 'folder', '/casos')
             menu_item('Processos', 'gavel', '/processos')
+            menu_item('Acordos', 'handshake', '/acordos')
             
             # menu_item('Prazos', 'schedule', '/prazos')  # Em desenvolvimento
             # menu_item('Compromissos', 'event', '/compromissos')  # Em desenvolvimento
-            # menu_item('Acordos', 'handshake', '/acordos')  # Em desenvolvimento
             
             menu_item('Pessoas', 'groups', '/pessoas')
             

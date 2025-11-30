@@ -196,7 +196,9 @@ def render_cases_list():
                         # Título do caso
                         ui.label(case['title']).classes('text-lg font-bold text-gray-800 leading-tight case-title')
 
-                        # Clientes com tratamento especial para nomes longos
+                        # Clientes usando regra centralizada de nome de exibição
+                        from ...core import get_display_name, get_display_name_by_id
+                        
                         clients_list = get_clients_list()
                         all_client_names = [c.get('name') or c.get('full_name', '') for c in clients_list if c.get('name') or c.get('full_name', '')]
                         
@@ -207,13 +209,44 @@ def render_cases_list():
                                 clients_text = f'✓ Todos os Clientes ({len(case["clients"])})'
                                 full_names = clients_text
                             else:
-                                # Usa get_short_name_helper para obter display_name de cada cliente
-                                display_names = [get_short_name_helper(client_name, clients_list) for client_name in case['clients']]
+                                # Usa função centralizada para obter nome de exibição
+                                display_names = []
+                                full_names_list = []
+                                
+                                for client_name in case['clients']:
+                                    # Busca cliente na lista para obter ID e usar função centralizada
+                                    client_found = False
+                                    for client in clients_list:
+                                        client_full_name = client.get('name') or client.get('full_name', '')
+                                        if client_full_name == client_name:
+                                            # Usa função centralizada
+                                            display_name = get_display_name(client)
+                                            display_names.append(display_name)
+                                            full_names_list.append(client_full_name)
+                                            client_found = True
+                                            break
+                                    
+                                    if not client_found:
+                                        # Fallback para nome original se não encontrar
+                                        display_names.append(client_name.split()[0] if client_name else client_name)
+                                        full_names_list.append(client_name)
+                                
                                 clients_text = ', '.join(display_names)
-                                full_names = ', '.join(case['clients'])
+                                full_names = ', '.join(full_names_list)
                         elif 'client' in case:
-                            clients_text = get_short_name_helper(case['client'], clients_list)
-                            full_names = case['client']
+                            # Busca cliente único
+                            client_found = False
+                            for client in clients_list:
+                                client_full_name = client.get('name') or client.get('full_name', '')
+                                if client_full_name == case['client']:
+                                    clients_text = get_display_name(client)
+                                    full_names = client_full_name
+                                    client_found = True
+                                    break
+                            
+                            if not client_found:
+                                clients_text = case['client'].split()[0] if case['client'] else case['client']
+                                full_names = case['client']
                         else:
                             clients_text = 'Sem cliente'
                             full_names = 'Sem cliente'

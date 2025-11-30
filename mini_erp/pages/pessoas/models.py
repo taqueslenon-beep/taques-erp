@@ -62,7 +62,8 @@ class Cliente(TypedDict, total=False):
     """Estrutura de um cliente."""
     _id: str
     full_name: str
-    display_name: str
+    nome_exibicao: str    # Campo obrigatório para exibição (renomeado de display_name)
+    display_name: str     # Mantido para compatibilidade
     nickname: str
     client_type: str  # 'PF' ou 'PJ'
     cpf: str
@@ -83,7 +84,8 @@ class ParteContraria(TypedDict, total=False):
     """Estrutura de um outro envolvido (parte contrária)."""
     _id: str
     full_name: str
-    display_name: str
+    nome_exibicao: str    # Campo obrigatório para exibição (renomeado de display_name)
+    display_name: str     # Mantido para compatibilidade
     nickname: str
     cpf_cnpj: str
     document: str     # Alias para cpf_cnpj (compatibilidade)
@@ -100,14 +102,14 @@ class ParteContraria(TypedDict, total=False):
 
 CLIENTS_TABLE_COLUMNS = [
     {'name': 'full_name', 'label': 'Nome Completo', 'field': 'full_name', 'align': 'left', 'sortable': True},
-    {'name': 'display_name', 'label': 'Exibição', 'field': 'display_name', 'align': 'left'},
+    {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left'},
     {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left'},
     {'name': 'actions', 'label': '', 'field': 'actions', 'align': 'right'},
 ]
 
 OPPOSING_TABLE_COLUMNS = [
     {'name': 'full_name', 'label': 'Nome Completo', 'field': 'full_name', 'align': 'left', 'sortable': True},
-    {'name': 'display_name', 'label': 'Exibição', 'field': 'display_name', 'align': 'left'},
+    {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left'},
     {'name': 'entity_type', 'label': 'Tipo', 'field': 'entity_type', 'align': 'left'},
     {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left'},
     {'name': 'actions', 'label': '', 'field': 'actions', 'align': 'right'},

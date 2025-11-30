@@ -14,20 +14,41 @@ def fazer_upload_avatar(user_uid, image_file):
     Returns:
         URL pública da imagem ou None em caso de erro
     """
+    if not user_uid:
+        print("Erro: user_uid não fornecido")
+        return None
+    
+    if not image_file:
+        print("Erro: image_file não fornecido")
+        return None
+    
     try:
+        # Garantir que estamos no início do arquivo
+        if hasattr(image_file, 'seek'):
+            image_file.seek(0)
+        
         # Validar imagem
         img = Image.open(image_file)
         
-        # Converter para RGB se necessário (para salvar como JPEG/PNG sem alpha se der erro, mas PNG suporta RGBA)
-        if img.mode in ('RGBA', 'P'):
-            img = img.convert('RGBA')
-        else:
-            img = img.convert('RGB')
+        # Verificar se a imagem é válida
+        img.verify()
         
-        # Redimensionar para 200x200 mantendo proporção ou cortando?
-        # Vamos usar thumbnail para garantir que cabe em 200x200, mas o ideal seria crop circular.
-        # Para simplicidade e seguindo o prompt: thumbnail 200x200.
-        img.thumbnail((200, 200))
+        # Reabrir após verify (verify fecha o arquivo)
+        image_file.seek(0)
+        img = Image.open(image_file)
+        
+        # Converter para RGBA para suportar transparência
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        
+        # Redimensionar para 200x200 mantendo proporção
+        # Usa thumbnail para manter aspect ratio
+        try:
+            # PIL 10.0+ usa Image.Resampling
+            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+        except AttributeError:
+            # Versões antigas do PIL usam Image diretamente
+            img.thumbnail((200, 200), Image.LANCZOS)
         
         # Converter para bytes
         img_bytes = io.BytesIO()
@@ -36,11 +57,16 @@ def fazer_upload_avatar(user_uid, image_file):
         
         # Upload para Firebase Storage
         bucket = storage.bucket()
+        if not bucket:
+            print("Erro: Bucket do Firebase Storage não disponível")
+            return None
+        
         blob = bucket.blob(f'avatars/{user_uid}.png')
         
         # Metadados para cache
         blob.cache_control = 'public, max-age=31536000'  # Cache por 1 ano
         
+        # Upload do arquivo
         blob.upload_from_string(
             img_bytes.getvalue(),
             content_type='image/png'
@@ -55,20 +81,37 @@ def fazer_upload_avatar(user_uid, image_file):
         
     except Exception as e:
         print(f"Erro ao fazer upload: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def obter_url_avatar(user_uid):
     """Obtém URL do avatar do usuário"""
+    if not user_uid:
+        return None
+    
     try:
         bucket = storage.bucket()
+        if not bucket:
+            return None
+        
         blob = bucket.blob(f'avatars/{user_uid}.png')
         
         if blob.exists():
-            # blob.make_public() # Opcional se já foi feito no upload, mas garante acesso
-            return blob.public_url
+            # Garante que o blob é público
+            try:
+                blob.make_public()
+            except:
+                pass  # Pode já ser público
+            
+            url = blob.public_url
+            # Adiciona timestamp para evitar cache antigo
+            return f"{url}?t={int(time.time())}"
         return None
     except Exception as e:
         print(f"Erro ao obter avatar: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def deletar_avatar(user_uid):

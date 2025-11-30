@@ -9,7 +9,7 @@ from collections import Counter
 from .models import (
     STATUS_COLORS, AREA_COLORS, PROBABILITY_COLORS, STATE_COLORS,
     CASE_TYPE_COLORS, CATEGORY_COLORS, TEMPORAL_COLORS, FINANCIAL_COLORS,
-    HEATMAP_COLORS,
+    HEATMAP_COLORS, RESULT_COLORS,
 )
 from .helpers import get_short_name, format_currency
 from .chart_builders import (
@@ -27,17 +27,146 @@ from .data_service import PainelDataService
 # ABA: TOTAIS
 # =============================================================================
 def render_tab_totais(ds: PainelDataService, primary_color: str) -> None:
-    """Renderiza a aba de Totais gerais."""
-    with ui.row().classes('gap-4 flex-wrap'):
-        with ui.card().classes('w-64 p-4'):
-            ui.label('Total de Casos').classes('text-gray-500 text-sm')
-            ui.label(str(ds.total_casos)).classes('text-3xl font-bold').style(f'color: {primary_color};')
-        with ui.card().classes('w-64 p-4'):
-            ui.label('Total de Processos').classes('text-gray-500 text-sm')
-            ui.label(str(ds.total_processos)).classes('text-3xl font-bold').style(f'color: {primary_color};')
-        with ui.card().classes('w-64 p-4'):
-            ui.label('Cenários Mapeados').classes('text-gray-500 text-sm')
-            ui.label(str(ds.total_cenarios)).classes('text-3xl font-bold').style(f'color: {primary_color};')
+    """Renderiza a aba de Totais gerais com seções distintas para Casos e Processos."""
+    # Calcular valores de processos
+    try:
+        total_processos = ds.get_total_processos()
+        processos_concluidos = ds.get_processos_concluidos()
+        processos_ativos = ds.get_processos_ativos()
+        processos_previstos = ds.get_processos_previstos()
+        erro_calculo = False
+    except Exception as e:
+        print(f"Erro ao calcular totais de processos: {e}")
+        import traceback
+        traceback.print_exc()
+        total_processos = None
+        processos_concluidos = None
+        processos_ativos = None
+        processos_previstos = None
+        erro_calculo = True
+    
+    # Calcular total de acompanhamentos de terceiros (TODOS, não apenas ativos)
+    try:
+        from ..processos.database import contar_todos_acompanhamentos
+        total_acompanhamentos_terceiros = contar_todos_acompanhamentos()
+        print(f"[PAINEL] Total de acompanhamentos de terceiros: {total_acompanhamentos_terceiros}")
+    except Exception as e:
+        print(f"[PAINEL] Erro ao contar acompanhamentos de terceiros: {e}")
+        import traceback
+        traceback.print_exc()
+        total_acompanhamentos_terceiros = 0
+    
+    # Calcular valores de casos
+    cases_type_counts = ds.get_cases_type_counts()
+    casos_antigos = cases_type_counts.get('Antigo', 0)
+    casos_novos = cases_type_counts.get('Novo', 0)
+    casos_futuros = cases_type_counts.get('Futuro', 0)
+    
+    # =========================================================================
+    # SEÇÃO: CASOS
+    # =========================================================================
+    with ui.card().classes('w-full p-6 mb-6'):
+        with ui.row().classes('items-center gap-3 mb-4'):
+            ui.icon('folder', size='md').style(f'color: {primary_color};')
+            ui.label('CASOS').classes('text-lg font-bold text-gray-800')
+        
+        with ui.row().classes('gap-4 flex-wrap'):
+            # Card: Total de Casos
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {primary_color};'):
+                ui.label('Total de Casos').classes('text-gray-500 text-sm')
+                ui.label(str(ds.total_casos)).classes('text-3xl font-bold').style(f'color: {primary_color};')
+            
+            # Card: Casos Antigos
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {CASE_TYPE_COLORS["Antigo"]};'):
+                ui.label('Casos Antigos').classes('text-gray-500 text-sm')
+                ui.label(str(casos_antigos)).classes('text-3xl font-bold').style(f'color: {CASE_TYPE_COLORS["Antigo"]};')
+            
+            # Card: Casos Novos
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {CASE_TYPE_COLORS["Novo"]};'):
+                ui.label('Casos Novos').classes('text-gray-500 text-sm')
+                ui.label(str(casos_novos)).classes('text-3xl font-bold').style(f'color: {CASE_TYPE_COLORS["Novo"]};')
+            
+            # Card: Casos Futuros
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {CASE_TYPE_COLORS["Futuro"]};'):
+                ui.label('Casos Futuros').classes('text-gray-500 text-sm')
+                ui.label(str(casos_futuros)).classes('text-3xl font-bold').style(f'color: {CASE_TYPE_COLORS["Futuro"]};')
+    
+    # =========================================================================
+    # SEÇÃO: PROCESSOS
+    # =========================================================================
+    with ui.card().classes('w-full p-6 mb-6'):
+        with ui.row().classes('items-center gap-3 mb-4'):
+            ui.icon('gavel', size='md').style(f'color: {primary_color};')
+            ui.label('PROCESSOS').classes('text-lg font-bold text-gray-800')
+        
+        with ui.row().classes('gap-4 flex-wrap'):
+            # Card: Total de Processos
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {primary_color};'):
+                ui.label('Total de Processos').classes('text-gray-500 text-sm')
+                if erro_calculo or total_processos is None:
+                    ui.label('–').classes('text-3xl font-bold').style(f'color: {primary_color};')
+                else:
+                    ui.label(str(total_processos)).classes('text-3xl font-bold').style(f'color: {primary_color};')
+            
+            # Card: Processos Ativos
+            with ui.card().classes('w-64 p-4 border-l-4').style('border-left-color: #0891b2;'):
+                ui.label('Processos Ativos').classes('text-gray-500 text-sm')
+                if erro_calculo or processos_ativos is None:
+                    ui.label('–').classes('text-3xl font-bold').style('color: #0891b2;')
+                else:
+                    ui.label(str(processos_ativos)).classes('text-3xl font-bold').style('color: #0891b2;')
+            
+            # Card: Processos Concluídos
+            with ui.card().classes('w-64 p-4 border-l-4').style('border-left-color: #059669;'):
+                ui.label('Processos Concluídos').classes('text-gray-500 text-sm')
+                if erro_calculo or processos_concluidos is None:
+                    ui.label('–').classes('text-3xl font-bold').style('color: #059669;')
+                else:
+                    ui.label(str(processos_concluidos)).classes('text-3xl font-bold').style('color: #059669;')
+            
+            # Card: Acompanhamentos de Terceiros (clicável)
+            # Cor laranja/âmbar (#f59e0b) para indicar "vigilância"
+            with ui.card().classes('w-64 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-shadow').style('border-left-color: #f59e0b;') as acompanhamentos_card:
+                ui.label('Acompanhamentos de Terceiros').classes('text-gray-500 text-sm')
+                total_acompanhamentos_label = ui.label(str(total_acompanhamentos_terceiros)).classes('text-3xl font-bold').style('color: #f59e0b;')
+                
+                # Handler de clique - navega para processos com filtro de acompanhamentos
+                def open_acompanhamentos():
+                    print(f"[PAINEL] Clique no card de acompanhamentos. Total: {total_acompanhamentos_terceiros}")
+                    ui.navigate.to('/processos?filter=acompanhamentos_terceiros')
+                
+                acompanhamentos_card.on('click', open_acompanhamentos)
+                
+                # TODO: Implementar listener em tempo real para atualizar o número automaticamente
+                # Por enquanto, número é atualizado ao recarregar a página
+            
+            # Card: Processos Previstos (clicável)
+            with ui.card().classes('w-64 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-shadow').style('border-left-color: #9333ea;') as previstos_card:
+                ui.label('Processos Previstos').classes('text-gray-500 text-sm')
+                if erro_calculo or processos_previstos is None:
+                    ui.label('–').classes('text-3xl font-bold').style('color: #9333ea;')
+                else:
+                    ui.label(str(processos_previstos)).classes('text-3xl font-bold').style('color: #9333ea;')
+                
+                # Handler de clique para navegar para processos com filtro
+                def open_previstos():
+                    ui.navigate.to('/processos?filter=futuro_previsto')
+                
+                previstos_card.on('click', open_previstos)
+    
+    # =========================================================================
+    # SEÇÃO: OUTRAS MÉTRICAS
+    # =========================================================================
+    with ui.card().classes('w-full p-6'):
+        with ui.row().classes('items-center gap-3 mb-4'):
+            ui.icon('assessment', size='md').style(f'color: {primary_color};')
+            ui.label('OUTRAS MÉTRICAS').classes('text-lg font-bold text-gray-800')
+        
+        with ui.row().classes('gap-4 flex-wrap'):
+            # Card: Cenários Mapeados
+            with ui.card().classes('w-64 p-4 border-l-4').style(f'border-left-color: {primary_color};'):
+                ui.label('Cenários Mapeados').classes('text-gray-500 text-sm')
+                ui.label(str(ds.total_cenarios)).classes('text-3xl font-bold').style(f'color: {primary_color};')
 
 
 # =============================================================================
@@ -340,9 +469,173 @@ def render_tab_status(ds: PainelDataService) -> None:
 # =============================================================================
 # ABA: RESULTADO
 # =============================================================================
-def render_tab_resultado() -> None:
-    """Renderiza a aba de Resultado (em desenvolvimento)."""
-    create_under_construction()
+def render_tab_resultado(ds: PainelDataService, on_result_change=None) -> None:
+    """Renderiza a aba de Resultado (Ganho/Perdido/Neutro) para processos concluídos."""
+    result_data = ds.get_processes_by_result()
+    counts = result_data['counts']
+    total = result_data['total']
+    all_finalized = result_data['all_finalized']
+    
+    # Cards de resumo
+    with ui.row().classes('w-full gap-4 flex-wrap mb-4'):
+        with ui.card().classes('flex-1 min-w-48 p-4 border-l-4').style(f'border-left-color: {RESULT_COLORS["Ganho"]};'):
+            ui.label('✅ Ganhos').classes('text-gray-500 text-sm mb-1')
+            ui.label(str(counts['Ganho'])).classes('text-3xl font-bold').style(f'color: {RESULT_COLORS["Ganho"]};')
+            ui.label('Processos vencidos').classes('text-xs text-gray-400 mt-1')
+        
+        with ui.card().classes('flex-1 min-w-48 p-4 border-l-4').style(f'border-left-color: {RESULT_COLORS["Perdido"]};'):
+            ui.label('❌ Perdidos').classes('text-gray-500 text-sm mb-1')
+            ui.label(str(counts['Perdido'])).classes('text-3xl font-bold').style(f'color: {RESULT_COLORS["Perdido"]};')
+            ui.label('Processos desfavoráveis').classes('text-xs text-gray-400 mt-1')
+        
+        with ui.card().classes('flex-1 min-w-48 p-4 border-l-4').style(f'border-left-color: {RESULT_COLORS["Neutro"]};'):
+            ui.label('⚪ Neutros').classes('text-gray-500 text-sm mb-1')
+            ui.label(str(counts['Neutro'])).classes('text-3xl font-bold').style(f'color: {RESULT_COLORS["Neutro"]};')
+            ui.label('Sem vencedor/perdedor').classes('text-xs text-gray-400 mt-1')
+        
+        with ui.card().classes('flex-1 min-w-48 p-4 border-l-4').style(f'border-left-color: {RESULT_COLORS["Não informado"]};'):
+            ui.label('❓ Pendentes').classes('text-gray-500 text-sm mb-1')
+            ui.label(str(counts['Não informado'])).classes('text-3xl font-bold').style(f'color: {RESULT_COLORS["Não informado"]};')
+            ui.label('Aguardando classificação').classes('text-xs text-gray-400 mt-1')
+    
+    # Total concluídos
+    with ui.card().classes('w-full p-3 mb-4 bg-gray-50'):
+        with ui.row().classes('items-center gap-2'):
+            ui.icon('check_circle', size='sm').classes('text-gray-600')
+            ui.label(f'Total de processos concluídos: {total}').classes('font-semibold text-gray-700')
+    
+    # Gráficos
+    if total > 0:
+        with ui.row().classes('w-full gap-4 flex-wrap mb-4'):
+            # Gráfico de Pizza
+            with ui.card().classes('flex-1 min-w-80 p-4'):
+                ui.label('Distribuição de Resultados').classes('text-lg font-semibold text-gray-700 mb-4')
+                
+                pie_data = [
+                    {'value': counts['Ganho'], 'name': 'Ganho', 'itemStyle': {'color': RESULT_COLORS['Ganho']}},
+                    {'value': counts['Perdido'], 'name': 'Perdido', 'itemStyle': {'color': RESULT_COLORS['Perdido']}},
+                    {'value': counts['Neutro'], 'name': 'Neutro', 'itemStyle': {'color': RESULT_COLORS['Neutro']}},
+                    {'value': counts['Não informado'], 'name': 'Não informado', 'itemStyle': {'color': RESULT_COLORS['Não informado']}},
+                ]
+                config = build_pie_chart_config(data=pie_data, series_name='Resultados')
+                ui.echart(config).classes('w-full h-64')
+            
+            # Gráfico de Barras
+            with ui.card().classes('flex-1 min-w-80 p-4'):
+                ui.label('Comparativo de Resultados').classes('text-lg font-semibold text-gray-700 mb-4')
+                
+                categories = ['Ganho', 'Perdido', 'Neutro', 'Não informado']
+                values = [counts[c] for c in categories]
+                colors = [RESULT_COLORS[c] for c in categories]
+                
+                config = build_bar_chart_config(
+                    categories=categories,
+                    values=values,
+                    colors=colors,
+                    series_name='Processos',
+                    bar_width='50%',
+                )
+                ui.echart(config).classes('w-full h-64')
+        
+        # Tabela de processos concluídos para marcar resultado
+        with ui.card().classes('w-full p-4'):
+            ui.label('📋 Processos Concluídos - Classificar Resultado').classes('text-lg font-semibold text-gray-700 mb-2')
+            ui.label('Clique no resultado para alterar a classificação do processo.').classes('text-sm text-gray-500 mb-4')
+            
+            # Função para criar badge de resultado
+            def create_result_badge(result: str):
+                color = RESULT_COLORS.get(result, '#6b7280')
+                icon = '✅' if result == 'Ganho' else '❌' if result == 'Perdido' else '⚪' if result == 'Neutro' else '❓'
+                return f'{icon} {result}'
+            
+            # Tabela interativa
+            columns = [
+                {'name': 'title', 'label': 'Título', 'field': 'title', 'align': 'left', 'sortable': True},
+                {'name': 'number', 'label': 'Número', 'field': 'number', 'align': 'left'},
+                {'name': 'area', 'label': 'Área', 'field': 'area', 'align': 'center'},
+                {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left'},
+                {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center'},
+                {'name': 'result', 'label': 'Resultado', 'field': 'result', 'align': 'center'},
+            ]
+            
+            # Formatar dados para a tabela
+            table_rows = []
+            for proc in all_finalized:
+                table_rows.append({
+                    'title': proc['title'],
+                    'number': proc['number'],
+                    'area': proc['area'],
+                    'clients': proc['clients'],
+                    'status': proc['status'],
+                    'result': proc['result'],
+                    '_index': proc['_index'],
+                    '_id': proc.get('_id'),
+                })
+            
+            # Tabela com slot customizado para resultado
+            table = ui.table(
+                columns=columns,
+                rows=table_rows,
+                row_key='_index',
+                pagination={'rowsPerPage': 10}
+            ).classes('w-full').props('flat bordered')
+            
+            # Slot customizado para coluna de resultado
+            table.add_slot('body-cell-result', '''
+                <q-td :props="props">
+                    <q-btn-dropdown 
+                        :label="props.value"
+                        :color="props.value === 'Ganho' ? 'green' : props.value === 'Perdido' ? 'red' : props.value === 'Neutro' ? 'grey' : 'blue-grey'"
+                        dense
+                        flat
+                        size="sm"
+                    >
+                        <q-list>
+                            <q-item clickable v-close-popup @click="$parent.$emit('set-result', {row: props.row, result: 'Ganho'})">
+                                <q-item-section>
+                                    <q-item-label>✅ Ganho</q-item-label>
+                                </q-item-section>
+                            </q-item>
+                            <q-item clickable v-close-popup @click="$parent.$emit('set-result', {row: props.row, result: 'Perdido'})">
+                                <q-item-section>
+                                    <q-item-label>❌ Perdido</q-item-label>
+                                </q-item-section>
+                            </q-item>
+                            <q-item clickable v-close-popup @click="$parent.$emit('set-result', {row: props.row, result: 'Neutro'})">
+                                <q-item-section>
+                                    <q-item-label>⚪ Neutro</q-item-label>
+                                </q-item-section>
+                            </q-item>
+                        </q-list>
+                    </q-btn-dropdown>
+                </q-td>
+            ''')
+            
+            # Handler para mudança de resultado
+            def handle_result_change(event):
+                row = event.args['row']
+                new_result = event.args['result']
+                idx = row['_index']
+                
+                # Atualiza no banco de dados
+                from mini_erp.pages.processos.database import update_process_field
+                success = update_process_field(idx, 'result', new_result)
+                
+                if success:
+                    ui.notify(f'Resultado atualizado para "{new_result}"!', type='positive')
+                    # Callback para refresh se fornecido
+                    if on_result_change:
+                        on_result_change()
+                else:
+                    ui.notify('Erro ao atualizar resultado', type='negative')
+            
+            table.on('set-result', handle_result_change)
+    else:
+        create_empty_state(
+            icon='assessment',
+            title='Nenhum processo concluído',
+            message='Quando processos forem concluídos, eles aparecerão aqui para classificação de resultado.'
+        )
 
 
 # =============================================================================

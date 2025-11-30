@@ -2087,14 +2087,14 @@ def case_detail(case_slug: str):
                         trigger_autosave()
                         report_save_indicator.refresh()
                     except Exception as err:
-                        print(f'Erro no callback do textarea: {err}')
+                        print(f'Erro no callback do editor: {err}')
                 
-                # Textarea direto, sem container extra - já aparece pronto para digitar
-                report_textarea = ui.textarea(
+                # Editor de texto rico para relatório
+                report_textarea = ui.editor(
                     value=report_value['content'],
-                    placeholder='Digite o relatório geral do caso aqui...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    placeholder='Digite o relatório geral do caso aqui...',
                     on_change=on_textarea_change
-                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                ).classes('w-full').style('min-height: 300px')
                     
 
             # Tab 5: Vistorias
@@ -2161,7 +2161,7 @@ def case_detail(case_slug: str):
                 
                 # Textarea simples e direto - pronto para uso imediato
                 def on_vistorias_change(e):
-                    """Callback para textarea"""
+                    """Callback para editor de texto rico"""
                     try:
                         new_value = e.value if hasattr(e, 'value') else str(e)
                         vistorias_value['content'] = new_value
@@ -2169,14 +2169,14 @@ def case_detail(case_slug: str):
                         trigger_autosave()
                         vistorias_save_indicator.refresh()
                     except Exception as err:
-                        print(f'Erro no callback do textarea: {err}')
+                        print(f'Erro no callback do editor: {err}')
                 
-                # Textarea direto, sem container extra - já aparece pronto para digitar
-                vistorias_textarea = ui.textarea(
+                # Editor de texto rico para vistorias
+                vistorias_editor = ui.editor(
                     value=vistorias_value['content'],
-                    placeholder='Digite as informações das vistorias aqui...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    placeholder='Digite as informações das vistorias aqui...',
                     on_change=on_vistorias_change
-                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                ).classes('w-full').style('min-height: 300px')
 
             # Tab 6: Estratégia Geral
             with ui.tab_panel(strategy_tab).classes('w-full gap-4'):
@@ -2190,11 +2190,11 @@ def case_detail(case_slug: str):
                         case['objectives'] = new_value
                         trigger_autosave()
                     
-                    ui.textarea(
+                    ui.editor(
                         value=case.get('objectives', ''),
                         placeholder='Descreva os objetivos do caso...',
                         on_change=on_objectives_change
-                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                    ).classes('w-full').style('min-height: 150px')
 
                 with ui.expansion('Considerações Jurídicas', icon='gavel').classes('w-full border rounded bg-gray-50'):
                     def on_legal_considerations_change(e):
@@ -2202,11 +2202,11 @@ def case_detail(case_slug: str):
                         case['legal_considerations'] = new_value
                         trigger_autosave()
                     
-                    ui.textarea(
+                    ui.editor(
                         value=case.get('legal_considerations', ''),
                         placeholder='Descreva as considerações jurídicas do caso...',
                         on_change=on_legal_considerations_change
-                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                    ).classes('w-full').style('min-height: 150px')
 
                 with ui.expansion('Considerações Técnicas', icon='science').classes('w-full border rounded bg-gray-50'):
                     def on_technical_considerations_change(e):
@@ -2214,11 +2214,11 @@ def case_detail(case_slug: str):
                         case['technical_considerations'] = new_value
                         trigger_autosave()
                     
-                    ui.textarea(
+                    ui.editor(
                         value=case.get('technical_considerations', ''),
                         placeholder='Descreva as considerações técnicas do caso...',
                         on_change=on_technical_considerations_change
-                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                    ).classes('w-full').style('min-height: 150px')
 
                 with ui.expansion('Teses a serem utilizadas', icon='gavel').classes('w-full border rounded bg-gray-50'):
                     # Inicializar lista de teses se não existir
@@ -2417,11 +2417,11 @@ def case_detail(case_slug: str):
                         case['strategy_observations'] = new_value
                         trigger_autosave()
                     
-                    ui.textarea(
+                    ui.editor(
                         value=case.get('strategy_observations', ''),
                         placeholder='Adicione observações gerais sobre a estratégia do caso...',
                         on_change=on_strategy_observations_change
-                    ).classes('w-full').style('min-height: 200px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                    ).classes('w-full').style('min-height: 150px')
 
             # Tab 7: Próximas Ações
             with ui.tab_panel(next_actions_tab).classes('w-full'):
@@ -2434,11 +2434,11 @@ def case_detail(case_slug: str):
                     case['next_actions'] = new_value
                     trigger_autosave()
                 
-                ui.textarea(
+                ui.editor(
                     value=case.get('next_actions', ''),
-                    placeholder='Descreva as próximas ações a serem realizadas neste caso...\n\nO texto será salvo automaticamente após alguns segundos de inatividade.',
+                    placeholder='Liste as próximas ações do caso...',
                     on_change=on_next_actions_change
-                ).classes('w-full').style('min-height: 500px; width: 100%; font-family: sans-serif; font-size: 14px;').props('outlined')
+                ).classes('w-full').style('min-height: 300px')
 
             # Tab 8: Slack
             with ui.tab_panel(slack_tab).classes('w-full'):
@@ -2657,43 +2657,83 @@ def case_swot(case_slug: str):
         asyncio.create_task(swot_autosave_with_debounce())
 
     def create_swot_section(title: str, icon: str, color: str, bg_color: str, border_color: str, field_key: str):
-        """Cria uma seção SWOT com 10 linhas fixas editáveis"""
-        with ui.card().classes(f'w-full h-full p-6 {bg_color} flex flex-col border-l-4 {border_color} overflow-auto'):
-            with ui.row().classes('items-center gap-2 mb-3 flex-shrink-0'):
-                ui.icon(icon, size='md').classes(f'text-{color}-600')
-                ui.label(title).classes(f'text-xl font-bold text-{color}-800')
+        """Cria uma seção SWOT com campos expansíveis e contador"""
+        with ui.card().classes(f'w-full h-full p-4 {bg_color} flex flex-col border-l-4 {border_color} overflow-auto'):
+            # Cabeçalho com título e contador
+            with ui.row().classes('items-center justify-between w-full mb-3 flex-shrink-0'):
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon(icon, size='md').classes(f'text-{color}-600')
+                    ui.label(title).classes(f'text-xl font-bold text-{color}-800')
+                
+                # Contador de itens preenchidos
+                @ui.refreshable
+                def item_counter():
+                    lines = case.get(field_key, [])
+                    filled_count = sum(1 for line in lines if line.strip())
+                    total_count = len([line for line in lines if line is not None])
+                    ui.label(f'{filled_count}/{total_count}').classes(f'text-sm font-medium text-{color}-600 bg-white px-2 py-1 rounded')
+                
+                item_counter()
             
-            # Garantir que sempre há exatamente 10 linhas
+            # Inicializar com pelo menos 2 campos
             lines = case.get(field_key, [])
-            while len(lines) < 10:
-                lines.append('')
-            case[field_key] = lines[:10]  # Limitar a 10 linhas
+            if len(lines) < 2:
+                lines.extend([''] * (2 - len(lines)))
+            case[field_key] = lines[:10]  # Máximo 10 campos
+            
+            # Estado para controlar campos visíveis
+            visible_fields = {'count': max(2, len([line for line in lines if line.strip()]))}
+            if visible_fields['count'] < len(lines) and any(lines[visible_fields['count']:]):
+                visible_fields['count'] = len(lines)
             
             def update_line(idx: int, value: str):
-                """Atualiza uma linha específica"""
+                """Atualiza uma linha específica e gerencia expansão automática"""
                 lines = case.get(field_key, [])
-                # Garantir que sempre há 10 linhas
-                while len(lines) < 10:
+                while len(lines) <= idx:
                     lines.append('')
-                if idx < 10:
-                    lines[idx] = value
-                    case[field_key] = lines[:10]  # Limitar a 10 linhas
-                    swot_trigger_autosave()
+                
+                lines[idx] = value
+                case[field_key] = lines[:10]  # Limitar a 10 linhas
+                swot_trigger_autosave()
+                
+                # Expandir automaticamente se necessário
+                filled_count = sum(1 for line in lines if line.strip())
+                if value.strip() and idx == visible_fields['count'] - 1 and visible_fields['count'] < 10:
+                    visible_fields['count'] = min(visible_fields['count'] + 1, 10)
+                    fields_container.refresh()
+                
+                item_counter.refresh()
             
             def make_on_change(idx: int):
                 """Factory function para criar callback com índice correto"""
                 return lambda val: update_line(idx, val)
             
-            with ui.column().classes('w-full gap-2 flex-grow'):
-                for idx in range(10):
-                    line_value = lines[idx] if idx < len(lines) else ''
-                    with ui.row().classes('w-full gap-2 items-start'):
-                        # Textarea com suporte a atalhos de teclado
-                        textarea = ui.textarea(
-                            value=line_value,
-                            placeholder='Digite aqui... (Ctrl+B: negrito, Ctrl+I: itálico)',
-                            on_change=make_on_change(idx)
-                        ).classes('flex-grow bg-white rounded shadow-sm swot-textarea').props('rows=2')
+            @ui.refreshable
+            def fields_container():
+                with ui.column().classes('w-full gap-2 flex-grow'):
+                    for idx in range(visible_fields['count']):
+                        line_value = lines[idx] if idx < len(lines) else ''
+                        with ui.row().classes('w-full gap-2 items-start'):
+                            # Textarea com suporte a atalhos de teclado
+                            textarea = ui.textarea(
+                                value=line_value,
+                                placeholder='Digite aqui...',
+                                on_change=make_on_change(idx)
+                            ).classes('flex-grow bg-white rounded border border-gray-300 swot-textarea').props('rows=1 outlined')
+                    
+                    # Botão para adicionar campo manualmente (se ainda não chegou no máximo)
+                    if visible_fields['count'] < 10:
+                        def add_field():
+                            visible_fields['count'] = min(visible_fields['count'] + 1, 10)
+                            fields_container.refresh()
+                        
+                        ui.button(
+                            '+ Adicionar item',
+                            on_click=add_field,
+                            icon='add'
+                        ).classes(f'mt-2 text-{color}-600 border-{color}-300 hover:bg-{color}-50').props('flat outlined size=sm')
+            
+            fields_container()
     
     # Adicionar CSS e JavaScript para suporte a atalhos de teclado
     ui.add_head_html('''
@@ -2823,13 +2863,11 @@ def case_swot(case_slug: str):
         
         swot_save_indicator()
         
-        with ui.row().classes('w-full items-center justify-between mb-2'):
-            ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
-            ui.label('💡 Atalhos: Ctrl+B (negrito), Ctrl+I (itálico)').classes('text-xs text-gray-500 italic')
+        # Indicadores removidos para interface mais limpa
         
-        with ui.grid(columns=2).classes('w-full h-[80vh] gap-4'):
+        with ui.grid(columns=2).classes('w-full h-[60vh] gap-4'):
             create_swot_section(
-                'Forças (Strengths)',
+                '✅ Forças (Strengths)',
                 'check_circle',
                 'green',
                 'bg-green-50',
@@ -2838,7 +2876,7 @@ def case_swot(case_slug: str):
             )
             
             create_swot_section(
-                'Fraquezas (Weaknesses)',
+                '⚠️ Fraquezas (Weaknesses)',
                 'warning',
                 'red',
                 'bg-red-50',
@@ -2847,7 +2885,7 @@ def case_swot(case_slug: str):
             )
             
             create_swot_section(
-                'Oportunidades (Opportunities)',
+                '📈 Oportunidades (Opportunities)',
                 'trending_up',
                 'blue',
                 'bg-blue-50',
@@ -2856,7 +2894,7 @@ def case_swot(case_slug: str):
             )
             
             create_swot_section(
-                'Ameaças (Threats)',
+                '⚠️ Ameaças (Threats)',
                 'report_problem',
                 'orange',
                 'bg-orange-50',

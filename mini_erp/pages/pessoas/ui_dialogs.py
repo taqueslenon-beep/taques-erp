@@ -119,7 +119,8 @@ def create_new_client_dialog(
             
             new_client = {
                 'full_name': c_full_name.value,
-                'display_name': c_display_name.value or '',
+                'nome_exibicao': c_display_name.value or '',  # Campo padronizado
+                'display_name': c_display_name.value or '',   # Mantido para compatibilidade
                 'nickname': c_nickname.value or '',
                 'client_type': client_type,
                 'cpf': cpf_digits,
@@ -230,7 +231,7 @@ def create_edit_client_dialog(
             nonlocal edit_client_index
             edit_client_index = get_clients_list().index(client)
             edit_c_full_name.value = get_full_name(client)
-            edit_c_display_name.value = client.get('display_name', '')
+            edit_c_display_name.value = client.get('nome_exibicao') or client.get('display_name', '')
             edit_c_nickname.value = client.get('nickname', '')
             current_type = client.get('client_type')
             if current_type not in CLIENT_TYPE_LABELS:
@@ -291,7 +292,8 @@ def create_edit_client_dialog(
                 existing_bonds = client.get('bonds', [])
                 updated_client = {
                     'full_name': edit_c_full_name.value,
-                    'display_name': edit_c_display_name.value or '',
+                    'nome_exibicao': edit_c_display_name.value or '',  # Campo padronizado
+                    'display_name': edit_c_display_name.value or '',   # Mantido para compatibilidade
                     'nickname': edit_c_nickname.value or '',
                     'client_type': client_type,
                     'cpf': cpf_digits,
@@ -363,7 +365,8 @@ def create_new_opposing_dialog(
                 return
             new_opposing = {
                 'full_name': op_full_name.value,
-                'display_name': op_display_name.value or '',
+                'nome_exibicao': op_display_name.value or '',  # Campo padronizado
+                'display_name': op_display_name.value or '',   # Mantido para compatibilidade
                 'nickname': op_nickname.value or '',
                 'cpf_cnpj': op_cpf_cnpj.value or '',
                 'entity_type': normalize_entity_type(op_entity_type.value),
@@ -420,7 +423,7 @@ def create_edit_opposing_dialog(
             nonlocal edit_opposing_index
             edit_opposing_index = get_opposing_parties_list().index(opposing)
             edit_op_full_name.value = get_full_name(opposing)
-            edit_op_display_name.value = opposing.get('display_name', '')
+            edit_op_display_name.value = opposing.get('nome_exibicao') or opposing.get('display_name', '')
             edit_op_nickname.value = opposing.get('nickname', '')
             edit_op_cpf_cnpj.value = opposing.get('cpf_cnpj') or opposing.get('document', '')
             edit_op_entity_type.value = normalize_entity_type(opposing.get('entity_type', 'PF'))
@@ -437,7 +440,8 @@ def create_edit_opposing_dialog(
                 opposing = get_opposing_parties_list()[edit_opposing_index]
                 updated_opposing = {
                     'full_name': edit_op_full_name.value,
-                    'display_name': edit_op_display_name.value or '',
+                    'nome_exibicao': edit_op_display_name.value or '',  # Campo padronizado
+                    'display_name': edit_op_display_name.value or '',   # Mantido para compatibilidade
                     'nickname': edit_op_nickname.value or '',
                     'cpf_cnpj': edit_op_cpf_cnpj.value or '',
                     'entity_type': normalize_entity_type(edit_op_entity_type.value),

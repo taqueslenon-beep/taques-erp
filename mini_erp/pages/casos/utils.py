@@ -30,26 +30,28 @@ except ImportError:
 
 def get_short_name_helper(full_name: str, source_list: list) -> str:
     """
-    Retorna sigla/apelido ou primeiro nome - função auxiliar global.
+    Retorna nome de exibição usando a regra centralizada.
+    
+    DEPRECATED: Esta função está sendo migrada para usar get_display_name_by_id().
+    Mantida para compatibilidade durante a transição.
     
     Args:
         full_name: Nome completo da pessoa/entidade
         source_list: Lista de dicionários contendo informações das pessoas/entidades
         
     Returns:
-        Sigla, apelido ou primeiro nome
+        Nome de exibição da pessoa
     """
+    from ...core import get_display_name
+    
+    # Busca pessoa na lista fornecida
     for item in source_list:
         item_name = item.get('name') or item.get('full_name', '')
         if item_name == full_name:
-            # Prioridade: nickname > alias > primeiro nome
-            if item.get('nickname'):
-                return item['nickname']
-            if item.get('alias'):
-                return item['alias']
-            # Se não tem apelido, retorna primeiro nome
-            return full_name.split()[0] if full_name else full_name
-    # Se não encontrou na lista, retorna primeiro nome
+            # Usa função centralizada para obter nome de exibição
+            return get_display_name(item)
+    
+    # Se não encontrou na lista, retorna primeiro nome como fallback
     return full_name.split()[0] if full_name else full_name
 
 

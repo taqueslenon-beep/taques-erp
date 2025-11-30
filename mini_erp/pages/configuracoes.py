@@ -17,8 +17,17 @@ def configuracoes():
         return
     
     current_user = get_current_user()
-    user_uid = current_user['uid'] if current_user else None
-    user_email = current_user['email'] if current_user else ''
+    if not current_user:
+        ui.navigate.to('/login')
+        return
+    
+    user_uid = current_user.get('uid')
+    user_email = current_user.get('email', '')
+    
+    if not user_uid:
+        ui.notify('Erro: Usuário não identificado. Faça login novamente.', type='negative')
+        ui.navigate.to('/login')
+        return
     
     with layout('Configurações', breadcrumbs=[('Configurações', None)]):
         with ui.tabs().classes('w-full') as tabs:
@@ -39,11 +48,19 @@ def configuracoes():
                         
                         # Carrega avatar atual
                         async def load_current_avatar():
-                            url = await run.io_bound(obter_url_avatar, user_uid)
-                            if url:
-                                avatar_img.source = url
-                            else:
-                                # Avatar padrão baseado nas iniciais ou imagem genérica
+                            try:
+                                if not user_uid:
+                                    raise ValueError("UID do usuário não disponível")
+                                
+                                url = await run.io_bound(obter_url_avatar, user_uid)
+                                if url:
+                                    avatar_img.source = url
+                                else:
+                                    # Avatar padrão baseado nas iniciais ou imagem genérica
+                                    avatar_img.source = f'https://ui-avatars.com/api/?name={user_email}&background=random&size=200'
+                            except Exception as e:
+                                print(f"Erro ao carregar avatar: {e}")
+                                # Fallback para avatar padrão
                                 avatar_img.source = f'https://ui-avatars.com/api/?name={user_email}&background=random&size=200'
 
                         ui.timer(0.1, load_current_avatar, once=True)
@@ -152,7 +169,7 @@ def configuracoes():
                             if src:
                                 avatar_state['preview_img'].set_source(src)
 
-                        def mover_foto(direcao):
+                        async def mover_foto(direcao):
                             step = 5 # Passo de movimento
                             if direcao == 'cima': avatar_state['offset_y'] -= step
                             elif direcao == 'baixo': avatar_state['offset_y'] += step
@@ -160,52 +177,60 @@ def configuracoes():
                             elif direcao == 'direita': avatar_state['offset_x'] += step
                             
                             # Atualiza preview
-                            # Como mover_foto é chamado por lambda, precisamos agendar a tarefa async
-                            # Mas como estamos no contexto do nicegui, podemos chamar update_preview diretamente se fosse async
-                            # Para simplificar, vamos chamar update_preview() e deixar o nicegui gerenciar
-                            # Hack: chamamos uma função auxiliar que agenda a corrotina
-                            async def _run():
-                                await update_preview()
-                            # No nicegui eventos on_click suportam async
-                            return _run()
+                            await update_preview()
 
                         async def salvar_avatar_editado():
                             if not avatar_state['imagem_bytes']:
+                                ui.notify('Nenhuma imagem para salvar.', type='warning')
+                                return
+                            
+                            if not user_uid:
+                                ui.notify('Erro: Usuário não identificado.', type='negative')
                                 return
 
                             ui.notify('Processando e salvando...', type='info', spinner=True)
                             
-                            # Processa imagem final
-                            _, img_bytes = await run.cpu_bound(
-                                processar_preview_sync,
-                                avatar_state['imagem_bytes'],
-                                avatar_state['offset_x'],
-                                avatar_state['offset_y'],
-                                avatar_state['zoom']
-                            )
-                            
-                            if not img_bytes:
-                                ui.notify('Erro ao processar imagem.', type='negative')
-                                return
-
-                            # Fecha dialog
-                            if avatar_state['dialog']:
-                                avatar_state['dialog'].close()
-                            
                             try:
+                                # Processa imagem final
+                                _, img_bytes = await run.cpu_bound(
+                                    processar_preview_sync,
+                                    avatar_state['imagem_bytes'],
+                                    avatar_state['offset_x'],
+                                    avatar_state['offset_y'],
+                                    avatar_state['zoom']
+                                )
+                                
+                                if not img_bytes:
+                                    ui.notify('Erro ao processar imagem.', type='negative')
+                                    return
+
+                                # Fecha dialog
+                                if avatar_state['dialog']:
+                                    avatar_state['dialog'].close()
+                                
                                 # Salva no storage
                                 file_obj = io.BytesIO(img_bytes)
                                 url = await run.io_bound(fazer_upload_avatar, user_uid, file_obj)
                                 
                                 if url:
+                                    # Atualiza avatar na página
                                     avatar_img.source = url
+                                    
+                                    # Força atualização imediata adicionando timestamp
+                                    import time
+                                    avatar_img.source = f"{url}?t={int(time.time())}"
+                                    
                                     ui.notify('Avatar atualizado com sucesso!', type='positive')
-                                    # Recarrega para atualizar navbar
+                                    
+                                    # Recarrega página após 1 segundo para atualizar navbar
                                     ui.timer(1.0, lambda: ui.navigate.reload(), once=True)
                                 else:
-                                    ui.notify('Erro ao salvar imagem no servidor.', type='negative')
+                                    ui.notify('Erro ao salvar imagem no servidor. Verifique as permissões.', type='negative')
                             except Exception as ex:
-                                ui.notify(f'Erro no upload: {str(ex)}', type='negative')
+                                print(f"Erro ao salvar avatar: {ex}")
+                                import traceback
+                                traceback.print_exc()
+                                ui.notify(f'Erro ao salvar: {str(ex)}', type='negative')
 
                         def abrir_editor(imagem_bytes):
                             avatar_state['imagem_bytes'] = imagem_bytes
@@ -229,15 +254,15 @@ def configuracoes():
                                         # Grid de setas
                                         with ui.element('div').classes('grid grid-cols-3 gap-2 w-32 mx-auto'):
                                             ui.element('div') # Espaço vazio
-                                            ui.button(icon='keyboard_arrow_up', on_click=lambda: mover_foto('cima')()).props('round dense color=primary')
+                                            ui.button(icon='keyboard_arrow_up', on_click=lambda: mover_foto('cima')).props('round dense color=primary')
                                             ui.element('div') # Espaço vazio
                                             
-                                            ui.button(icon='keyboard_arrow_left', on_click=lambda: mover_foto('esquerda')()).props('round dense color=primary')
+                                            ui.button(icon='keyboard_arrow_left', on_click=lambda: mover_foto('esquerda')).props('round dense color=primary')
                                             ui.element('div') # Centro (pode ser um reset se quiser)
-                                            ui.button(icon='keyboard_arrow_right', on_click=lambda: mover_foto('direita')()).props('round dense color=primary')
+                                            ui.button(icon='keyboard_arrow_right', on_click=lambda: mover_foto('direita')).props('round dense color=primary')
                                             
                                             ui.element('div') # Espaço vazio
-                                            ui.button(icon='keyboard_arrow_down', on_click=lambda: mover_foto('baixo')()).props('round dense color=primary')
+                                            ui.button(icon='keyboard_arrow_down', on_click=lambda: mover_foto('baixo')).props('round dense color=primary')
                                             ui.element('div') # Espaço vazio
                                         
                                         ui.separator().classes('my-2')
@@ -245,11 +270,9 @@ def configuracoes():
                                         ui.label('Zoom').classes('font-bold text-gray-700')
                                         
                                         # Slider de Zoom
-                                        def on_zoom_change(e):
+                                        async def on_zoom_change(e):
                                             avatar_state['zoom'] = e.value
-                                            # Debounce ou update imediato? Imediato é melhor para UX se for rápido
-                                            async def _run(): await update_preview()
-                                            return _run()
+                                            await update_preview()
 
                                         ui.slider(min=50, max=150, value=100, step=5, on_change=on_zoom_change).props('label-always')
                                         ui.label('50% - 150%').classes('text-xs text-gray-400 text-center w-full')
@@ -277,24 +300,60 @@ def configuracoes():
 
                         # Handler de Upload Inicial
                         async def handle_upload(e):
-                            file = e.content
-                            if not file:
-                                return
-                            
-                            # Validação básica de tamanho (5MB)
-                            if file.seek(0, 2) > 5 * 1024 * 1024:
-                                ui.notify('Arquivo muito grande! Máximo 5MB.', type='warning')
-                                return
-                            file.seek(0)
-                            
-                            # Lê os bytes
-                            img_bytes = file.read()
-                            
-                            # Abre editor
-                            abrir_editor(img_bytes)
-                            
-                            # Reseta o componente de upload para permitir selecionar o mesmo arquivo novamente se quiser
-                            upload_component.reset()
+                            try:
+                                # No NiceGUI, UploadEventArguments tem um atributo 'file' do tipo FileUpload
+                                if not hasattr(e, 'file'):
+                                    ui.notify('Erro: evento de upload inválido.', type='negative')
+                                    return
+                                
+                                file_upload = e.file
+                                
+                                # FileUpload tem métodos read() e name
+                                file_name = getattr(file_upload, 'name', '')
+                                
+                                # Validação de tipo de arquivo
+                                if file_name:
+                                    ext = file_name.lower().split('.')[-1] if '.' in file_name else ''
+                                    if ext and ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                                        ui.notify('Formato não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
+                                        upload_component.reset()
+                                        return
+                                
+                                # Lê os bytes do arquivo
+                                # FileUpload é um objeto file-like com método read()
+                                # SmallFileUpload não tem seek(), então lemos diretamente
+                                img_bytes = file_upload.read()
+                                
+                                # Validação de tamanho (5MB)
+                                if len(img_bytes) > 5 * 1024 * 1024:
+                                    ui.notify('Arquivo muito grande! Máximo 5MB.', type='warning')
+                                    upload_component.reset()
+                                    return
+                                
+                                if len(img_bytes) == 0:
+                                    ui.notify('Arquivo vazio ou inválido.', type='warning')
+                                    upload_component.reset()
+                                    return
+                                
+                                # Valida se é realmente uma imagem válida
+                                try:
+                                    from PIL import Image
+                                    img_test = Image.open(io.BytesIO(img_bytes))
+                                    img_test.verify()
+                                except Exception:
+                                    ui.notify('Arquivo não é uma imagem válida.', type='negative')
+                                    upload_component.reset()
+                                    return
+                                
+                                # Abre editor
+                                abrir_editor(img_bytes)
+                                
+                            except Exception as ex:
+                                print(f"Erro no upload: {ex}")
+                                import traceback
+                                traceback.print_exc()
+                                ui.notify(f'Erro ao processar arquivo: {str(ex)}', type='negative')
+                                upload_component.reset()
 
                         upload_component = ui.upload(
                             label='Alterar Foto', 

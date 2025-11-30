@@ -120,6 +120,76 @@ class PainelDataService:
         return sorted(counter.items(), key=lambda x: x[1], reverse=True)
     
     # =========================================================================
+    # CÁLCULOS DE PROCESSOS POR STATUS (CONCLUÍDOS/ATIVOS)
+    # =========================================================================
+    def get_total_processos(self) -> int:
+        """
+        Retorna o total de processos cadastrados.
+        
+        Returns:
+            Número total de processos (todos os status)
+        """
+        return self.total_processos
+    
+    def get_processos_concluidos(self) -> int:
+        """
+        Conta processos concluídos.
+        
+        Mapeamento de status:
+        - "Concluído"
+        - "Concluído com pendências"
+        
+        Returns:
+            Número de processos concluídos
+        """
+        try:
+            status_concluidos = {'Concluído', 'Concluído com pendências'}
+            count = sum(1 for proc in self._processes 
+                       if proc.get('status') in status_concluidos)
+            return count
+        except Exception as e:
+            print(f"Erro ao calcular processos concluídos: {e}")
+            return 0
+    
+    def get_processos_ativos(self) -> int:
+        """
+        Conta processos ativos (em tramitação).
+        
+        Mapeamento de status:
+        - "Em andamento"
+        - "Em monitoramento"
+        
+        Returns:
+            Número de processos ativos
+        """
+        try:
+            status_ativos = {'Em andamento', 'Em monitoramento'}
+            count = sum(1 for proc in self._processes 
+                       if proc.get('status') in status_ativos)
+            return count
+        except Exception as e:
+            print(f"Erro ao calcular processos ativos: {e}")
+            return 0
+    
+    def get_processos_previstos(self) -> int:
+        """
+        Conta processos futuros/previstos.
+        
+        Mapeamento de status:
+        - "Futuro/Previsto"
+        
+        Returns:
+            Número de processos previstos
+        """
+        try:
+            count = sum(1 for proc in self._processes 
+                       if proc.get('status') == 'Futuro/Previsto')
+            return count
+        except Exception as e:
+            print(f"Erro ao calcular processos previstos: {e}")
+            return 0
+    
+    # =========================================================================
     # CONTAGENS POR CLIENTE
     # =========================================================================
     def get_cases_by_client(self) -> List[Tuple[str, int]]:
@@ -173,12 +243,39 @@ class PainelDataService:
         return counter
     
     def get_processes_by_year(self) -> Counter:
-        """Conta processos por ano."""
+        """Conta processos por ano, extraindo o ano do campo data_abertura."""
         counter = Counter()
         for proc in self._processes:
+            # Tenta primeiro o campo year (se existir)
             year = proc.get('year')
+            
+            # Se não tiver year, tenta extrair de data_abertura
+            if not year:
+                data_abertura = proc.get('data_abertura', '')
+                if data_abertura:
+                    data_abertura = str(data_abertura).strip()
+                    
+                    # Formato: apenas ano (AAAA)
+                    if len(data_abertura) == 4 and data_abertura.isdigit():
+                        year = data_abertura
+                    # Formato: MM/AAAA ou DD/MM/AAAA
+                    elif '/' in data_abertura:
+                        partes = data_abertura.split('/')
+                        # Se tiver 2 partes: MM/AAAA -> pega a última
+                        # Se tiver 3 partes: DD/MM/AAAA -> pega a última
+                        if len(partes) >= 2:
+                            year = partes[-1].strip()
+                    # Formato: AAAA-MM-DD (ISO)
+                    elif '-' in data_abertura:
+                        partes = data_abertura.split('-')
+                        if len(partes) >= 1:
+                            year = partes[0].strip()
+            
             if year:
-                counter[str(year)] += 1
+                # Valida se é um ano válido (4 dígitos)
+                year_str = str(year).strip()
+                if len(year_str) == 4 and year_str.isdigit():
+                    counter[year_str] += 1
         return counter
     
     # =========================================================================
@@ -302,6 +399,71 @@ class PainelDataService:
             'areas': areas_ordenadas,
         }
     
+    # =========================================================================
+    # DADOS DE RESULTADO (GANHO/PERDIDO/NEUTRO)
+    # =========================================================================
+    def get_finalized_processes(self) -> List[dict]:
+        """Retorna lista de processos com status 'Concluído' ou 'Concluído com pendências'."""
+        finalized_statuses = {'Concluído', 'Concluído com pendências'}
+        return [
+            proc for proc in self._processes 
+            if proc.get('status') in finalized_statuses
+        ]
+    
+    def get_processes_by_result(self) -> Dict[str, Any]:
+        """Coleta estatísticas de processos por resultado (Ganho/Perdido/Neutro)."""
+        finalized = self.get_finalized_processes()
+        
+        result_counts = {
+            'Ganho': 0,
+            'Perdido': 0,
+            'Neutro': 0,
+            'Não informado': 0
+        }
+        
+        processes_by_result = {
+            'Ganho': [],
+            'Perdido': [],
+            'Neutro': [],
+            'Não informado': []
+        }
+        
+        for proc in finalized:
+            result = proc.get('result') or 'Não informado'
+            if result not in result_counts:
+                result = 'Não informado'
+            
+            result_counts[result] += 1
+            processes_by_result[result].append({
+                'title': proc.get('title', 'Sem título'),
+                'number': proc.get('number', '-'),
+                'area': proc.get('area', '-'),
+                'status': proc.get('status', '-'),
+                'result': result,
+                'clients': proc.get('clients', []),
+                '_id': proc.get('_id'),
+                '_index': self._processes.index(proc)
+            })
+        
+        return {
+            'counts': result_counts,
+            'total': len(finalized),
+            'processes': processes_by_result,
+            'all_finalized': [
+                {
+                    'title': proc.get('title', 'Sem título'),
+                    'number': proc.get('number', '-'),
+                    'area': proc.get('area', '-'),
+                    'status': proc.get('status', '-'),
+                    'result': proc.get('result') or 'Não informado',
+                    'clients': ', '.join(proc.get('clients', [])) or '-',
+                    '_id': proc.get('_id'),
+                    '_index': self._processes.index(proc)
+                }
+                for proc in finalized
+            ]
+        }
+
     # =========================================================================
     # DADOS DE PROBABILIDADE
     # =========================================================================

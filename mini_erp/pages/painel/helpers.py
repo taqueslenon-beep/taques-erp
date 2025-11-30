@@ -66,3 +66,5 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+
+

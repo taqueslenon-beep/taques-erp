@@ -21,8 +21,12 @@ def create_full_name_input() -> ui.input:
 
 
 def create_display_name_input() -> ui.input:
-    """Cria input padronizado para nome de exibição."""
-    return ui.input('Nome de Exibição').classes('w-full mb-2')
+    """
+    Cria input padronizado para nome de exibição.
+    
+    ATUALIZADO: Agora usa o campo padronizado 'nome_exibicao'.
+    """
+    return ui.input('Nome de Exibição').classes('w-full mb-2').tooltip('Nome que será exibido em todo o sistema')
 
 
 def create_nickname_input() -> ui.input:

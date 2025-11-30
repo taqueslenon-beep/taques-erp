@@ -202,7 +202,8 @@ def prepare_client_row_data(client: Dict[str, Any], original_index: int) -> Dict
     return {
         'id': original_index,  # mantém índice original para eventos edit/delete
         'full_name': get_full_name(client),
-        'display_name': get_display_name(client),
+        'nome_exibicao': get_display_name(client),  # Campo padronizado
+        'display_name': get_display_name(client),   # Mantido para compatibilidade
         'cpf_cnpj': client.get('cpf_cnpj') or client.get('document', ''),
     }
 
@@ -221,7 +222,8 @@ def prepare_opposing_row_data(opposing: Dict[str, Any], index: int) -> Dict[str,
     return {
         'id': index,
         'full_name': get_full_name(opposing),
-        'display_name': get_display_name(opposing),
+        'nome_exibicao': get_display_name(opposing),  # Campo padronizado
+        'display_name': get_display_name(opposing),   # Mantido para compatibilidade
         'entity_type': opposing.get('entity_type', 'PF'),
         'cpf_cnpj': opposing.get('cpf_cnpj') or opposing.get('document', ''),
     }

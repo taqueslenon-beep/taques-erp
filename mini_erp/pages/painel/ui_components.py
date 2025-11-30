@@ -177,3 +177,5 @@ def create_stat_summary_row(items: List[Tuple[str, str, str, str]]) -> None:
                 ui.label(f'{label}: {value}').classes('text-sm font-medium text-gray-700')
 
 
+
+
