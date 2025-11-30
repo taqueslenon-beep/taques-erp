@@ -2,4 +2,8 @@ nicegui
 reportlab
 firebase-admin
 watchfiles
+slack-sdk
+python-dotenv
+requests
+pytest
 

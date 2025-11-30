@@ -13,3 +13,5 @@ fi
 python3 iniciar.py
 
 
+
+

@@ -84,12 +84,22 @@ def main():
     os.environ['APP_PORT'] = str(porta)
     
     # Rodar o servidor
+    # Em desenvolvimento, usa dev_server.py para auto-reload
+    # Em produção, usa main.py diretamente
+    dev_server_path = os.path.join(PASTA_PROJETO, 'dev_server.py')
+    usar_dev_server = os.path.exists(dev_server_path)
+    
+    if usar_dev_server:
+        print(f'\n🔄 Modo desenvolvimento: Auto-reload habilitado')
+        print(f'   Mudanças em arquivos .py serão detectadas automaticamente')
+        print(f'   A página recarregará sozinha quando você salvar arquivos\n')
+        cmd = [sys.executable, 'dev_server.py']
+    else:
+        print(f'\n⚠️  dev_server.py não encontrado. Usando modo sem auto-reload.')
+        cmd = [sys.executable, '-m', 'mini_erp.main']
+    
     try:
-        subprocess.run([
-            sys.executable,
-            '-m',
-            'mini_erp.main'
-        ], cwd=PASTA_PROJETO)
+        subprocess.run(cmd, cwd=PASTA_PROJETO)
         
     except KeyboardInterrupt:
         print('\n\n⛔ Servidor interrompido pelo usuário')
@@ -103,5 +113,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

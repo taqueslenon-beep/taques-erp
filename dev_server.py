@@ -65,9 +65,12 @@ class StableFilter(DefaultFilter):
         
         path_obj = Path(path)
         
-        # Ignora diretórios específicos
+        # Ignora diretórios específicos (mas permite mini_erp/)
         for part in path_obj.parts:
-            if part in self.ignore_dirs or part.startswith('.'):
+            if part in self.ignore_dirs:
+                return False
+            # Ignora diretórios ocultos, exceto se for parte do projeto
+            if part.startswith('.') and part not in ['.nicegui']:
                 return False
         
         # Só aceita arquivos .py
@@ -79,8 +82,12 @@ class StableFilter(DefaultFilter):
         if name.startswith('.') or name.startswith('~') or name.endswith('~'):
             return False
         
-        # Ignora dev_server.py (evita loop se editar este arquivo)
-        if name == 'dev_server.py':
+        # Ignora dev_server.py e iniciar.py (evita loop)
+        if name in ['dev_server.py', 'iniciar.py']:
+            return False
+        
+        # Ignora arquivos de backup/scripts de migração
+        if 'backup' in name.lower() or 'migrate' in name.lower():
             return False
         
         # Debounce: ignora se reiniciou muito recentemente
@@ -89,7 +96,8 @@ class StableFilter(DefaultFilter):
             return False
         
         _last_restart = now
-        print(f"📝 Mudança detectada: {path}")
+        print(f"\n📝 Mudança detectada: {path}")
+        print(f"🔄 Reiniciando servidor...")
         return True
 
 
@@ -141,9 +149,13 @@ def main():
     print(f"🔄 Auto-reload habilitado (debounce: {DEBOUNCE_SECONDS}s)")
     print(f"🌐 Acesse a aplicação em: http://localhost:{PORT}")
     print("\n💡 Dicas:")
-    print("   • Salve qualquer arquivo .py para recarregar")
+    print("   • Salve qualquer arquivo .py para recarregar automaticamente")
+    print("   • O servidor reinicia quando detecta mudanças")
+    print("   • A página web pode precisar de refresh manual (F5) após mudanças")
     print("   • Pressione Ctrl+C para parar o servidor")
-    print("   • A página web recarregará automaticamente")
+    print("\n⚠️  IMPORTANTE: Se mudanças não aparecerem:")
+    print("   • Pressione F5 no navegador para forçar refresh")
+    print("   • Ou Ctrl+Shift+R (hard refresh) para limpar cache")
     print("\n" + "="*60 + "\n")
     
     # Abre navegador em thread separada
