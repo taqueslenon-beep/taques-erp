@@ -8,7 +8,7 @@ from nicegui import ui
 from typing import Dict, Any, Tuple, Callable
 from ...utils import make_required_label, format_option_for_pessoa, format_option_for_search_pessoa
 from ...database import listar_pessoas_como_clientes, listar_todas_pessoas
-from ....core import get_display_name
+from .....core import get_display_name
 
 
 def render_aba_partes(state: Dict[str, Any]) -> Tuple[ui.select, ui.column, ui.select, ui.column, ui.select, ui.column, Callable, Callable, Callable]:
