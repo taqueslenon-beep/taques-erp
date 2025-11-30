@@ -1,0 +1,75 @@
+[2025-11-29 23:06:55] [INFO] [reinicializacao] Iniciando reinicialização - Modo: completo, Backup: sim, Validação: sim
+[2025-11-29 23:06:55] [INFO] [reinicializacao] [FASE 1] Preparando sistema para desligamento...
+[2025-11-29 23:06:55] [INFO] [reinicializacao] [FASE 1] ✓ Sistema preparado para desligamento
+[2025-11-29 23:06:55] [INFO] [reinicializacao] [FASE 1] Exportando dados do Firestore...
+[2025-11-29 23:06:55] [INFO] [reinicializacao] [FASE 1] Exportando coleção: cases...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ cases: 22 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: processes...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ processes: 21 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: clients...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ clients: 9 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: opposing_parties...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ opposing_parties: 12 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: users...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ users: 0 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: benefits...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ benefits: 0 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: agreements...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ agreements: 0 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando coleção: convictions...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ convictions: 0 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ Total: 64 documentos exportados
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando inventário do Storage...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ⚠️  Erro ao exportar Storage: 404 GET https://storage.googleapis.com/storage/v1/b/taques-erp.appspot.com/o?projection=noAcl&prettyPrint=false: The specified bucket does not exist.
+[2025-11-29 23:06:56] [WARNING] [reinicializacao] Erro ao exportar Storage: 404 GET https://storage.googleapis.com/storage/v1/b/taques-erp.appspot.com/o?projection=noAcl&prettyPrint=false: The specified bucket does not exist.
+Traceback (most recent call last):
+  File "/Users/lenontaques/Desktop/taques-erp/scripts/reinicializar_sistema.py", line 216, in exportar_storage_inventory
+    for blob in blobs:
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/page_iterator.py", line 208, in _items_iter
+    for page in self._page_iter(increment=False):
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/page_iterator.py", line 244, in _page_iter
+    page = self._next_page()
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/page_iterator.py", line 373, in _next_page
+    response = self._get_next_page_response()
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/page_iterator.py", line 432, in _get_next_page_response
+    return self.api_request(
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/cloud/storage/_http.py", line 90, in api_request
+    return call()
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+  File "/Users/lenontaques/Desktop/taques-erp/.venv/lib/python3.9/site-packages/google/cloud/_http/__init__.py", line 494, in api_request
+    raise exceptions.from_http_response(response)
+google.api_core.exceptions.NotFound: 404 GET https://storage.googleapis.com/storage/v1/b/taques-erp.appspot.com/o?projection=noAcl&prettyPrint=false: The specified bucket does not exist.
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] Exportando sessões ativas...
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✓ 4 sessões exportadas
+[2025-11-29 23:06:56] [INFO] [reinicializacao] [FASE 1] ✗ FASE 1 falhou: Object of type DatetimeWithNanoseconds is not JSON serializable
+[2025-11-29 23:06:56] [ERROR] [reinicializacao] FASE 1 falhou: Object of type DatetimeWithNanoseconds is not JSON serializable
+Traceback (most recent call last):
+  File "/Users/lenontaques/Desktop/taques-erp/scripts/reinicializar_sistema.py", line 344, in executar_fase1
+    json.dump(full_backup, f, ensure_ascii=False, indent=2)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 431, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 325, in _iterencode_list
+    yield from chunks
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 438, in _iterencode
+    o = _default(o)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type DatetimeWithNanoseconds is not JSON serializable
+[2025-11-29 23:06:56] [CRITICAL] [reinicializacao] Erro crítico em FASE 1 ou 2 - sistema não foi alterado

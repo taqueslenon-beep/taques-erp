@@ -1,0 +1,164 @@
+================================================================================
+DIAGNÓSTICO DE INFRAESTRUTURA - DETERMINAÇÃO DE LOCALIZAÇÃO DO SERVIDOR
+================================================================================
+Data/Hora: $(date)
+================================================================================
+
+1. INFORMAÇÕES BÁSICAS DO SISTEMA
+================================================================================
+
+Hostname:         Mac.lan
+Usuário:          lenontaques
+Sistema:          macOS 15.6 (Build 24G84)
+Kernel:           Darwin 24.6.0 (ARM64 - Apple M4)
+Hardware:         MacBook Air M4 (MW123LL/A)
+Memória:          16 GB RAM
+Tempo ligado:     9 horas 58 minutos
+Load Average:     3.51, 3.51, 3.56
+
+================================================================================
+2. INFORMAÇÕES DE REDE
+================================================================================
+
+IP LOCAL (Privado):
+  - Interface:    en0 (Ethernet/WiFi ativo)
+  - IP:           192.168.1.54
+  - Máscara:      255.255.255.0 (0xffffff00)
+  - Broadcast:    192.168.1.255
+  - Status:       ATIVO
+
+IP PÚBLICO (Externo):
+  - IP:           187.17.229.240
+  - Tipo:         IP Público (não é privado)
+  - Verificado em: https://meuip.com.br e https://api.ipify.org
+
+Loopback:
+  - IP:           127.0.0.1 (localhost)
+  - Status:       ATIVO
+
+ANÁLISE DE IP:
+  - IP Privado (192.168.x.x): SIM - Máquina está em rede local
+  - IP Público (187.17.229.240): SIM - Acesso à internet funcionando
+  - IP Estático: NÃO (geralmente IPs residenciais são dinâmicos)
+  - Conclusão: Máquina local conectada à internet via roteador doméstico/escritório
+
+================================================================================
+3. TIPO DE MÁQUINA DETECTADO
+================================================================================
+
+✅ CONCLUSÃO: MÁQUINA LOCAL (LAPTOP/DESKTOP PESSOAL)
+
+Evidências:
+  - Hardware: MacBook Air (laptop pessoal)
+  - Hostname: "Mac.lan" (padrão de máquina local macOS)
+  - IP Privado: 192.168.1.54 (faixa de rede doméstica/comercial)
+  - Sistema: macOS desktop (não é servidor Linux)
+  - Usuário: lenontaques (usuário pessoal, não "root" ou serviço)
+  - Ambiente: Desktop pessoal com navegador (Vivaldi) rodando
+
+NÃO É:
+  ❌ Servidor Cloud (AWS, DigitalOcean, etc) - não tem IP público estático dedicado
+  ❌ VPS Dedicado - não é ambiente Linux servidor
+  ❌ Hospedagem Compartilhada - não há limitações típicas de hosting
+
+================================================================================
+4. SERVIDOR PYTHON - STATUS E CONFIGURAÇÃO
+================================================================================
+
+SERVIDOR RODANDO: ✅ SIM
+
+Processos Python detectados:
+  - PID 35725: Python mini_erp/main.py (processo principal)
+  - PID 35766: Processo auxiliar (multiprocessing)
+  - PID 27214: Python iniciar.py
+  - PID 27215: Python dev_server.py
+
+Porta em uso:
+  - Porta: 8080 (http-alt)
+  - Status: LISTEN (aguardando conexões)
+  - Tipo: TCP/IPv4
+  - Endereço: *:http-alt (todas as interfaces)
+  - Conexões ativas: 2 conexões estabelecidas
+
+Acessos detectados:
+  - Navegador (Vivaldi) conectado via localhost:8080
+  - Conexões: localhost:52918 -> localhost:8080 (ESTABLISHED)
+
+================================================================================
+5. TESTES DE CONECTIVIDADE
+================================================================================
+
+✅ Teste 1 - Ping localhost:
+   Resultado: SUCESSO
+   - 3 pacotes enviados, 3 recebidos (0% perda)
+   - Tempo médio: 0.122 ms
+
+✅ Teste 2 - Acesso à internet (Google):
+   Resultado: SUCESSO
+   - HTTP Status: 301 (redirecionamento - conexão OK)
+
+✅ Teste 3 - Porta 8080:
+   Resultado: FUNCIONANDO
+   - Servidor escutando na porta 8080
+   - Aceitando conexões
+
+⚠️  Teste 4 - Acesso externo à porta 8080:
+   Status: NÃO VERIFICADO (requer teste externo ou ferramenta especializada)
+   Observação: IP privado 192.168.1.54 não é acessível diretamente de fora.
+              Para acesso externo, seria necessário:
+              - Configurar port forwarding no roteador (192.168.1.1)
+              - Usar serviço de túnel (ngrok, localtunnel, etc)
+              - Verificar se o roteador tem IP público estático
+
+================================================================================
+6. DIAGNÓSTICO FINAL
+================================================================================
+
+LOCALIZAÇÃO: MÁQUINA LOCAL (CASA/ESCRITÓRIO)
+
+Ambiente:
+  ✅ Laptop MacBook Air M4 pessoal
+  ✅ Conectado à rede local (192.168.1.x)
+  ✅ IP público dinâmico (187.17.229.240)
+  ✅ Servidor Python rodando localmente na porta 8080
+
+Acesso ao Servidor:
+  ✅ Local: http://localhost:8080 ou http://192.168.1.54:8080
+  ⚠️  Externo: Provavelmente NÃO ACESSÍVEL sem configuração adicional
+  
+  Para acesso externo, você precisaria:
+  1. Configurar port forwarding no roteador (porta 8080 -> 192.168.1.54:8080)
+  2. Verificar se o IP público (187.17.229.240) é estático ou muda com frequência
+  3. Considerar usar serviço de túnel reverso (ngrok, localtunnel) para desenvolvimento
+  4. Para produção: migrar para servidor cloud (AWS, DigitalOcean, etc)
+
+Recomendações:
+  📌 Para desenvolvimento local: Está perfeito como está
+  📌 Para acesso remoto temporário: Use ngrok ou similar
+  📌 Para produção: Considere servidor cloud com IP estático
+  📌 Para equipe: Configure VPN ou túnel seguro se necessário
+
+================================================================================
+7. COMANDOS ÚTEIS PARA VERIFICAÇÃO FUTURA
+================================================================================
+
+Verificar IP público:
+  curl https://api.ipify.org
+  curl https://meuip.com.br
+
+Verificar portas abertas:
+  lsof -i :8080
+
+Verificar processos Python:
+  ps aux | grep python
+
+Verificar conectividade:
+  ping -c 3 google.com
+
+Verificar configuração de rede:
+  ifconfig (macOS/Linux)
+  ipconfig (Windows)
+
+================================================================================
+FIM DO DIAGNÓSTICO
+================================================================================

@@ -1,0 +1,1304 @@
+{
+  "timestamp": "20251130_044045",
+  "total_documents": 26,
+  "processes": [
+    {
+      "access_lawyer_comment": "",
+      "nucleo": "Ambiental",
+      "legal_thesis": "",
+      "other_parties": [],
+      "access_client_comment": "",
+      "result": null,
+      "access_technicians_comment": "",
+      "system": null,
+      "link": "",
+      "clients": [
+        "Refloresta - Matriz"
+      ],
+      "number": "16.371.021-8",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 137428 - refloresta - 1,3 ha - campo do tenente 2020",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": false,
+      "access_client_requested": false,
+      "data_abertura": "03/02/2020",
+      "opposing_parties": [
+        "Força Verde",
+        "IAT/PR"
+      ],
+      "process_type": "Existente",
+      "scenarios": [],
+      "relatory_timeline": "",
+      "status": "Em andamento",
+      "relatory_documents": "",
+      "title": "AIA 137428 - REFLORESTA - 1,3 HA - CAMPO DO TENENTE 2020",
+      "cases": [
+        "1.4 - Campo do Tenente  / 2020"
+      ],
+      "case_ids": [
+        "1-4-campo-do-tenente-2020"
+      ],
+      "access_lawyer": false,
+      "state": "Paraná",
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-137428---refloresta---1,3-ha---campo-do-tenente-2020",
+      "_backup_doc_id": "aia-137428---refloresta---1,3-ha---campo-do-tenente-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Luciane"
+      ],
+      "number": "39821-A",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 39821-a - em app - luciane - rio da areia do meio - 2016 - 0,726 ha",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "12/01/2016",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 39821-A - EM APP - LUCIANE - RIO DA AREIA DO MEIO - 2016 - 0,726 HA",
+      "cases": [
+        "1.2 - Rio da Areia do Meio  / 2016"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-2-rio-da-areia-do-meio-2016"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-39820-a---em-app---luciane---rio-da-areia-do-meio---2016---16,56-ha",
+      "_backup_doc_id": "aia-39820-a---em-app---luciane---rio-da-areia-do-meio---2016---16,56-ha"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Luciane"
+      ],
+      "number": "AIA 39820 - A",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 39820-a - luciane - rio da areia do meio - 2016 - 16,56 ha ",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "12/01/2016",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 39820-A - LUCIANE - RIO DA AREIA DO MEIO - 2016 - 16,56 HA ",
+      "cases": [
+        "1.2 - Rio da Areia do Meio  / 2016"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-2-rio-da-areia-do-meio-2016"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-39820-a---rio-da-areia-do-meio---2016---16,56-ha-",
+      "_backup_doc_id": "aia-39820-a---rio-da-areia-do-meio---2016---16,56-ha-"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Refloresta - Matriz"
+      ],
+      "number": "AIA 39822-A",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 39822-a - refloresta - rio da areia do meio 2016 - 16,56 ha ",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "12/01/2016",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 39822-A - REFLORESTA - RIO DA AREIA DO MEIO 2016 - 16,56 HA ",
+      "cases": [
+        "1.2 - Rio da Areia do Meio  / 2016"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-2-rio-da-areia-do-meio-2016"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-39822-a---refloresta---rio-da-areia-do-meio-2016",
+      "_backup_doc_id": "aia-39822-a---refloresta---rio-da-areia-do-meio-2016"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Refloresta - Matriz"
+      ],
+      "number": "AIA 39823-A",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 39823-a - em app - refloresta - rio da areia do meio 2016 - 0,72 ha",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "12/01/2016",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 39823-A - EM APP - REFLORESTA - RIO DA AREIA DO MEIO 2016 - 0,72 HA",
+      "cases": [
+        "1.2 - Rio da Areia do Meio  / 2016"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-2-rio-da-areia-do-meio-2016"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-39823-a---refloresta---rio-da-areia-do-meio-2016---0,72-ha",
+      "_backup_doc_id": "aia-39823-a---refloresta---rio-da-areia-do-meio-2016---0,72-ha"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SEI - Ibama",
+      "access_lawyer_granted": true,
+      "link": "https://sei.ibama.gov.br/processo_acesso_externo_consulta.php?id_acesso_externo=2108592&id_orgao_acesso_externo=0&infra_hash=ca82588b75225c9f1daaf76f4a7d9e80",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "02026.002103/2008-15",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 450566-d - desmatamento - 12,74 ha - ibama",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "IBAMA"
+      ],
+      "scenarios": [],
+      "data_abertura": "05/09/2008",
+      "relatory_documents": "",
+      "status": "Em andamento",
+      "title": "AIA 450566-D - DESMATAMENTO - 12,74 HA - IBAMA",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": true,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-450566-d---desmatamento---12,74-ha---ibama",
+      "_backup_doc_id": "aia-450566-d---desmatamento---12,74-ha---ibama"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SEI - Ibama",
+      "access_lawyer_granted": true,
+      "link": "https://sei.ibama.gov.br/processo_acesso_externo_consulta.php?id_acesso_externo=2066141&id_orgao_acesso_externo=0&infra_hash=73462f791c33bedf10d6d8adf6dcf7e6",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "02026.002104/2008-51",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 450567-d - desmatamento - 2.72 ha - ibama",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Jocel "
+      ],
+      "scenarios": [],
+      "data_abertura": "05/09/2008",
+      "relatory_documents": "",
+      "status": "Em andamento",
+      "title": "AIA 450567-D - DESMATAMENTO - 2.72 HA - IBAMA",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": true,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-450567-d---desmatamento---2.72-ha---ibama",
+      "_backup_doc_id": "aia-450567-d---desmatamento---2.72-ha---ibama"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Jhonny"
+      ],
+      "number": "AIA 5504-E",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 5504-e - jhonny - 7,92 ha - rio negrinho 2020",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "03/11/2020",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 5504-E - JHONNY - 7,92 HA - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-5504-e---jhonny---7,92-ha---rio-negrinho-2020",
+      "_backup_doc_id": "aia-5504-e---jhonny---7,92-ha---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SGPE",
+      "link": "",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "AIA 5505-E",
+      "access_technicians_requested": false,
+      "title_searchable": "aia 5505-e - jocel - 7,92 ha - rio negrinho 2020",
+      "depth": 0,
+      "area": "Administrativo",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "scenarios": [],
+      "data_abertura": "03/11/2020",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AIA 5505-E - JOCEL - 7,92 HA - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "aia-5505-e---jocel---7,92-ha---rio-negrinho-2020",
+      "_backup_doc_id": "aia-5505-e---jocel---7,92-ha---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "access_lawyer_granted": true,
+      "link": "https://eproc1g.tjsc.jus.br/eproc/controlador.php?acao=processo_selecionar&num_processo=00006432520198240041&hash=5361dfe249b774e62d8b84047a131451",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "0000643-25.2019.8.24.0041/SC",
+      "access_technicians_requested": false,
+      "title_searchable": "ação civil pública - contagem 2008",
+      "depth": 0,
+      "area": "Cível",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "Infelizmente <b>não houve a interposição de recurso de apelação</b> mesmo com a sentença desfavorável, perdendo-se uma oportui<br><br><br>",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "data_abertura": "03/04/2019",
+      "relatory_documents": "- Petição inicial<div>- Constituição<br>- <b>Sentença: </b>documento mais importante deste processo.</div>",
+      "status": "Concluído",
+      "title": "AÇÃO CIVIL PÚBLICA - CONTAGEM 2008",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": true,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "ação-civil-pública---contagem-2008",
+      "_backup_doc_id": "ação-civil-pública---contagem-2008"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "legal_thesis": "",
+      "other_parties": [],
+      "nucleo": "Ambiental",
+      "access_client_comment": "",
+      "access_technicians_comment": "",
+      "system": "Projudi",
+      "future_probability": "Baixa",
+      "link": "",
+      "future_description": "",
+      "clients": [
+        "Refloresta - Matriz"
+      ],
+      "number": "",
+      "title_searchable": "ação penal - campo do tenente ",
+      "access_technicians_requested": false,
+      "depth": 0,
+      "access_lawyer_requested": false,
+      "area": "Criminal",
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": false,
+      "access_client_requested": false,
+      "data_abertura": "",
+      "opposing_parties": [
+        "MPPR"
+      ],
+      "process_type": "Futuro",
+      "scenarios": [],
+      "relatory_timeline": "",
+      "status": "Futuro/Previsto",
+      "relatory_documents": "",
+      "title": "AÇÃO PENAL - CAMPO DO TENENTE ",
+      "cases": [
+        "1.4 - Campo do Tenente  / 2020"
+      ],
+      "state": "Paraná",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-4-campo-do-tenente-2020"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "ação-penal---campo-do-tenente-",
+      "_backup_doc_id": "ação-penal---campo-do-tenente-"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "access_lawyer_granted": true,
+      "link": "https://eproc1g.tjsc.jus.br/eproc/controlador.php?acao=processo_selecionar&num_processo=50023188020258240055&hash=3492ee2b28c209b162c15cd089b87d31",
+      "clients": [
+        "Jhonny"
+      ],
+      "number": "5002318-80.2025.8.24.0055/SC",
+      "access_technicians_requested": false,
+      "title_searchable": "ação penal - jhonny - rio negrinho 2020 ",
+      "depth": 0,
+      "access_lawyer_requested": true,
+      "area": "Criminal",
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": true,
+      "access_client_requested": false,
+      "data_abertura": "29/08/2025 ",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "process_type": "Existente",
+      "status": "Em andamento",
+      "relatory_documents": "",
+      "title": "AÇÃO PENAL - JHONNY - RIO NEGRINHO 2020 ",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "access_technicians_granted": true,
+      "strategy_objectives": "",
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "ação-penal---jhonny---rio-negrinho-2020-",
+      "_backup_doc_id": "ação-penal---jhonny---rio-negrinho-2020-"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "legal_thesis": "Não se aplica. Processo já finalizado.",
+      "other_parties": [],
+      "nucleo": "Ambiental",
+      "access_client_comment": "",
+      "access_technicians_comment": "",
+      "system": "Processo físico 📁",
+      "link": "",
+      "clients": [
+        "Jocel",
+        "Carlos",
+        "Sr. Friedrisch"
+      ],
+      "number": "041.08.004776-0",
+      "access_technicians_requested": false,
+      "title_searchable": "termo circunstanciado - jocel, carlos e sr. friedrich - contagem 2008",
+      "depth": 0,
+      "area": "Criminal",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "Não se aplica. Processo já finalizado.",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "relatory_timeline": "",
+      "scenarios": [],
+      "data_abertura": "2008",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "TERMO CIRCUNSTANCIADO - JOCEL, CARLOS E SR. FRIEDRICH - CONTAGEM 2008",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "access_lawyer": false,
+      "state": "Santa Catarina",
+      "strategy_objectives": "Não se aplica. Processo já finalizado.",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "ação-penal---jocel,-calros-e-sr.-friedrich",
+      "_backup_doc_id": "ação-penal---jocel,-calros-e-sr.-friedrich"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [
+        "Polícia Científica de Santa Catarina"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "access_lawyer_granted": true,
+      "link": "https://eproc1g.tjsc.jus.br/eproc/controlador.php?acao=processo_selecionar&num_processo=00019086720168240041&acao_origem=selecionar_processos_agendar_arquivo_completo&hash=b101d0b12df6c92099bc5d59ed4042b7",
+      "clients": [
+        "Luciane",
+        "Refloresta - Matriz"
+      ],
+      "number": "0001908-67.2016.8.24.0041",
+      "access_technicians_requested": false,
+      "title_searchable": "ação penal - rio da areia do meio 2016 - luciane e refloresta",
+      "depth": 0,
+      "area": "Criminal",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": true,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "data_abertura": "27/09/2016",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "AÇÃO PENAL - RIO DA AREIA DO MEIO 2016 - LUCIANE E REFLORESTA",
+      "cases": [
+        "1.2 - Rio da Areia do Meio  / 2016"
+      ],
+      "case_ids": [
+        "1-2-rio-da-areia-do-meio-2016"
+      ],
+      "access_lawyer": false,
+      "access_technicians_granted": true,
+      "strategy_objectives": "",
+      "state": "Santa Catarina",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "ação-penal---rio-da-areia-do-meio-2016---luciane-e-refloresta",
+      "_backup_doc_id": "ação-penal---rio-da-areia-do-meio-2016---luciane-e-refloresta"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [
+        "Polícia Militar Ambiental de Canoinhas"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "access_lawyer_granted": true,
+      "link": "5002520-28.2023.8.24.0055",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "5002520-28.2023.8.24.0055",
+      "access_technicians_requested": false,
+      "title_searchable": "execução de acordo (anpp) - jocel - rio negrinho 2020",
+      "depth": 0,
+      "access_lawyer_requested": true,
+      "area": "Criminal",
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": true,
+      "access_client_requested": false,
+      "data_abertura": "04/09/2023",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "process_type": "Existente",
+      "status": "Concluído",
+      "relatory_documents": "",
+      "title": "EXECUÇÃO DE ACORDO (ANPP) - JOCEL - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "access_technicians_granted": true,
+      "strategy_objectives": "",
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "execução-de-acordo-(anpp)---jocel---rio-negrinho-2020",
+      "_backup_doc_id": "execução-de-acordo-(anpp)---jocel---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "Sistema Interno - MPSC",
+      "link": "https://www.mpsc.mp.br/servicos/procedimentos-e-processos",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "06.2013.00008764-9",
+      "access_technicians_requested": false,
+      "title_searchable": "inquérito civil 2013 - contagem 2008",
+      "depth": 0,
+      "area": "Cível",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "data_abertura": "11/07/2013",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "INQUÉRITO CIVIL 2013 - CONTAGEM 2008",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": true,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "inquérito-civil-2013---contagem-2008",
+      "_backup_doc_id": "inquérito-civil-2013---contagem-2008"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "access_lawyer_granted": true,
+      "link": "5000194-32.2022.8.24.0055",
+      "clients": [
+        "Jhonny",
+        "Jocel"
+      ],
+      "number": "5000194-32.2022.8.24.0055",
+      "access_technicians_requested": false,
+      "title_searchable": "inquérito policial - jhonny e jocel - rio negrinho 2020",
+      "depth": 0,
+      "access_lawyer_requested": true,
+      "area": "Criminal",
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": true,
+      "access_client_requested": false,
+      "data_abertura": "27/01/2022",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "PC/SC"
+      ],
+      "scenarios": [],
+      "process_type": "Existente",
+      "status": "Concluído",
+      "relatory_documents": "",
+      "title": "INQUÉRITO POLICIAL - JHONNY E JOCEL - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "access_technicians_granted": true,
+      "strategy_objectives": "",
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "inquérito-policial---jhonny-e-jocel---rio-negrinho-2020",
+      "_backup_doc_id": "inquérito-policial---jhonny-e-jocel---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [
+        "Daniel Fuchs"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SEI - Ibama",
+      "link": "",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "02026.002104/2008-51",
+      "access_technicians_requested": false,
+      "title_searchable": "prad - contagem 2008 - apenas área de 2,72 ha (app) - apresentado por daniel fuchs",
+      "depth": 1,
+      "area": "Técnico/projetos",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Instituto Brasileiro do Meio Ambiente e dos Recursos Naturais Renováveis"
+      ],
+      "scenarios": [],
+      "data_abertura": "12/05/2009",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "PRAD - CONTAGEM 2008 - APENAS ÁREA DE 2,72 HA (APP) - APRESENTADO POR DANIEL FUCHS",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": "aia-450567-d---desmatamento---2.72-ha---ibama",
+      "relatory_facts": "",
+      "_id": "prad---contagem-2008---apenas-área-de-2,72-ha-(app)---apresentado-por-daniel-fuchs",
+      "_backup_doc_id": "prad---contagem-2008---apenas-área-de-2,72-ha-(app)---apresentado-por-daniel-fuchs"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SEI - Ibama",
+      "link": "",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "02026.002103/2008-15",
+      "access_technicians_requested": false,
+      "title_searchable": "prad 2012 - contagem 2008 - 12,74 ha - contagem 2008 - apresentado por alexandro banaszewski",
+      "depth": 1,
+      "area": "Técnico/projetos",
+      "access_lawyer_requested": false,
+      "protocols": [
+        {
+          "system": "SEI - Ibama",
+          "date": "",
+          "number": "",
+          "observations": "",
+          "title": "PROTOCOLO DO PRAD "
+        }
+      ],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "IBAMA"
+      ],
+      "scenarios": [],
+      "data_abertura": "21/09/2012",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "PRAD 2012 - CONTAGEM 2008 - 12,74 HA - CONTAGEM 2008 - APRESENTADO POR ALEXANDRO BANASZEWSKI",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": "aia-450566-d---desmatamento---12,74-ha---ibama",
+      "relatory_facts": "",
+      "_id": "prad---ibama---contagem-2008",
+      "_backup_doc_id": "prad---ibama---contagem-2008"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [
+        "MPSC"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "SEI - Ibama",
+      "link": "",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "02026.002103/2008-15",
+      "access_technicians_requested": false,
+      "title_searchable": "prad 2023 - contagem 2008 - 14,74 ha - apresentado por edson (mm florestal)",
+      "depth": 1,
+      "area": "Técnico/projetos",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Instituto Brasileiro do Meio Ambiente e dos Recursos Naturais Renováveis"
+      ],
+      "scenarios": [],
+      "data_abertura": "03/2020",
+      "relatory_documents": "",
+      "status": "Em andamento",
+      "title": "PRAD 2023 - CONTAGEM 2008 - 14,74 HA - APRESENTADO POR EDSON (MM FLORESTAL)",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": "aia-450567-d---desmatamento---2.72-ha---ibama",
+      "relatory_facts": "",
+      "_id": "prad-2023---contagem-2008---14,74-ha---apresentado-por-edson-(mm-florestal)",
+      "_backup_doc_id": "prad-2023---contagem-2008---14,74-ha---apresentado-por-edson-(mm-florestal)"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "access_client_comment": "",
+      "other_parties": [
+        "Instituto Brasileiro do Meio Ambiente e dos Recursos Naturais Renováveis"
+      ],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "eproc - TJSC - 1ª instância",
+      "link": "",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "0000643-25.2019.8.24.0041",
+      "access_technicians_requested": false,
+      "title_searchable": "prad/laudo - contagem 2008 - apresentado junto à acp - alexandro",
+      "depth": 1,
+      "area": "Técnico/projetos",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "data_abertura": "07/05/2018",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "PRAD/LAUDO - CONTAGEM 2008 - APRESENTADO JUNTO À ACP - ALEXANDRO",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": "ação-civil-pública---contagem-2008",
+      "relatory_facts": "",
+      "_id": "prad-laudo---contagem-2008---apresentado-junto-à-acp---alexandro",
+      "_backup_doc_id": "prad-laudo---contagem-2008---apresentado-junto-à-acp---alexandro"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "Sistema Interno - MPSC",
+      "link": "https://www.mpsc.mp.br/servicos/procedimentos-e-processos",
+      "clients": [
+        "Jocel"
+      ],
+      "number": "09.2023.00005897-9",
+      "access_technicians_requested": false,
+      "title_searchable": "procedimento administrativo - mp - acompanhamento do cumprimento de sentença - acp",
+      "depth": 0,
+      "area": "Cível",
+      "access_lawyer_requested": true,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "Jocel "
+      ],
+      "scenarios": [],
+      "data_abertura": "10/08/2023",
+      "relatory_documents": "",
+      "status": "Em andamento",
+      "title": "PROCEDIMENTO ADMINISTRATIVO - MP - ACOMPANHAMENTO DO CUMPRIMENTO DE SENTENÇA - ACP",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": true,
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "procedimento-administrativo---mp---acompanhamento-do-cumprimento-de-sentença---acp",
+      "_backup_doc_id": "procedimento-administrativo---mp---acompanhamento-do-cumprimento-de-sentença---acp"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "legal_thesis": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "nucleo": "Ambiental",
+      "access_client_comment": "",
+      "system": "e-STF",
+      "link": "",
+      "clients": [
+        "Jhonny"
+      ],
+      "number": "",
+      "access_technicians_requested": false,
+      "title_searchable": "reclamação constitucional - stf - jhonny - rio negrinho 2020",
+      "depth": 0,
+      "area": "Criminal",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": false,
+      "access_client_requested": false,
+      "data_abertura": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "relatory_timeline": "",
+      "scenarios": [],
+      "process_type": "Futuro",
+      "relatory_documents": "",
+      "status": "Futuro/Previsto",
+      "title": "RECLAMAÇÃO CONSTITUCIONAL - STF - JHONNY - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "reclamação-constitucional-ao-stf---rio-negrinho-2020",
+      "_backup_doc_id": "reclamação-constitucional-ao-stf---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "legal_thesis": "",
+      "other_parties": [],
+      "access_client_comment": "",
+      "access_technicians_comment": "",
+      "nucleo": "Ambiental",
+      "system": "e-STJ",
+      "link": "",
+      "clients": [
+        "Jhonny"
+      ],
+      "number": "",
+      "title_searchable": "recurso especial - stj - jhonny - rio negrinho 2020",
+      "access_technicians_requested": false,
+      "depth": 1,
+      "area": "Criminal",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [
+        "ação-penal---jhonny---rio-negrinho-2020-"
+      ],
+      "access_technicians": false,
+      "access_client_requested": false,
+      "data_abertura": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "process_type": "Futuro",
+      "scenarios": [],
+      "relatory_timeline": "",
+      "relatory_documents": "",
+      "status": "Futuro/Previsto",
+      "title": "RECURSO ESPECIAL - STJ - JHONNY - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "access_lawyer": false,
+      "state": "Santa Catarina",
+      "strategy_objectives": "",
+      "parent_id": "ação-penal---jhonny---rio-negrinho-2020-",
+      "relatory_facts": "",
+      "_id": "recurso-especial---stj---jhonny---rio-negrinho-2020",
+      "_backup_doc_id": "recurso-especial---stj---jhonny---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": null,
+      "access_client_comment": "",
+      "other_parties": [],
+      "access_technicians_comment": "",
+      "legal_thesis": "",
+      "nucleo": "Ambiental",
+      "system": "e-STF",
+      "link": "",
+      "clients": [
+        "Jhonny"
+      ],
+      "number": "",
+      "access_technicians_requested": false,
+      "title_searchable": "recurso extraordinário - stf - jhonny - rio negrinho 2020",
+      "depth": 0,
+      "access_lawyer_requested": false,
+      "area": "Criminal",
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "",
+      "parent_ids": [],
+      "access_technicians": false,
+      "access_client_requested": false,
+      "data_abertura": "",
+      "relatory_timeline": "",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "scenarios": [],
+      "process_type": "Futuro",
+      "status": "Futuro/Previsto",
+      "relatory_documents": "",
+      "title": "RECURSO EXTRAORDINÁRIO - STF - JHONNY - RIO NEGRINHO 2020",
+      "cases": [
+        "1.3 - Rio Negrinho / 2020"
+      ],
+      "state": "Santa Catarina",
+      "access_lawyer": false,
+      "case_ids": [
+        "1-3-rio-negrinho-2020"
+      ],
+      "strategy_objectives": "",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "recurso-extraordinário---stf---jhonny---rio-negrinho-2020",
+      "_backup_doc_id": "recurso-extraordinário---stf---jhonny---rio-negrinho-2020"
+    },
+    {
+      "access_lawyer_comment": "",
+      "result": "Perdido",
+      "legal_thesis": "Não se aplica. Processo já finalizado.",
+      "other_parties": [],
+      "nucleo": "Ambiental",
+      "access_client_comment": "",
+      "access_technicians_comment": "",
+      "system": "Processo físico 📁",
+      "link": "",
+      "clients": [
+        "Carlos",
+        "Sr. Friedrisch",
+        "Jocel"
+      ],
+      "number": "041.08.005182",
+      "access_technicians_requested": false,
+      "title_searchable": "termo circunstanciado - jocel, carlos e sr. friedrich - contagem 2008",
+      "depth": 0,
+      "area": "Criminal",
+      "access_lawyer_requested": false,
+      "protocols": [],
+      "access_client": false,
+      "strategy_observations": "Não se aplica. Processo já finalizado.",
+      "access_technicians": false,
+      "access_client_requested": false,
+      "process_type": "Existente",
+      "opposing_parties": [
+        "MPSC"
+      ],
+      "relatory_timeline": "",
+      "scenarios": [],
+      "data_abertura": "2008",
+      "relatory_documents": "",
+      "status": "Concluído",
+      "title": "TERMO CIRCUNSTANCIADO - JOCEL, CARLOS E SR. FRIEDRICH - CONTAGEM 2008",
+      "cases": [
+        "1.1 - Contagem / 2008"
+      ],
+      "case_ids": [
+        "1-1-contagem-2008"
+      ],
+      "access_lawyer": false,
+      "state": "Santa Catarina",
+      "strategy_objectives": "Não se aplica. Processo já finalizado.",
+      "parent_id": null,
+      "relatory_facts": "",
+      "_id": "termo-circunstanciado---jocel,-carlos-e-sr.-friedrich---contagem-2008",
+      "_backup_doc_id": "termo-circunstanciado---jocel,-carlos-e-sr.-friedrich---contagem-2008"
+    }
+  ]
+}
