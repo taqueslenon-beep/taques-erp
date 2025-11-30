@@ -164,3 +164,5 @@ ui.select(options=[]).classes('w-full mb-2')
 - **Consistência:** O padrão `w-full mb-2` é muito comum em inputs e selects
 
 
+
+

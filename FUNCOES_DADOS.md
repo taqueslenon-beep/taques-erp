@@ -512,3 +512,5 @@ save_all() -> None
 6. **Deduplicação**: Sistema remove duplicatas automaticamente em várias operações
 
 
+
+

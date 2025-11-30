@@ -125,3 +125,5 @@
 - **Cache**: Thread-safe em memória (5 minutos TTL)
 
 
+
+
