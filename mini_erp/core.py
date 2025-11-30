@@ -2111,7 +2111,6 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             menu_item('Casos', 'folder', '/casos')
             menu_item('Processos', 'gavel', '/processos')
-            menu_item('Acordos', 'handshake', '/acordos')
             
             # menu_item('Prazos', 'schedule', '/prazos')  # Em desenvolvimento
             # menu_item('Compromissos', 'event', '/compromissos')  # Em desenvolvimento
