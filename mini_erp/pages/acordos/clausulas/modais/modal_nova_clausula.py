@@ -18,6 +18,15 @@ from ..models import CLAUSULA_TIPO_OPTIONS, CLAUSULA_STATUS_OPTIONS, CLAUSULA_ST
 from ...utils import make_required_label
 
 
+def limpar_campo(valor):
+    """Limpa valor vindo de inputs de forma segura, prevenindo .strip() em None."""
+    if valor is None:
+        return ''
+    if not isinstance(valor, str):
+        valor = str(valor)
+    return valor.strip()
+
+
 def criar_dialog_nova_clausula(
     on_save_callback: Optional[Callable] = None,
     clausula_edit: Optional[Dict[str, Any]] = None,
@@ -195,15 +204,36 @@ def criar_dialog_nova_clausula(
                     try:
                         saving = True
                         
-                        # Coletar dados
+                        def obter_valor_input(campo_input):
+                            """Coleta valor do input usando limpar_campo para evitar AttributeError."""
+                            valor_bruto = campo_input.value if campo_input else None
+                            return limpar_campo(valor_bruto)
+                        
+                        # Coletar dados com tratamento defensivo de None
+                        tipo_clausula_val = limpar_campo(
+                            tipo_clausula_select.value if tipo_clausula_select else None
+                        )
+                        titulo_val = obter_valor_input(titulo_input)
+                        numero_val = obter_valor_input(numero_input)
+                        descricao_val = obter_valor_input(descricao_input)
+                        status_val = limpar_campo(
+                            status_select.value if status_select else None
+                        )
+                        prazo_seg_val = obter_valor_input(prazo_seguranca_input)
+                        prazo_fatal_val = obter_valor_input(prazo_fatal_input)
+                        
+                        # Log para debug (remover em produção se necessário)
+                        print(f"DEBUG: Valores coletados - tipo: {tipo_clausula_val}, titulo: {titulo_val}, status: {status_val}")
+                        
+                        # Montar dicionário de dados
                         clausula_data = {
-                            'tipo_clausula': tipo_clausula_select.value if tipo_clausula_select.value else '',
-                            'titulo': titulo_input.value.strip() if titulo_input.value else '',
-                            'numero': numero_input.value.strip() if numero_input.value else None,
-                            'descricao': descricao_input.value.strip() if descricao_input.value else None,
-                            'status': status_select.value if status_select.value else '',
-                            'prazo_seguranca': prazo_seguranca_input.value.strip() if prazo_seguranca_input.value else None,
-                            'prazo_fatal': prazo_fatal_input.value.strip() if prazo_fatal_input.value else None,
+                            'tipo_clausula': tipo_clausula_val,
+                            'titulo': titulo_val,
+                            'numero': numero_val or None,
+                            'descricao': descricao_val or None,
+                            'status': status_val,
+                            'prazo_seguranca': prazo_seg_val or None,
+                            'prazo_fatal': prazo_fatal_val or None,
                         }
                         
                         # Validações individuais (mais específicas)
@@ -220,9 +250,10 @@ def criar_dialog_nova_clausula(
                             errors.append(error_titulo)
                         
                         # Validar status
-                        if not clausula_data.get('status') or not clausula_data['status'].strip():
+                        status_val_raw = clausula_data.get('status', '')
+                        if not status_val_raw or (isinstance(status_val_raw, str) and not status_val_raw.strip()):
                             errors.append('Status é obrigatório!')
-                        elif clausula_data['status'] not in CLAUSULA_STATUS_OPTIONS:
+                        elif isinstance(status_val_raw, str) and status_val_raw not in CLAUSULA_STATUS_OPTIONS:
                             errors.append(f'Status inválido! Use um dos seguintes: {", ".join(CLAUSULA_STATUS_OPTIONS)}')
                         
                         # Validar datas
@@ -241,8 +272,9 @@ def criar_dialog_nova_clausula(
                             return
                         
                         # Adiciona campos de comprovação se status = "Cumprida"
-                        descricao_comprov = descricao_comprovacao_input.value.strip() if descricao_comprovacao_input.value else ''
-                        link_comprov = link_comprovacao_input.value.strip() if link_comprovacao_input.value else None
+                        descricao_comprov = obter_valor_input(descricao_comprovacao_input)
+                        link_comprov_raw = obter_valor_input(link_comprovacao_input)
+                        link_comprov = link_comprov_raw if link_comprov_raw else None
                         
                         if clausula_data['status'] == CLAUSULA_STATUS_CUMPRIDA:
                             clausula_data['descricao_comprovacao'] = descricao_comprov
@@ -319,11 +351,21 @@ def criar_dialog_nova_clausula(
                         # Fechar modal após sucesso (com pequeno delay para garantir que notificação apareça)
                         ui.timer(0.1, lambda: dialog.close(), once=True)
                         
+                    except AttributeError as e:
+                        # Erro específico: tentativa de fazer .strip() em None
+                        import traceback
+                        error_trace = traceback.format_exc()
+                        print(f"ERRO AttributeError ao salvar cláusula: {error_trace}")  # Log para debug
+                        ui.notify('Erro ao processar dados: algum campo está vazio ou inválido. Verifique todos os campos obrigatórios.', type='negative', timeout=6000)
                     except Exception as e:
                         import traceback
                         error_trace = traceback.format_exc()
                         print(f"ERRO inesperado ao salvar cláusula: {error_trace}")  # Log para debug
-                        ui.notify(f'Erro inesperado: {str(e)}', type='negative')
+                        # Mensagem mais amigável para o usuário
+                        mensagem_erro = f'Erro ao salvar cláusula: {str(e)}'
+                        if 'NoneType' in str(e) or 'strip' in str(e):
+                            mensagem_erro = 'Erro ao processar dados: verifique se todos os campos obrigatórios estão preenchidos corretamente.'
+                        ui.notify(mensagem_erro, type='negative', timeout=6000)
                     finally:
                         saving = False
                 

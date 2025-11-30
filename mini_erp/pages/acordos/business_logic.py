@@ -288,15 +288,38 @@ def validar_clausula(clausula_data: Dict[str, Any]) -> Tuple[bool, str]:
     """
     from .models import CLAUSULA_STATUS_OPTIONS, CLAUSULA_TIPO_OPTIONS, CLAUSULA_STATUS_CUMPRIDA
     
+    # Helper para limpar e validar campo string
+    def limpar_campo_string(valor, nome_campo):
+        """
+        Limpa campo string, tratando None e tipos não-string.
+        
+        Args:
+            valor: Valor a limpar (pode ser None, str, etc)
+            nome_campo: Nome do campo para mensagens de erro
+        
+        Returns:
+            String limpa ou string vazia se inválido
+        """
+        if valor is None:
+            return ''
+        if not isinstance(valor, str):
+            try:
+                valor = str(valor) if valor else ''
+            except Exception:
+                return ''
+        return valor.strip()
+    
     # Valida tipo de cláusula (obrigatório)
-    tipo_clausula = clausula_data.get('tipo_clausula', '').strip()
+    tipo_clausula_raw = clausula_data.get('tipo_clausula')
+    tipo_clausula = limpar_campo_string(tipo_clausula_raw, 'Tipo de Cláusula')
     if not tipo_clausula:
         return False, 'Tipo de Cláusula é obrigatório!'
     if tipo_clausula not in CLAUSULA_TIPO_OPTIONS:
         return False, f'Tipo de Cláusula inválido! Use um dos seguintes: {", ".join(CLAUSULA_TIPO_OPTIONS)}'
     
     # Valida título (obrigatório)
-    titulo = clausula_data.get('titulo', '').strip()
+    titulo_raw = clausula_data.get('titulo')
+    titulo = limpar_campo_string(titulo_raw, 'Título')
     if not titulo:
         return False, 'Título da cláusula é obrigatório!'
     if len(titulo) < 3:
@@ -305,7 +328,8 @@ def validar_clausula(clausula_data: Dict[str, Any]) -> Tuple[bool, str]:
         return False, 'Título da cláusula deve ter no máximo 200 caracteres!'
     
     # Valida status (obrigatório)
-    status = clausula_data.get('status', '').strip()
+    status_raw = clausula_data.get('status')
+    status = limpar_campo_string(status_raw, 'Status')
     if not status:
         return False, 'Selecione um status!'
     if status not in CLAUSULA_STATUS_OPTIONS:
@@ -313,14 +337,16 @@ def validar_clausula(clausula_data: Dict[str, Any]) -> Tuple[bool, str]:
     
     # Validação condicional: se status = "Cumprida", descrição de comprovação é obrigatória
     if status == CLAUSULA_STATUS_CUMPRIDA:
-        descricao_comprovacao = clausula_data.get('descricao_comprovacao', '').strip()
+        descricao_comprovacao_raw = clausula_data.get('descricao_comprovacao')
+        descricao_comprovacao = limpar_campo_string(descricao_comprovacao_raw, 'Descrição de Comprovação')
         if not descricao_comprovacao:
             return False, 'Descrição de Comprovação é obrigatória para cláusulas cumpridas!'
         if len(descricao_comprovacao) > 1000:
             return False, 'Descrição de Comprovação deve ter no máximo 1000 caracteres!'
         
         # Valida link de comprovação se preenchido
-        link_comprovacao = clausula_data.get('link_comprovacao', '').strip()
+        link_comprovacao_raw = clausula_data.get('link_comprovacao')
+        link_comprovacao = limpar_campo_string(link_comprovacao_raw, 'Link de Comprovação')
         if link_comprovacao:
             if len(link_comprovacao) > 500:
                 return False, 'Link de Comprovação deve ter no máximo 500 caracteres!'
@@ -328,8 +354,10 @@ def validar_clausula(clausula_data: Dict[str, Any]) -> Tuple[bool, str]:
                 return False, 'Link de Comprovação deve ser uma URL válida (ex: https://exemplo.com)'
     
     # Valida prazos (opcionais, mas se ambos preenchidos, validar lógica)
-    prazo_seguranca = clausula_data.get('prazo_seguranca', '').strip()
-    prazo_fatal = clausula_data.get('prazo_fatal', '').strip()
+    prazo_seguranca_raw = clausula_data.get('prazo_seguranca')
+    prazo_seguranca = limpar_campo_string(prazo_seguranca_raw, 'Prazo de Segurança') if prazo_seguranca_raw else ''
+    prazo_fatal_raw = clausula_data.get('prazo_fatal')
+    prazo_fatal = limpar_campo_string(prazo_fatal_raw, 'Prazo Fatal') if prazo_fatal_raw else ''
     
     # Se ambos prazos preenchidos, validar formato e lógica
     if prazo_seguranca and prazo_fatal:
@@ -457,10 +485,20 @@ def validate_tipo_clausula(valor: str) -> Tuple[bool, str]:
     """
     from .models import CLAUSULA_TIPO_OPTIONS
     
-    if not valor or not valor.strip():
+    # Trata None e tipos não-string
+    if valor is None:
         return False, 'Tipo de Cláusula é obrigatório!'
     
+    if not isinstance(valor, str):
+        try:
+            valor = str(valor) if valor else ''
+        except Exception:
+            return False, 'Tipo de Cláusula é obrigatório!'
+    
     valor = valor.strip()
+    if not valor:
+        return False, 'Tipo de Cláusula é obrigatório!'
+    
     if valor not in CLAUSULA_TIPO_OPTIONS:
         return False, f'Tipo de Cláusula inválido! Use um dos seguintes: {", ".join(CLAUSULA_TIPO_OPTIONS)}'
     
@@ -477,10 +515,20 @@ def validate_titulo_clausula(valor: str) -> Tuple[bool, str]:
     Returns:
         Tupla (is_valid, error_message)
     """
-    if not valor or not valor.strip():
+    # Trata None e tipos não-string
+    if valor is None:
         return False, 'Título da Cláusula é obrigatório!'
     
+    if not isinstance(valor, str):
+        try:
+            valor = str(valor) if valor else ''
+        except Exception:
+            return False, 'Título da Cláusula é obrigatório!'
+    
     titulo = valor.strip()
+    if not titulo:
+        return False, 'Título da Cláusula é obrigatório!'
+    
     if len(titulo) < 3:
         return False, 'Título da Cláusula deve ter pelo menos 3 caracteres!'
     
@@ -501,10 +549,21 @@ def validate_datas_clausula(prazo_seg: Optional[str], prazo_fatal: Optional[str]
     Returns:
         Tupla (is_valid, error_message)
     """
+    # Helper para limpar campo de data
+    def limpar_data(valor):
+        if valor is None:
+            return ''
+        if not isinstance(valor, str):
+            try:
+                valor = str(valor) if valor else ''
+            except Exception:
+                return ''
+        return valor.strip()
+    
     # Se ambos preenchidos, validar formato e lógica
     if prazo_seg and prazo_fatal:
-        prazo_seg = prazo_seg.strip()
-        prazo_fatal = prazo_fatal.strip()
+        prazo_seg = limpar_data(prazo_seg)
+        prazo_fatal = limpar_data(prazo_fatal)
         
         try:
             # Tenta DD/MM/AAAA primeiro
@@ -526,24 +585,26 @@ def validate_datas_clausula(prazo_seg: Optional[str], prazo_fatal: Optional[str]
     
     # Se apenas um prazo preenchido, validar formato
     elif prazo_seg:
-        prazo_seg = prazo_seg.strip()
-        try:
-            if '/' in prazo_seg:
-                datetime.strptime(prazo_seg, '%d/%m/%Y')
-            else:
-                datetime.strptime(prazo_seg, '%Y-%m-%d')
-        except ValueError:
-            return False, 'Prazo de Segurança inválido! Use o formato DD/MM/AAAA ou YYYY-MM-DD.'
+        prazo_seg = limpar_data(prazo_seg)
+        if prazo_seg:  # Só valida se não estiver vazio após limpar
+            try:
+                if '/' in prazo_seg:
+                    datetime.strptime(prazo_seg, '%d/%m/%Y')
+                else:
+                    datetime.strptime(prazo_seg, '%Y-%m-%d')
+            except ValueError:
+                return False, 'Prazo de Segurança inválido! Use o formato DD/MM/AAAA ou YYYY-MM-DD.'
     
     elif prazo_fatal:
-        prazo_fatal = prazo_fatal.strip()
-        try:
-            if '/' in prazo_fatal:
-                datetime.strptime(prazo_fatal, '%d/%m/%Y')
-            else:
-                datetime.strptime(prazo_fatal, '%Y-%m-%d')
-        except ValueError:
-            return False, 'Prazo Fatal inválido! Use o formato DD/MM/AAAA ou YYYY-MM-DD.'
+        prazo_fatal = limpar_data(prazo_fatal)
+        if prazo_fatal:  # Só valida se não estiver vazio após limpar
+            try:
+                if '/' in prazo_fatal:
+                    datetime.strptime(prazo_fatal, '%d/%m/%Y')
+                else:
+                    datetime.strptime(prazo_fatal, '%Y-%m-%d')
+            except ValueError:
+                return False, 'Prazo Fatal inválido! Use o formato DD/MM/AAAA ou YYYY-MM-DD.'
     
     return True, ''
 
@@ -562,24 +623,35 @@ def validate_comprovacao(status: str, descricao: Optional[str], link: Optional[s
     """
     from .models import CLAUSULA_STATUS_CUMPRIDA
     
+    # Helper para limpar campo string
+    def limpar_campo(valor):
+        if valor is None:
+            return ''
+        if not isinstance(valor, str):
+            try:
+                valor = str(valor) if valor else ''
+            except Exception:
+                return ''
+        return valor.strip()
+    
     # Se status não é "Cumprida", não precisa validar
     if status != CLAUSULA_STATUS_CUMPRIDA:
         return True, ''
     
     # Se status é "Cumprida", descrição é obrigatória
-    if not descricao or not descricao.strip():
+    descricao_limpa = limpar_campo(descricao)
+    if not descricao_limpa:
         return False, 'Descrição de Comprovação é obrigatória para cláusulas cumpridas!'
     
-    descricao = descricao.strip()
-    if len(descricao) > 1000:
+    if len(descricao_limpa) > 1000:
         return False, 'Descrição de Comprovação deve ter no máximo 1000 caracteres!'
     
     # Valida link se preenchido
-    if link and link.strip():
-        link = link.strip()
-        if len(link) > 500:
+    link_limpo = limpar_campo(link)
+    if link_limpo:
+        if len(link_limpo) > 500:
             return False, 'Link de Comprovação deve ter no máximo 500 caracteres!'
-        if not eh_url_valida(link):
+        if not eh_url_valida(link_limpo):
             return False, 'Link de Comprovação deve ser uma URL válida (ex: https://exemplo.com)'
     
     return True, ''
