@@ -4,9 +4,107 @@ ui_components.py - Componentes de interface NiceGUI para o módulo de Processos.
 Este módulo contém:
 - Slots de tabela customizados (templates Vue)
 - Colunas de tabela para visualização de acesso
+- CSS padrão para cores alternadas nas tabelas
 """
 
 from typing import List, Dict, Any
+from mini_erp.constants import AREA_COLORS_BACKGROUND, AREA_COLORS_TEXT, AREA_COLORS_BORDER
+
+
+# =============================================================================
+# CSS PADRÃO PARA TABELAS DE PROCESSOS - CORES ALTERNADAS
+# =============================================================================
+
+TABELA_PROCESSOS_CSS = '''
+<style>
+    /* CSS Padrão para Tabelas de Processos - Cores Alternadas */
+    .q-table {
+        border-collapse: collapse;
+        border: 1px solid #e0e0e0;
+    }
+    .q-table thead th {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        padding: 8px 10px !important;
+        text-align: center !important;
+        background-color: #f5f5f5 !important;
+        border-bottom: 2px solid #d0d0d0 !important;
+        border-right: 1px solid #e0e0e0 !important;
+        vertical-align: middle !important;
+        white-space: normal !important;
+        line-height: 1.3 !important;
+    }
+    .q-table thead th:last-child {
+        border-right: none !important;
+    }
+    .q-table tbody td {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+        border-bottom: 1px solid #e8e8e8 !important;
+        border-right: 1px solid #e8e8e8 !important;
+        vertical-align: middle !important;
+    }
+    .q-table tbody td:last-child {
+        border-right: none !important;
+    }
+    /* CORES ALTERNADAS - Par: cinza claro, Ímpar: branco */
+    .q-table tbody tr:nth-child(even) {
+        background-color: #fafafa !important;
+    }
+    .q-table tbody tr:nth-child(odd) {
+        background-color: #ffffff !important;
+    }
+    /* Hover suave */
+    .q-table tbody tr:hover {
+        background-color: #f0f7ff !important;
+    }
+    .q-table tbody tr:last-child td {
+        border-bottom: 1px solid #e8e8e8 !important;
+    }
+    /* PADRONIZAÇÃO DE FONTE - COLUNA "NÚMERO" */
+    /* Garante que números com e sem link tenham exatamente a mesma aparência visual */
+    .process-number-text,
+    .process-number-link {
+        font-size: 11px !important;
+        font-weight: normal !important;
+        color: #374151 !important;
+        line-height: 1.4 !important;
+        text-decoration: none !important;
+        font-family: inherit !important;
+    }
+    /* Links mantêm mesma aparência, mas cursor muda no hover */
+    .process-number-link:hover {
+        color: #374151 !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+    }
+    .process-number-link:active,
+    .process-number-link:visited {
+        color: #374151 !important;
+        text-decoration: none !important;
+    }
+    /* LINHA LILÁS/ROXA PASTEL PARA PROCESSOS FUTURO/PREVISTO */
+    .q-table tbody tr[data-status="Futuro/Previsto"],
+    .q-table tbody tr.future-process-row {
+        background-color: #F3E5F5 !important;
+        border-left: 4px solid #9B59B6 !important;
+    }
+    .q-table tbody tr[data-status="Futuro/Previsto"]:hover,
+    .q-table tbody tr.future-process-row:hover {
+        background-color: #E1BEE7 !important;
+    }
+    /* LINHA AZUL CLARO PARA ACOMPANHAMENTOS DE TERCEIROS */
+    .q-table tbody tr[data-type="third_party_monitoring"],
+    .q-table tbody tr.third-party-monitoring-row {
+        background-color: #E8F1FF !important;
+        border-left: 4px solid #4A90E2 !important;
+    }
+    .q-table tbody tr[data-type="third_party_monitoring"]:hover,
+    .q-table tbody tr.third-party-monitoring-row:hover {
+        background-color: #D4E7FF !important;
+    }
+</style>
+'''
 
 
 # =============================================================================
@@ -192,27 +290,63 @@ BODY_SLOT_ACCESS_CLIENT = '''
 
 
 # =============================================================================
-# SLOT DE CÉLULA PARA ÁREA
+# FUNÇÃO PARA GERAR SLOT DE ÁREA COM CORES DINÂMICAS
 # =============================================================================
 
-BODY_SLOT_AREA = '''
-    <q-td :props="props">
+def _generate_area_slot() -> str:
+    """
+    Gera o slot de área com cores centralizadas.
+    Importa cores de mini_erp.constants para garantir consistência.
+    """
+    # Mapear áreas para seus estilos
+    area_styles = []
+    for area in ['Administrativo', 'Criminal', 'Cível', 'Civil', 'Tributário', 'Técnico/projetos', 'Projeto/Técnicos']:
+        bg = AREA_COLORS_BACKGROUND.get(area, '#e5e7eb')
+        text = AREA_COLORS_TEXT.get(area, '#374151')
+        border = AREA_COLORS_BORDER.get(area, '#9ca3af')
+        
+        # Para variações de nome (Civil/Cível)
+        conditions = [f"props.value === '{area}'"]
+        if area == 'Cível':
+            conditions.append("props.value === 'Civil'")
+        elif area == 'Técnico/projetos':
+            conditions.append("props.value === 'Projeto/Técnicos'")
+        
+        condition = ' || '.join([f"({c})" for c in conditions]) if len(conditions) > 1 else conditions[0]
+        style_str = f"'background-color: {bg}; color: {text}; border: 1px solid {border};'"
+        
+        if area_styles:
+            area_styles.append(f"{condition} ? {style_str} : ")
+        else:
+            area_styles.append(f"{condition} ? {style_str} : ")
+    
+    # Estilo padrão
+    default_style = f"'background-color: {AREA_COLORS_BACKGROUND.get('Outros', '#e5e7eb')}; color: {AREA_COLORS_TEXT.get('Outros', '#374151')}; border: 1px solid {AREA_COLORS_BORDER.get('Outros', '#9ca3af')};'"
+    
+    return f'''
+    <q-td :props="props" style="vertical-align: middle;">
         <q-badge 
             v-if="props.value && props.value !== '-'"
-            :style="props.value === 'Administrativo' ? 'background-color: #d1d5db; color: #1f2937; border: 1px solid #9ca3af;' : 
-                    props.value === 'Criminal' ? 'background-color: #fecaca; color: #7f1d1d; border: 1px solid #f87171;' : 
-                    (props.value === 'Cível' || props.value === 'Civil') ? 'background-color: #bfdbfe; color: #1e3a8a; border: 1px solid #60a5fa;' : 
-                    props.value === 'Tributário' ? 'background-color: #ddd6fe; color: #4c1d95; border: 1px solid #a78bfa;' : 
-                    (props.value === 'Técnico/projetos' || props.value === 'Projeto/Técnicos') ? 'background-color: #bbf7d0; color: #14532d; border: 1px solid #4ade80;' : 
-                    'background-color: #e5e7eb; color: #374151; border: 1px solid #9ca3af;'"
+            :style="props.value === 'Administrativo' ? 'background-color: {AREA_COLORS_BACKGROUND['Administrativo']}; color: {AREA_COLORS_TEXT['Administrativo']}; border: 1px solid {AREA_COLORS_BORDER['Administrativo']};' : 
+                    props.value === 'Criminal' ? 'background-color: {AREA_COLORS_BACKGROUND['Criminal']}; color: {AREA_COLORS_TEXT['Criminal']}; border: 1px solid {AREA_COLORS_BORDER['Criminal']};' : 
+                    (props.value === 'Cível' || props.value === 'Civil') ? 'background-color: {AREA_COLORS_BACKGROUND['Cível']}; color: {AREA_COLORS_TEXT['Cível']}; border: 1px solid {AREA_COLORS_BORDER['Cível']};' : 
+                    props.value === 'Tributário' ? 'background-color: {AREA_COLORS_BACKGROUND['Tributário']}; color: {AREA_COLORS_TEXT['Tributário']}; border: 1px solid {AREA_COLORS_BORDER['Tributário']};' : 
+                    (props.value === 'Técnico/projetos' || props.value === 'Projeto/Técnicos') ? 'background-color: {AREA_COLORS_BACKGROUND['Técnico/projetos']}; color: {AREA_COLORS_TEXT['Técnico/projetos']}; border: 1px solid {AREA_COLORS_BORDER['Técnico/projetos']};' : 
+                    'background-color: {AREA_COLORS_BACKGROUND.get('Outros', '#e5e7eb')}; color: {AREA_COLORS_TEXT.get('Outros', '#374151')}; border: 1px solid {AREA_COLORS_BORDER.get('Outros', '#9ca3af')};'"
             class="px-2 py-1"
             style="font-weight: 600; font-size: 12px; border-radius: 4px;"
         >
-            {{ props.value }}
+            {{{{ props.value }}}}
         </q-badge>
         <span v-else class="text-gray-400">-</span>
     </q-td>
 '''
+
+# =============================================================================
+# SLOT DE CÉLULA PARA ÁREA
+# =============================================================================
+
+BODY_SLOT_AREA = _generate_area_slot()
 
 
 # =============================================================================
@@ -231,16 +365,34 @@ BODY_SLOT_TITLE = '''
 '''
 
 BODY_SLOT_NUMBER = '''
-    <q-td :props="props">
-        <a 
-            v-if="props.row.link" 
-            :href="props.row.link" 
-            target="_blank" 
-            class="text-blue-600 hover:text-blue-800 hover:underline"
-        >
-            {{ props.value }}
-        </a>
-        <span v-else class="text-gray-600">{{ props.value }}</span>
+    <q-td :props="props" style="vertical-align: middle; padding: 6px 10px;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <a 
+                v-if="props.row.link && props.value" 
+                :href="props.row.link" 
+                target="_blank" 
+                class="process-number-link"
+                style="font-size: 11px; font-weight: normal; color: #374151; line-height: 1.4; text-decoration: none; font-family: inherit;">
+                {{ props.value }}
+            </a>
+            <span v-else-if="props.value" 
+                  class="process-number-text"
+                  style="font-size: 11px; font-weight: normal; color: #374151; line-height: 1.4; font-family: inherit;">
+                {{ props.value }}
+            </span>
+            <span v-else class="text-gray-400" style="font-size: 11px;">—</span>
+            <q-btn 
+                v-if="props.value"
+                flat dense round 
+                icon="content_copy" 
+                size="xs" 
+                color="grey"
+                class="ml-1"
+                @click.stop="$parent.$emit('copyNumber', props.value)"
+            >
+                <q-tooltip>Copiar número</q-tooltip>
+            </q-btn>
+        </div>
     </q-td>
 '''
 
@@ -258,7 +410,7 @@ BODY_SLOT_NUCLEO = '''
 '''
 
 BODY_SLOT_CASES = '''
-    <q-td :props="props" style="white-space: normal; vertical-align: top;">
+    <q-td :props="props" style="white-space: normal; vertical-align: middle;">
         <div v-if="props.row.cases_list && props.row.cases_list.length > 0" class="flex flex-col gap-0.5">
             <div v-for="(caso, index) in props.row.cases_list" :key="index" class="text-xs text-gray-700 leading-tight">
                 {{ caso }}
@@ -269,18 +421,22 @@ BODY_SLOT_CASES = '''
 '''
 
 BODY_SLOT_STATUS = '''
-    <q-td :props="props">
-        <q-badge 
-            :style="props.value === 'Em andamento' ? 'background-color: #eab308; color: #111827;' : 
-                    props.value === 'Concluído' ? 'background-color: #166534; color: #ffffff;' : 
-                    props.value === 'Concluído com pendências' ? 'background-color: #4d7c0f; color: #ffffff;' : 
-                    props.value === 'Em monitoramento' ? 'background-color: #ea580c; color: #ffffff;' : 
-                    'background-color: #9ca3af; color: #111827;'"
-            class="text-white px-3 py-1"
-            style="border: 1px solid rgba(0,0,0,0.1);"
-        >
-            {{ props.value }}
-        </q-badge>
+    <q-td :props="props" style="vertical-align: middle;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <q-badge 
+                :style="props.value === 'Em andamento' ? 'background-color: #fde047; color: #000000;' : 
+                        props.value === 'Concluído' ? 'background-color: #4ade80; color: #000000;' : 
+                        props.value === 'Concluído com pendências' ? 'background-color: #a3e635; color: #000000;' : 
+                        props.value === 'Em monitoramento' ? 'background-color: #fdba74; color: #000000;' : 
+                        props.value === 'Futuro/Previsto' ? 'background-color: #e9d5ff; color: #6b21a8;' : 
+                        'background-color: #d1d5db; color: #000000;'"
+                class="px-3 py-1"
+                style="border: 1px solid rgba(0,0,0,0.1);"
+            >
+                {{ props.value }}
+            </q-badge>
+            <q-icon v-if="props.value === 'Futuro/Previsto'" name="auto_awesome" size="18px" style="color: #9333ea;"></q-icon>
+        </div>
     </q-td>
 '''
 
@@ -294,7 +450,7 @@ BODY_SLOT_LINK = '''
 '''
 
 BODY_SLOT_CLIENTS = '''
-    <q-td :props="props" style="white-space: normal; vertical-align: top;">
+    <q-td :props="props" style="white-space: normal; vertical-align: middle;">
         <div v-if="props.row.short_clients_list && props.row.short_clients_list.length > 0" class="flex flex-col gap-0.5">
             <div v-for="(client, index) in props.row.short_clients_list" :key="index" class="text-xs text-gray-700 leading-tight">
                 {{ client }}

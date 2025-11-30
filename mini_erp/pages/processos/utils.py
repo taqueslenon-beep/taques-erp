@@ -7,32 +7,50 @@ Este módulo contém:
 - Funções de ícones e estilos para cenários
 """
 
+import re
 from typing import List, Dict, Any, Tuple, Optional
+
+from ...core import get_display_name
+
+
+def normalize_name_for_display(value: Optional[str]) -> str:
+    """
+    Normaliza nomes removendo textos entre parênteses e espaços extras.
+    Retorna sempre em letras maiúsculas para facilitar matching.
+    """
+    if not value:
+        return ''
+    
+    # Remove conteúdos entre parênteses e normaliza espaços
+    normalized = re.sub(r'\s*\([^)]*\)', '', value.strip())
+    normalized = re.sub(r'\s+', ' ', normalized)
+    return normalized.strip().upper()
 
 
 def get_short_name(full_name: str, source_list: List[Dict[str, Any]]) -> str:
     """
-    Retorna sigla/apelido ou primeiro nome de uma pessoa.
+    Retorna nome de exibição usando a regra centralizada.
     
-    Prioridade: nickname > alias > primeiro nome
+    MIGRADO: Agora usa get_display_name() para consistência em todo o sistema.
     
     Args:
         full_name: Nome completo da pessoa
         source_list: Lista de pessoas (clientes ou partes contrárias)
     
     Returns:
-        Nome abreviado ou sigla
+        Nome de exibição da pessoa
     """
+    target_normalized = normalize_name_for_display(full_name)
+    
+    # Busca pessoa na lista fornecida
     for item in source_list:
-        if item.get('name') == full_name:
-            # Prioridade: nickname > alias > primeiro nome
-            if item.get('nickname'):
-                return item['nickname']
-            if item.get('alias'):
-                return item['alias']
-            # Se não tem apelido, retorna primeiro nome
-            return full_name.split()[0] if full_name else full_name
-    # Se não encontrou na lista, retorna primeiro nome
+        # Suporta tanto 'name' quanto 'full_name' para compatibilidade
+        item_name = item.get('name') or item.get('full_name', '')
+        if target_normalized and normalize_name_for_display(item_name) == target_normalized:
+            # Usa função centralizada para obter nome de exibição
+            return get_display_name(item)
+    
+    # Se não encontrou na lista, retorna primeiro nome como fallback
     return full_name.split()[0] if full_name else full_name
 
 
@@ -241,11 +259,11 @@ def get_status_badge_style(status: Optional[str]) -> str:
         String de estilo CSS
     """
     styles = {
-        'Em andamento': 'background-color: #eab308; color: #1f2937;',
-        'Concluído': 'background-color: #166534; color: #ffffff;',
-        'Concluído com pendências': 'background-color: #4d7c0f; color: #ffffff;',
-        'Em monitoramento': 'background-color: #ea580c; color: #ffffff;',
+        'Em andamento': 'background-color: #fde047; color: #000000;',
+        'Concluído': 'background-color: #4ade80; color: #000000;',
+        'Concluído com pendências': 'background-color: #a3e635; color: #000000;',
+        'Em monitoramento': 'background-color: #fdba74; color: #000000;',
     }
-    return styles.get(status, 'background-color: #9ca3af; color: #1f2937;')
+    return styles.get(status, 'background-color: #d1d5db; color: #000000;')
 
 

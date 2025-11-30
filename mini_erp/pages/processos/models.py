@@ -26,12 +26,18 @@ SYSTEM_OPTIONS = [
     'eproc - TJSC - 2ª instância',
     'eproc - TRF-4 - 1ª instância',
     'eproc - TRF-4 - 2ª instância',
-    'Projudi',
-    'SGPE',
-    'SEI - Ibama',
-    'SinFAT',
     'e-STF',
-    'e-STJ'
+    'e-STJ',
+    'eProtocolo',
+    'Projudi',
+    'SEI - Ibama',
+    'SGPE',
+    'SinFAT',
+    # Sistemas internos do Ministério Público
+    'Sistema Interno - MPPR',  # Ministério Público do Paraná
+    'Sistema Interno - MPSC',  # Ministério Público de Santa Catarina
+    # Processo físico (não eletrônico)
+    'Processo físico 📁',
 ]
 
 # Opções de núcleo
@@ -45,8 +51,25 @@ STATUS_OPTIONS = [
     'Em andamento', 
     'Concluído', 
     'Concluído com pendências', 
-    'Em monitoramento'
+    'Em monitoramento',
+    'Futuro/Previsto'
 ]
+
+# Constantes de status padronizadas (para evitar inconsistências)
+STATUS_EM_ANDAMENTO = 'Em andamento'
+STATUS_CONCLUIDO = 'Concluído'
+STATUS_CONCLUIDO_PENDENCIAS = 'Concluído com pendências'
+STATUS_EM_MONITORAMENTO = 'Em monitoramento'
+STATUS_FUTURO_PREVISTO = 'Futuro/Previsto'
+
+# Dicionário de mapeamento de status (para compatibilidade e validação)
+STATUS_MAP = {
+    'EM_ANDAMENTO': STATUS_EM_ANDAMENTO,
+    'CONCLUIDO': STATUS_CONCLUIDO,
+    'CONCLUIDO_PENDENCIAS': STATUS_CONCLUIDO_PENDENCIAS,
+    'EM_MONITORAMENTO': STATUS_EM_MONITORAMENTO,
+    'FUTURO_PREVISTO': STATUS_FUTURO_PREVISTO,
+}
 
 # Opções de resultado do processo
 RESULT_OPTIONS = ['Ganho', 'Perdido', 'Neutro']
@@ -281,8 +304,12 @@ class ProtocolDict(TypedDict, total=False):
     """Estrutura de um protocolo de processo."""
     title: str
     date: str
-    link: str
-    by: str
+    number: str
+    system: str
+    link: str  # Link externo do protocolo (ex: URL do sistema)
+    observations: str
+    case_ids: List[str]  # Slugs dos casos vinculados
+    process_ids: List[str]  # IDs dos processos vinculados
 
 
 class ProcessDict(TypedDict, total=False):
@@ -296,6 +323,11 @@ class ProcessDict(TypedDict, total=False):
     status: str
     result: Optional[str]
     process_type: str
+    data_abertura: Optional[str]  # Data de abertura aproximada: DD/MM/AAAA, MM/AAAA ou AAAA
+    # Hierarquia de Processos (pai-filho-neto-bisneto)
+    parent_id: Optional[str]  # ID do processo pai (DEPRECATED - usar parent_ids)
+    parent_ids: List[str]  # Lista de IDs dos processos pais (vínculos)
+    depth: int  # Nível: 0=raiz, 1=filho, 2=neto, 3=bisneto, etc.
     clients: List[str]
     opposing_parties: List[str]
     other_parties: List[str]
@@ -317,5 +349,85 @@ class ProcessDict(TypedDict, total=False):
     access_technicians_granted: bool
     access_client_requested: bool
     access_client_granted: bool
+
+
+# =============================================================================
+# ACOMPANHAMENTO DE TERCEIROS
+# =============================================================================
+
+# Status de acompanhamento
+THIRD_PARTY_MONITORING_STATUS_OPTIONS = ['ativo', 'concluído', 'suspenso']
+
+# Tipos de acompanhamento
+THIRD_PARTY_MONITORING_TYPE_OPTIONS = [
+    'Acompanhamento de Sócio',
+    'Acompanhamento Familiar',
+    'Acompanhamento Corporativo',
+    'Acompanhamento de Devedor',
+    'Acompanhamento de Jurisprudência',
+    'Acompanhamento de Legislação',
+    'Acompanhamento de Risco',
+    'Acompanhamento de Oportunidade',
+    'Acompanhamento de Conformidade',
+]
+
+# Níveis de envolvimento
+THIRD_PARTY_INVOLVEMENT_LEVEL_OPTIONS = [
+    'Acompanhamento Informativo',
+    'Acompanhamento Consultivo',
+    'Acompanhamento Ativo',
+    'Acompanhamento de Interesse',
+]
+
+# Intensidade de monitoramento
+THIRD_PARTY_MONITORING_INTENSITY_OPTIONS = [
+    'Monitoramento Passivo',
+    'Monitoramento Regular',
+    'Monitoramento Intenso',
+]
+
+# Frequência de check-in
+THIRD_PARTY_CHECK_IN_FREQUENCY_OPTIONS = [
+    'Semanal',
+    'Quinzenal',
+    'Mensal',
+    'Trimestral',
+    'Semestral',
+    'Conforme necessário',
+]
+
+
+class ThirdPartyMonitoringDict(TypedDict, total=False):
+    """Estrutura de um acompanhamento de terceiros."""
+    id: str  # Identificador único (gerado automaticamente)
+    # Campos básicos
+    link_do_processo: str
+    tipo_de_processo: str
+    data_de_abertura: str
+    # Partes envolvidas (novo schema)
+    parte_ativa: List[str]  # Obrigatório - array de IDs/nomes
+    parte_passiva: List[str]  # Opcional - array de IDs/nomes
+    outros_envolvidos: List[str]  # Opcional - array de IDs/nomes
+    # Vínculos
+    processos_pais: List[str]
+    cases: List[str]
+    # Campos legados (para compatibilidade durante migração)
+    clientes: List[str]  # Deprecated - usar parte_ativa
+    client_id: str  # Deprecated
+    client_name: str  # Deprecated
+    parte_contraria: List[str]  # Deprecated - usar parte_passiva
+    third_party_name: str  # Deprecated - nome da pessoa/entidade sendo acompanhada
+    # Status e metadata
+    status: str
+    created_at: str
+    updated_at: str
+    process_title: str  # Título/descrição do acompanhamento
+    process_number: Optional[str]  # Número do processo (se aplicável)
+    monitoring_type: str  # Tipo de acompanhamento
+    start_date: str  # Data de início (formato DD/MM/AAAA)
+    status: str  # ativo | concluído | suspenso
+    created_at: str  # Data de criação (ISO format)
+    updated_at: str  # Data última atualização (ISO format)
+    observations: Optional[str]  # Observações adicionais
 
 

@@ -17,8 +17,8 @@ Uso:
 """
 
 # Exporta a função principal para registro de rotas
-from .processos_page import processos
-from .acesso_processos_page import acesso_processos
+from .visualizacoes.visualizacao_padrao import processos
+from .visualizacoes.visualizacao_acesso import acesso_processos
 
 # Exporta módulos para acesso externo se necessário
 from . import models

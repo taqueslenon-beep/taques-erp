@@ -72,7 +72,27 @@ def create_simple_process_modal(on_success: Optional[Callable] = None):
                 ).classes('flex-1').props('outlined dense')
             
             # Link
-            link_input = ui.input('Link do Processo').classes('w-full').props('outlined dense')
+            with ui.row().classes('w-full gap-2 items-end'):
+                link_input = ui.input('Link do Processo').classes('flex-grow').props('outlined dense')
+                
+                def open_link():
+                    link = link_input.value.strip()
+                    if link:
+                        # Garante que o link tenha protocolo
+                        if not link.startswith(('http://', 'https://')):
+                            link = 'https://' + link
+                        ui.run_javascript(f'window.open("{link}", "_blank")')
+                
+                open_link_btn = ui.button('Abrir', icon='open_in_new', on_click=open_link).props('dense size=sm color=primary')
+                
+                def update_button_state():
+                    if link_input.value and link_input.value.strip():
+                        open_link_btn.props(remove='disabled')
+                    else:
+                        open_link_btn.props(add='disabled')
+                
+                link_input.on('input', update_button_state)
+                update_button_state()  # Estado inicial
             
             # Divisor
             ui.separator().classes('my-2')
@@ -132,7 +152,18 @@ def create_simple_process_modal(on_success: Optional[Callable] = None):
                     if val and val not in state['selected_clients']:
                         # Extrai o nome completo (remove parte entre parênteses)
                         full_name = val.split(' (')[0] if '(' in val else val
-                        state['selected_clients'].append(full_name)
+                        
+                        # CORREÇÃO: Busca o nome de exibição ao invés de salvar nome completo
+                        clients = get_clients_list()
+                        display_name = full_name  # fallback
+                        
+                        for client in clients:
+                            client_full_name = client.get('full_name') or client.get('name', '')
+                            if client_full_name == full_name:
+                                display_name = get_display_name(client)
+                                break
+                        
+                        state['selected_clients'].append(display_name)
                         refresh_client_chips()
                         client_select.value = None
                 
@@ -174,7 +205,18 @@ def create_simple_process_modal(on_success: Optional[Callable] = None):
                     if val and val not in state['selected_opposing']:
                         # Extrai o nome completo (remove parte entre parênteses)
                         full_name = val.split(' (')[0] if '(' in val else val
-                        state['selected_opposing'].append(full_name)
+                        
+                        # CORREÇÃO: Busca o nome de exibição ao invés de salvar nome completo
+                        opposing_parties = get_opposing_parties_list()
+                        display_name = full_name  # fallback
+                        
+                        for op in opposing_parties:
+                            op_full_name = op.get('full_name') or op.get('name', '')
+                            if op_full_name == full_name:
+                                display_name = get_display_name(op)
+                                break
+                        
+                        state['selected_opposing'].append(display_name)
                         refresh_opposing_chips()
                         opposing_select.value = None
                 
@@ -225,6 +267,7 @@ def create_simple_process_modal(on_success: Optional[Callable] = None):
                     status=status_select.value,
                     result=None,
                     process_type='Existente',  # Valor padrão
+                    data_abertura=None,  # Campo não disponível no modal simples
                     clients=state['selected_clients'].copy(),
                     opposing_parties=state['selected_opposing'].copy(),
                     other_parties=[],
@@ -279,26 +322,28 @@ def create_simple_process_modal(on_success: Optional[Callable] = None):
         case_options = [c['title'] for c in cases if c.get('title')]
         case_select.options = case_options
         
-        # Clientes
+        # Clientes - usando regra centralizada de exibição
+        from ...core import get_display_name
+        
         clients = get_clients_list()
         client_options = []
         for c in clients:
             name = c.get('full_name') or c.get('name', '')
-            nickname = c.get('nickname', '')
-            if nickname and nickname != name:
-                client_options.append(f"{name} ({nickname})")
+            display_name = get_display_name(c)
+            if display_name and display_name != name:
+                client_options.append(f"{name} ({display_name})")
             else:
                 client_options.append(name)
         client_select.options = sorted(client_options)
         
-        # Parte contrária
+        # Parte contrária - usando regra centralizada de exibição
         opposing = get_opposing_parties_list()
         opposing_options = []
         for o in opposing:
             name = o.get('full_name') or o.get('name', '')
-            nickname = o.get('nickname', '')
-            if nickname and nickname != name:
-                opposing_options.append(f"{name} ({nickname})")
+            display_name = get_display_name(o)
+            if display_name and display_name != name:
+                opposing_options.append(f"{name} ({display_name})")
             else:
                 opposing_options.append(name)
         opposing_select.options = sorted(opposing_options)
