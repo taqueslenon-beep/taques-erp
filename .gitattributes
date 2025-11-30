@@ -1,0 +1,9 @@
+* text=auto
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+__pycache__/ export-ignore
+.nicegui/ export-ignore
+.vscode/ export-ignore
+.DS_Store export-ignore
+
