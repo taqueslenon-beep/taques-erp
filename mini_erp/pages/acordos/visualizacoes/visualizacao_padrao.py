@@ -10,7 +10,7 @@ from ....auth import is_authenticated
 from ..database import listar_acordos, buscar_acordos, buscar_acordo_por_id
 from ..componentes.search_bar import header_acordos
 from ..filtros.filtros_manager import filtros_acordos
-from ..componentes.tabela_acordos import tabela_acordos
+from ..ui_components import tabela_acordos
 from ..modais.modal_novo_acordo import render_acordo_dialog
 from ..modais.modal_editar_acordo import render_acordo_edit_dialog
 

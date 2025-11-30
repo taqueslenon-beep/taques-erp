@@ -8,7 +8,7 @@ from nicegui import ui
 from datetime import datetime
 from typing import Optional, Callable, Dict, Any
 
-from ....core import PRIMARY_COLOR
+from .....core import PRIMARY_COLOR
 from ..business_logic import (
     validar_clausula, formatar_data_para_exibicao, formatar_data_para_iso,
     validate_tipo_clausula, validate_titulo_clausula, validate_datas_clausula,
