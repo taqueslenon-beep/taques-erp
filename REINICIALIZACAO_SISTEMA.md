@@ -284,3 +284,4 @@ md5 backups/backup_completo_[TIMESTAMP].json
 **Versão do script**: 1.0.0
 
 
+

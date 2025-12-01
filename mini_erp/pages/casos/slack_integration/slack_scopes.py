@@ -208,3 +208,4 @@ def get_recommended_scopes() -> List[str]:
     return SLACK_SCOPES_RECOMMENDED.copy()
 
 
+

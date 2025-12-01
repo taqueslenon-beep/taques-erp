@@ -220,3 +220,4 @@ A implementação da regra centralizada de "Nome de Exibição" foi **concluída
 O sistema agora possui um **ponto único de verdade** para exibição de nomes de pessoas, eliminando inconsistências e melhorando significativamente a experiência do usuário.
 
 
+

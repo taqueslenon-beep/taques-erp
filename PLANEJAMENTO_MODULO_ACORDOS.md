@@ -493,3 +493,4 @@ mini_erp/pages/acordos/
 **Documento criado em:** 2025-01-XX  
 **Status:** Planejamento completo - Pronto para implementação
 
+

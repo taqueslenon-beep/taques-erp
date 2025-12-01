@@ -6,6 +6,7 @@ Exibe todos os processos cadastrados no Firebase em uma tabela limpa.
 
 import json
 from pathlib import Path
+from typing import Optional, Dict, Any, List
 
 from nicegui import app, ui, context
 from ....core import layout, get_processes_list, get_clients_list, get_opposing_parties_list, get_cases_list, invalidate_cache
@@ -21,9 +22,12 @@ def _get_priority_name(name: str, people_list: list) -> str:
     """
     Busca pessoa na lista e retorna nome de exibição usando regra centralizada.
     
-    MIGRADO: Agora usa get_display_name() para consistência em todo o sistema.
+    CORREÇÃO: Garante que SEMPRE retorna nome_exibicao (não nome_completo).
     Faz busca bidirecional (nome completo → display_name e display_name → nome completo).
     Sempre em MAIÚSCULAS.
+    
+    IMPORTANTE: Se a pessoa não for encontrada, tenta buscar por nome_completo também
+    para garantir que encontre mesmo quando o processo tem nome_completo salvo.
     """
     from ....core import get_display_name
     
@@ -36,18 +40,23 @@ def _get_priority_name(name: str, people_list: list) -> str:
     person = None
     for p in people_list:
         full_name = p.get('full_name') or p.get('name', '')
+        # CORREÇÃO: Também verifica nome_completo se existir
+        nome_completo = p.get('nome_completo', '')
         display_name = get_display_name(p)
         normalized_full = normalize_name_for_display(full_name)
+        normalized_completo = normalize_name_for_display(nome_completo) if nome_completo else ''
         normalized_display = normalize_name_for_display(display_name)
         
-        # Busca por nome completo, ID ou nome de exibição (com fallback normalizado)
+        # Busca por nome completo, ID, nome_completo ou nome de exibição (com fallback normalizado)
         if (
             full_name == name or 
+            nome_completo == name or
             p.get('_id') == name or 
             display_name == name or
             display_name.upper() == name.upper() or
             (normalized_input and (
                 normalized_full == normalized_input or
+                normalized_completo == normalized_input or
                 normalized_display == normalized_input
             ))
         ):
@@ -55,11 +64,21 @@ def _get_priority_name(name: str, people_list: list) -> str:
             break
     
     if person:
-        # Usa função centralizada para obter nome de exibição
+        # CORREÇÃO: SEMPRE usa get_display_name que prioriza nome_exibicao
+        # Nunca retorna nome_completo diretamente
         display_name = get_display_name(person)
-        return display_name.upper() if display_name else name.upper()
+        if display_name:
+            return display_name.upper()
+        # Se get_display_name retornou vazio, tenta nome_exibicao diretamente
+        nome_exibicao = person.get('nome_exibicao', '').strip()
+        if nome_exibicao:
+            return nome_exibicao.upper()
+        # Último fallback: usa full_name apenas se não houver nome_exibicao
+        fallback_name = person.get('full_name') or person.get('name', '')
+        return fallback_name.upper() if fallback_name else name.upper()
     
     # Se não encontrou, retorna o nome original em maiúsculas
+    # (mas idealmente isso não deveria acontecer se os dados estiverem corretos)
     return name.upper() if name else ''
 
 
@@ -199,426 +218,287 @@ def build_case_filter_options(all_rows: list = None) -> list:
         return ['']
 
 
+def _process_single_process_to_row(proc: Dict[str, Any], all_people: List[Dict], is_desdobramento: bool = False, parent_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Processa um único processo (pai ou desdobramento) e retorna row_data.
+    
+    Args:
+        proc: Dicionário do processo
+        all_people: Lista de pessoas (clientes + partes contrárias)
+        is_desdobramento: Se True, marca como desdobramento
+        parent_id: ID do processo pai (se for desdobramento)
+    
+    Returns:
+        Dicionário row_data pronto para a tabela
+    """
+    is_third_party = proc.get('_is_third_party_monitoring', False)
+    
+    if is_third_party:
+        clients_list = ['NA']
+        opposing_list = ['NA']
+        display_title = proc.get('title') or proc.get('process_title') or proc.get('titulo') or 'Acompanhamento de Terceiro'
+        
+        # Extrai casos vinculados
+        cases_list = []
+        try:
+            cases_raw = proc.get('cases') or proc.get('casos') or proc.get('case_ids') or []
+            if isinstance(cases_raw, list):
+                for c in cases_raw:
+                    if c is None:
+                        continue
+                    case_str = str(c).strip()
+                    if case_str:
+                        cases_list.append(case_str)
+            elif isinstance(cases_raw, str):
+                if cases_raw:
+                    cases_list = [c.strip() for c in cases_raw.split(',') if c.strip()]
+            else:
+                if cases_raw:
+                    case_str = str(cases_raw).strip()
+                    if case_str:
+                        cases_list = [case_str]
+        except Exception:
+            cases_list = []
+    else:
+        # Processo normal
+        clients_raw = proc.get('clients') or proc.get('client') or []
+        clients_list = _format_names_list(clients_raw, all_people)
+        
+        opposing_raw = proc.get('opposing_parties') or []
+        opposing_list = _format_names_list(opposing_raw, all_people)
+        
+        # Extrai casos vinculados
+        cases_raw = proc.get('cases') or []
+        case_ids = proc.get('case_ids') or []
+        cases_list = []
+        
+        try:
+            if cases_raw:
+                if isinstance(cases_raw, list):
+                    for c in cases_raw:
+                        if c is None:
+                            continue
+                        case_str = str(c).strip()
+                        if case_str:
+                            cases_list.append(case_str)
+                else:
+                    case_str = str(cases_raw).strip()
+                    if case_str:
+                        cases_list.append(case_str)
+        except Exception:
+            pass
+        
+        # Converter case_ids para títulos
+        try:
+            if case_ids and isinstance(case_ids, list):
+                from ....core import get_cases_list
+                all_cases = get_cases_list()
+                case_titles_by_id = {}
+                for case in all_cases:
+                    case_id = case.get('_id') or case.get('id')
+                    case_title = case.get('title') or ''
+                    if case_id and case_title:
+                        case_titles_by_id[str(case_id)] = str(case_title).strip()
+                
+                for cid in case_ids:
+                    if cid:
+                        case_title = case_titles_by_id.get(str(cid), str(cid).strip())
+                        if case_title and case_title not in cases_list:
+                            cases_list.append(case_title)
+        except Exception:
+            pass
+        
+        # Remover duplicatas
+        seen = set()
+        cases_list = [c for c in cases_list if c and (c not in seen and not seen.add(c))]
+        
+        display_title = get_display_title(proc)
+    
+    # Processamento de data de abertura
+    data_abertura_raw = proc.get('data_abertura') or ''
+    data_abertura_display = ''
+    data_abertura_sort = ''
+    
+    if data_abertura_raw:
+        try:
+            data_abertura_raw = data_abertura_raw.strip()
+            if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
+                data_abertura_display = data_abertura_raw
+                data_abertura_sort = f"{data_abertura_raw}/00/00"
+            elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
+                partes = data_abertura_raw.split('/')
+                if len(partes) == 2:
+                    data_abertura_display = data_abertura_raw
+                    data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
+            elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
+                partes = data_abertura_raw.split('/')
+                if len(partes) == 3:
+                    data_abertura_display = data_abertura_raw
+                    data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
+            elif '-' in data_abertura_raw:
+                partes = data_abertura_raw.split('-')
+                if len(partes) == 3:
+                    data_abertura_display = f"{partes[2]}/{partes[1]}/{partes[0]}"
+                    data_abertura_sort = f"{partes[0]}/{partes[1]}/{partes[2]}"
+                else:
+                    data_abertura_display = data_abertura_raw
+            else:
+                data_abertura_display = data_abertura_raw
+        except Exception:
+            data_abertura_display = data_abertura_raw
+    
+    # Processamento de data para acompanhamentos
+    if is_third_party and not data_abertura_display:
+        data_abertura_raw = proc.get('data_de_abertura') or proc.get('start_date') or ''
+        if data_abertura_raw:
+            try:
+                data_abertura_raw = data_abertura_raw.strip()
+                if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
+                    data_abertura_display = data_abertura_raw
+                    data_abertura_sort = f"{data_abertura_raw}/00/00"
+                elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
+                    partes = data_abertura_raw.split('/')
+                    if len(partes) == 2:
+                        data_abertura_display = data_abertura_raw
+                        data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
+                elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
+                    partes = data_abertura_raw.split('/')
+                    if len(partes) == 3:
+                        data_abertura_display = data_abertura_raw
+                        data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
+                else:
+                    data_abertura_display = data_abertura_raw
+            except Exception:
+                data_abertura_display = data_abertura_raw
+    
+    # Status
+    proc_status = proc.get('status')
+    if not proc_status or (isinstance(proc_status, str) and not proc_status.strip()):
+        proc_status = ''
+    if proc.get('process_type') == 'Futuro' and not proc_status:
+        proc_status = 'Futuro/Previsto'
+    proc_status = proc_status or ''
+    
+    # Título com prefixo de desdobramento se necessário
+    if is_desdobramento:
+        display_title = f"🔀 {display_title}"
+    
+    row_data = {
+        '_id': proc.get('_id') or proc.get('id', ''),
+        'data_abertura': data_abertura_display,
+        'data_abertura_sort': data_abertura_sort,
+        'title': display_title,
+        'title_raw': proc.get('title') or proc.get('process_title') or proc.get('titulo') or proc.get('searchable_title') or '(sem título)',
+        'number': proc.get('number') or proc.get('process_number') or '',
+        'clients_list': clients_list,
+        'opposing_list': opposing_list,
+        'cases_list': cases_list,
+        'system': proc.get('system') or '',
+        'status': proc_status,
+        'area': proc.get('area') or proc.get('area_direito') or '',
+        'link': proc.get('link') or proc.get('link_do_processo') or '',
+        'is_third_party_monitoring': is_third_party,
+        'is_desdobramento': is_desdobramento,  # Marca como desdobramento
+        'parent_id': parent_id,  # ID do processo pai
+    }
+    
+    return row_data
+
+
 def fetch_processes():
     """
     Busca TODOS os processos do Firestore e formata para exibição.
     
     VISUALIZAÇÃO PADRÃO: Esta função retorna TODOS os processos cadastrados,
     incluindo processos normais E acompanhamentos de terceiros.
+    Agora inclui desdobramentos agrupados hierarquicamente.
     Sem nenhum filtro aplicado. Os filtros são aplicados posteriormente
     na função filter_rows() quando o usuário seleciona opções nos dropdowns.
     
     Returns:
-        Lista de dicionários prontos para a tabela (TODOS os processos + acompanhamentos).
+        Lista de dicionários prontos para a tabela (TODOS os processos + acompanhamentos + desdobramentos).
     """
     try:
-        # Buscar processos normais
-        raw = get_processes_list()
-        print(f"[FETCH_PROCESSOS] Processos normais encontrados: {len(raw)}")
+        # Buscar processos agrupados por hierarquia (pai + desdobramentos)
+        from ..database import get_processes_with_children
+        processos_hierarquicos = get_processes_with_children()
+        print(f"[FETCH_PROCESSOS] Processos principais encontrados: {len(processos_hierarquicos)}")
         
-        # Buscar acompanhamentos de terceiros e adicionar à lista
+        # Contar total de desdobramentos
+        total_desdobramentos = sum(len(grupo.get('desdobramentos', [])) for grupo in processos_hierarquicos)
+        print(f"[FETCH_PROCESSOS] Total de desdobramentos encontrados: {total_desdobramentos}")
+        
+        # Buscar acompanhamentos de terceiros (não são processos hierárquicos)
+        acompanhamentos_raw = []
         try:
             from ..database import obter_todos_acompanhamentos
-            acompanhamentos = obter_todos_acompanhamentos()
-            print(f"[FETCH_PROCESSOS] Acompanhamentos encontrados: {len(acompanhamentos)}")
+            acompanhamentos_raw = obter_todos_acompanhamentos()
+            print(f"[FETCH_PROCESSOS] Acompanhamentos encontrados: {len(acompanhamentos_raw)}")
             
-            # Adicionar acompanhamentos à lista raw
-            for acomp in acompanhamentos:
-                # Marcar como acompanhamento para processamento posterior
+            # Marcar acompanhamentos
+            for acomp in acompanhamentos_raw:
                 acomp['_is_third_party_monitoring'] = True
-                
-                # DEBUG: Verificar se acompanhamento tem casos
-                cases_debug = acomp.get('cases') or acomp.get('casos') or acomp.get('case_ids') or []
-                if cases_debug:
-                    print(f"[FETCH_PROCESSOS] Acompanhamento '{acomp.get('title', 'Sem título')}' tem casos: {cases_debug}")
-                else:
-                    print(f"[FETCH_PROCESSOS] ⚠️  Acompanhamento '{acomp.get('title', 'Sem título')}' NÃO tem casos vinculados")
-                
-                raw.append(acomp)
-            
-            print(f"[FETCH_PROCESSOS] Total combinado (processos + acompanhamentos): {len(raw)}")
         except Exception as e:
             print(f"[FETCH_PROCESSOS] Erro ao buscar acompanhamentos: {e}")
             import traceback
             traceback.print_exc()
         
-        # Log geral de processos buscados
-        print(f"[FETCH_PROCESSES] Total de processos retornados do banco: {len(raw)}")
-        
-        # DEBUG: Rastreamento específico do processo "RECURSO ESPECIAL"
-        recurso_especial = None
-        for p in raw:
-            if 'RECURSO ESPECIAL' in (p.get('title') or '').upper():
-                recurso_especial = p
-                print(f"[DEBUG RECURSO ESPECIAL] ✓ Encontrado no banco:")
-                print(f"  Título: {p.get('title')}")
-                print(f"  Status: '{p.get('status')}' (tipo: {type(p.get('status'))})")
-                print(f"  Process Type: '{p.get('process_type')}'")
-                print(f"  Doc ID: {p.get('_id')}")
-                print(f"  Todos os campos: {list(p.keys())}")
-                break
-        
-        if not recurso_especial:
-            print(f"[DEBUG RECURSO ESPECIAL] ❌ NÃO encontrado no banco!")
-            print(f"[DEBUG] Total de processos retornados: {len(raw)}")
-            print(f"[DEBUG] Títulos dos primeiros 5: {[p.get('title', 'Sem título')[:50] for p in raw[:5]]}")
-        
-        # DEBUG: Busca processos com "Jandir" no título ou clientes
-        processos_jandir = []
-        for p in raw:
-            titulo = (p.get('title') or '').upper()
-            clientes = p.get('clients', [])
-            clientes_str = ' '.join(str(c) for c in clientes).upper()
-            
-            if 'JANDIR' in titulo or 'JANDIR' in clientes_str:
-                processos_jandir.append({
-                    'id': p.get('_id'),
-                    'titulo': p.get('title'),
-                    'clientes': clientes,
-                    'status': p.get('status')
-                })
-        
-        if processos_jandir:
-            print(f"[DEBUG JANDIR] Encontrados {len(processos_jandir)} processo(s) relacionados a Jandir:")
-            for proc in processos_jandir:
-                print(f"  - ID: {proc['id']}")
-                print(f"    Título: {proc['titulo']}")
-                print(f"    Clientes: {proc['clientes']}")
-                print(f"    Status: {proc['status']}")
-        else:
-            print(f"[DEBUG JANDIR] Nenhum processo encontrado com 'Jandir' no título ou clientes")
-        
-        # DEBUG: Lista processos sem clientes
-        processos_sem_clientes = [p for p in raw if not p.get('clients') or (isinstance(p.get('clients'), list) and len(p.get('clients')) == 0)]
-        if processos_sem_clientes:
-            print(f"[DEBUG] ⚠️  Encontrados {len(processos_sem_clientes)} processo(s) sem clientes:")
-            for p in processos_sem_clientes[:5]:  # Mostra apenas os 5 primeiros
-                print(f"  - {p.get('title', 'Sem título')} (ID: {p.get('_id')})")
-        
-        # Debug: verifica processos futuros
-        future_processes = [p for p in raw if p.get('process_type') == 'Futuro' or p.get('status') == 'Futuro/Previsto']
-        if future_processes:
-            print(f"[DEBUG] Encontrados {len(future_processes)} processos futuros: {[p.get('title') for p in future_processes]}")
-        
         # Carrega listas de pessoas para buscar siglas/display_names
         clients_list = get_clients_list()
         opposing_list = get_opposing_parties_list()
         all_people = clients_list + opposing_list
-
-        # Cache único de casos para evitar consultas repetidas
-        all_cases = get_cases_list()
-        case_titles_by_id = {}
-        for case in all_cases:
-            case_id = case.get('_id') or case.get('id')
-            case_title = case.get('title') or ''
-            if case_id and case_title:
-                case_titles_by_id[str(case_id)] = str(case_title).strip()
         
         rows = []
-        rows_count_before = 0
-        rows_count_after = 0
-        recurso_especial_in_rows = False
         
-        for proc in raw:
-            rows_count_before += 1
+        # Processar processos principais e seus desdobramentos
+        for grupo in processos_hierarquicos:
+            processo_principal = grupo.get('processo_principal')
+            desdobramentos = grupo.get('desdobramentos', [])
             
-            # Verificar se é um acompanhamento de terceiro
-            is_third_party = proc.get('_is_third_party_monitoring', False)
+            if not processo_principal:
+                continue
             
-            # Debug: verifica processos sem status ou com status diferente
-            proc_status = proc.get('status') or ''
-            proc_title = proc.get('title') or proc.get('process_title') or 'Sem título'
-            if not proc_status and proc.get('process_type') == 'Futuro':
-                print(f"[DEBUG] Processo sem status encontrado: {proc_title} (process_type: {proc.get('process_type')})")
+            # Processar processo principal
+            parent_id = processo_principal.get('_id')
+            row_principal = _process_single_process_to_row(processo_principal, all_people, is_desdobramento=False)
+            rows.append(row_principal)
             
-            if is_third_party:
-                # É um acompanhamento de terceiro - processar de forma diferente
-                print(f"[FETCH_PROCESSOS] Processando acompanhamento: {proc_title}")
-                
-                # REGRA: Acompanhamentos mostram "NA" em Clientes e Parte Contrária
-                clients_list = ['NA']
-                opposing_list = ['NA']
-                
-                # Título do acompanhamento (definir antes de usar nos logs)
-                display_title = proc.get('title') or proc.get('process_title') or proc.get('titulo') or 'Acompanhamento de Terceiro'
-                
-                # Extrai casos vinculados - acompanhamentos podem ter casos
-                # IMPORTANTE: Verificar múltiplos campos possíveis para compatibilidade
-                # CORREÇÃO: Adiciona validação e tratamento de erros para prevenir ValueError
-                cases_list = []
-                try:
-                    cases_raw = proc.get('cases') or proc.get('casos') or proc.get('case_ids') or []
-                    if isinstance(cases_raw, list):
-                        for c in cases_raw:
-                            try:
-                                if c is None:
-                                    continue
-                                case_str = str(c).strip()
-                                if case_str:
-                                    cases_list.append(case_str)
-                            except Exception as case_exc:
-                                print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar caso de acompanhamento '{c}': {case_exc}")
-                                continue
-                    elif isinstance(cases_raw, str):
-                        # Se for string, pode ser uma lista separada por vírgula ou um único caso
-                        try:
-                            if cases_raw:
-                                cases_list = [c.strip() for c in cases_raw.split(',') if c.strip()]
-                        except Exception as str_exc:
-                            print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar casos como string '{cases_raw}': {str_exc}")
-                            cases_list = []
-                    else:
-                        try:
-                            if cases_raw:
-                                case_str = str(cases_raw).strip()
-                                if case_str:
-                                    cases_list = [case_str]
-                        except Exception as single_exc:
-                            print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar caso único '{cases_raw}': {single_exc}")
-                            cases_list = []
-                except Exception as cases_exc:
-                    print(f"[FETCH_PROCESSOS] ⚠️  Erro ao extrair casos do acompanhamento: {cases_exc}")
-                    cases_list = []
-                
-                # Log para debug
-                if cases_list:
-                    print(f"[FETCH_PROCESSOS] Acompanhamento '{display_title}' tem casos: {cases_list}")
-                else:
-                    print(f"[FETCH_PROCESSOS] ⚠️  Acompanhamento '{display_title}' NÃO tem casos vinculados")
-                
-            else:
-                # É um processo normal - processar normalmente
-                # Extrai e formata clientes (prioridade + MAIÚSCULAS) - retorna lista
-                clients_raw = proc.get('clients') or proc.get('client') or []
-                clients_list = _format_names_list(clients_raw, all_people)
-
-                # Extrai e formata partes contrárias (prioridade + MAIÚSCULAS) - retorna lista
-                opposing_raw = proc.get('opposing_parties') or []
-                opposing_list = _format_names_list(opposing_raw, all_people)
-
-                # Extrai casos vinculados - retorna lista
-                # IMPORTANTE: Verificar múltiplos campos (cases, case_ids) para compatibilidade
-                # CORREÇÃO: Adiciona validação e tratamento de erros para prevenir ValueError
-                cases_raw = proc.get('cases') or []
-                case_ids = proc.get('case_ids') or []
-                
-                cases_list = []
-                
-                # Processar casos diretos (títulos) do campo 'cases'
-                try:
-                    if cases_raw:
-                        if isinstance(cases_raw, list):
-                            for c in cases_raw:
-                                try:
-                                    if c is None:
-                                        continue
-                                    case_str = str(c).strip()
-                                    if case_str:
-                                        cases_list.append(case_str)
-                                except Exception as case_exc:
-                                    print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar caso '{c}': {case_exc}")
-                                    continue
-                        else:
-                            try:
-                                case_str = str(cases_raw).strip()
-                                if case_str:
-                                    cases_list.append(case_str)
-                            except Exception as case_exc:
-                                print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar caso único '{cases_raw}': {case_exc}")
-                except Exception as cases_raw_exc:
-                    print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar cases_raw: {cases_raw_exc}")
-                
-                # Se tiver case_ids, converter IDs para títulos
-                try:
-                    if case_ids and isinstance(case_ids, list):
-                        # Buscar títulos dos casos pelos IDs (cache para evitar múltiplas buscas)
-                        all_cases = get_cases_list()
-                        case_titles_by_id = {}
-                        for case in all_cases:
-                            try:
-                                case_id = case.get('_id') or case.get('id')
-                                case_title = case.get('title') or ''
-                                if case_id and case_title:
-                                    case_titles_by_id[str(case_id)] = str(case_title).strip()
-                            except Exception as case_map_exc:
-                                print(f"[FETCH_PROCESSOS] ⚠️  Erro ao mapear caso: {case_map_exc}")
-                                continue
-                        
-                        # Converter IDs para títulos e adicionar à lista
-                        for cid in case_ids:
-                            try:
-                                if cid:
-                                    case_title = case_titles_by_id.get(str(cid), str(cid).strip())
-                                    # Evitar duplicatas
-                                    if case_title and case_title not in cases_list:
-                                        cases_list.append(case_title)
-                            except Exception as cid_exc:
-                                print(f"[FETCH_PROCESSOS] ⚠️  Erro ao converter case_id '{cid}': {cid_exc}")
-                                continue
-                except Exception as case_ids_exc:
-                    print(f"[FETCH_PROCESSOS] ⚠️  Erro ao processar case_ids: {case_ids_exc}")
-                
-                # Remover duplicatas mantendo ordem
-                seen = set()
-                cases_list = [c for c in cases_list if c and (c not in seen and not seen.add(c))]
-                
-                # Título simples sem indentação hierárquica
-                display_title = get_display_title(proc)
-
-            # =====================================================
-            # PROCESSAMENTO DE DATA DE ABERTURA (APROXIMADA)
-            # =====================================================
-            # Suporta 3 formatos:
-            # - AAAA (apenas ano): 2008 → ordena como 2008/00/00
-            # - MM/AAAA (mês/ano): 09/2008 → ordena como 2008/09/00
-            # - DD/MM/AAAA (completa): 05/09/2008 → ordena como 2008/09/05
-            # =====================================================
-            data_abertura_raw = proc.get('data_abertura') or ''
-            data_abertura_display = ''
-            data_abertura_sort = ''  # Formato AAAA/MM/DD para ordenação correta
-            
-            if data_abertura_raw:
-                try:
-                    data_abertura_raw = data_abertura_raw.strip()
-                    
-                    # Formato: AAAA (apenas ano) - 4 dígitos
-                    if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
-                        data_abertura_display = data_abertura_raw
-                        data_abertura_sort = f"{data_abertura_raw}/00/00"
-                    
-                    # Formato: MM/AAAA (mês e ano) - 7 caracteres
-                    elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
-                        partes = data_abertura_raw.split('/')
-                        if len(partes) == 2:
-                            data_abertura_display = data_abertura_raw
-                            data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
-                    
-                    # Formato: DD/MM/AAAA (completa) - 10 caracteres
-                    elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
-                        partes = data_abertura_raw.split('/')
-                        if len(partes) == 3:
-                            data_abertura_display = data_abertura_raw
-                            data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                    
-                    # Formato legado: YYYY-MM-DD
-                    elif '-' in data_abertura_raw:
-                        partes = data_abertura_raw.split('-')
-                        if len(partes) == 3:
-                            data_abertura_display = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                            data_abertura_sort = f"{partes[0]}/{partes[1]}/{partes[2]}"
-                        else:
-                            data_abertura_display = data_abertura_raw
-                    
-                    else:
-                        # Fallback - mantém valor original
-                        data_abertura_display = data_abertura_raw
-                        
-                except Exception:
-                    data_abertura_display = data_abertura_raw
-            
-            # Processamento de data para acompanhamentos (se ainda não processado)
-            if is_third_party and not data_abertura_display:
-                data_abertura_raw = proc.get('data_de_abertura') or proc.get('start_date') or ''
-                if data_abertura_raw:
-                    # Mesma lógica de processamento de data
-                    try:
-                        data_abertura_raw = data_abertura_raw.strip()
-                        if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
-                            data_abertura_display = data_abertura_raw
-                            data_abertura_sort = f"{data_abertura_raw}/00/00"
-                        elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
-                            partes = data_abertura_raw.split('/')
-                            if len(partes) == 2:
-                                data_abertura_display = data_abertura_raw
-                                data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
-                        elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
-                            partes = data_abertura_raw.split('/')
-                            if len(partes) == 3:
-                                data_abertura_display = data_abertura_raw
-                                data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                        else:
-                            data_abertura_display = data_abertura_raw
-                    except Exception:
-                        data_abertura_display = data_abertura_raw
-            
-            # Título já foi processado acima (dentro do if/else)
-            if not is_third_party:
-                display_title = get_display_title(proc)
-            
-            # Garante que processos futuros tenham status correto
-            # CORREÇÃO: Normaliza status vazio/None para garantir que todos os processos apareçam
-            proc_status = proc.get('status')
-            
-            # Se status é None, string vazia ou apenas espaços, trata como vazio
-            if not proc_status or (isinstance(proc_status, str) and not proc_status.strip()):
-                proc_status = ''
-            
-            # Se processo é do tipo "Futuro" e não tem status, define como "Futuro/Previsto"
-            if proc.get('process_type') == 'Futuro' and not proc_status:
-                proc_status = 'Futuro/Previsto'
-            
-            # Garante que status seja sempre uma string (não None)
-            proc_status = proc_status or ''
-            
-            # DEBUG: Rastreamento específico do processo "RECURSO ESPECIAL"
-            is_recurso_especial = 'RECURSO ESPECIAL' in display_title.upper()
-            if is_recurso_especial:
-                print(f"[DEBUG RECURSO ESPECIAL] Processando para tabela:")
-                print(f"  Status original: '{proc.get('status')}'")
-                print(f"  Status final: '{proc_status}'")
-                print(f"  Process Type: '{proc.get('process_type')}'")
-                print(f"  Título: '{display_title}'")
-            
-            row_data = {
-                '_id': proc.get('_id') or proc.get('id', ''),
-                'data_abertura': data_abertura_display,
-                'data_abertura_sort': data_abertura_sort,  # Formato AAAA/MM/DD para ordenação
-                'title': display_title,
-                'title_raw': proc.get('title') or proc.get('process_title') or proc.get('titulo') or proc.get('searchable_title') or '(sem título)',  # Título original para busca
-                'number': proc.get('number') or proc.get('process_number') or '',
-                'clients_list': clients_list,  # Já é ['NA'] para acompanhamentos
-                'opposing_list': opposing_list,  # Já é ['NA'] para acompanhamentos
-                'cases_list': cases_list,
-                'system': proc.get('system') or '',
-                'status': proc_status,
-                'area': proc.get('area') or proc.get('area_direito') or '',
-                'link': proc.get('link') or proc.get('link_do_processo') or '',
-                'is_third_party_monitoring': is_third_party,  # Marca como acompanhamento para aplicar cores
-            }
-            
-            if is_third_party:
-                print(f"[FETCH_PROCESSOS] Row de acompanhamento criada: título='{display_title}', casos={cases_list}")
-            
-            rows.append(row_data)
-            rows_count_after += 1
-            
-            if is_recurso_especial:
-                recurso_especial_in_rows = True
-                print(f"[DEBUG RECURSO ESPECIAL] ✓ Adicionado à lista de rows")
-                print(f"  Row data: {row_data}")
+            # Processar desdobramentos (indentados)
+            for desdobramento in desdobramentos:
+                row_desdobramento = _process_single_process_to_row(
+                    desdobramento, 
+                    all_people, 
+                    is_desdobramento=True, 
+                    parent_id=parent_id
+                )
+                rows.append(row_desdobramento)
+        
+        # Processar acompanhamentos de terceiros (não hierárquicos)
+        for acomp in acompanhamentos_raw:
+            row_acompanhamento = _process_single_process_to_row(acomp, all_people, is_desdobramento=False)
+            rows.append(row_acompanhamento)
         
         # DEBUG: Validação final
-        print(f"[FETCH_PROCESSES] Total processos no banco: {len(raw)}")
-        print(f"[FETCH_PROCESSES] Total rows criadas: {len(rows)}")
+        print(f"[FETCH_PROCESSES] Total de rows criadas: {len(rows)}")
+        print(f"[FETCH_PROCESSES] - Processos principais: {len(processos_hierarquicos)}")
+        print(f"[FETCH_PROCESSES] - Desdobramentos: {total_desdobramentos}")
+        print(f"[FETCH_PROCESSES] - Acompanhamentos: {len(acompanhamentos_raw)}")
         
-        # Verifica se processos de Jandir foram adicionados às rows
-        rows_jandir = [r for r in rows if 'JANDIR' in (r.get('title') or '').upper() or any('JANDIR' in str(c).upper() for c in r.get('clients_list', []))]
-        if rows_jandir:
-            print(f"[FETCH_PROCESSES] ✓ Processo(s) de Jandir adicionado(s) às rows: {len(rows_jandir)}")
-        elif processos_jandir:
-            print(f"[FETCH_PROCESSES] ⚠️  Processo(s) de Jandir encontrado(s) no banco mas NÃO adicionado(s) às rows!")
+        # Ordena por título (processos principais primeiro, depois desdobramentos)
+        rows.sort(key=lambda r: (
+            r.get('is_desdobramento', False),  # Desdobramentos depois
+            (r.get('title') or '').lower()
+        ))
         
-        if recurso_especial and not recurso_especial_in_rows:
-            print(f"[DEBUG RECURSO ESPECIAL] ❌ ERRO: Processo encontrado no banco mas NÃO foi adicionado às rows!")
-        elif recurso_especial_in_rows:
-            print(f"[DEBUG RECURSO ESPECIAL] ✓ Processo adicionado com sucesso às rows")
-        
-        # Ordena por título
-        rows.sort(key=lambda r: (r.get('title') or '').lower())
         return rows
     except Exception as e:
         print(f"Erro ao buscar processos: {e}")
+        import traceback
+        traceback.print_exc()
         return []
+
+
+# Colunas da tabela com larguras otimizadas
 
 
 # Colunas da tabela com larguras otimizadas
@@ -1003,19 +883,90 @@ def processos():
             
             search_input.on('update:model-value', on_search_change)
             
-            # Botões de ação - responsivos
-            ui.button('+ Novo Processo', on_click=lambda: open_process_modal()).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
-            ui.button('+ Novo Processo Futuro', icon='schedule', on_click=lambda: open_future_process_modal()).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
-            
-            # Modal de acompanhamento de terceiros
+            # Modal de acompanhamento de terceiros (precisa estar antes do menu)
             from ..modais.modal_acompanhamento_terceiros import render_third_party_monitoring_dialog
             third_party_dialog, open_third_party_modal = render_third_party_monitoring_dialog(
                 on_success=on_process_saved
             )
             
-            ui.button('+ Novo Acompanhamento de Terceiro', icon='link', on_click=lambda: open_third_party_modal()).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
+            # Função para novo desdobramento de processo
+            def novo_desdobramento():
+                """Abre diálogo para selecionar processo pai e depois abre modal de novo desdobramento."""
+                from nicegui import ui
+                from ....core import get_processes_list
+                
+                # Obter lista de processos para seleção
+                processos = get_processes_list()
+                
+                if not processos:
+                    ui.notify('Não há processos cadastrados para criar desdobramento.', type='warning')
+                    return
+                
+                # Criar opções para o seletor
+                opcoes_processos = {}
+                for p in processos:
+                    proc_id = p.get('_id')
+                    if proc_id:
+                        titulo = p.get('title') or p.get('number') or 'Sem título'
+                        numero = p.get('number', '')
+                        display = f"{titulo}" + (f" ({numero})" if numero else "")
+                        opcoes_processos[proc_id] = display
+                
+                if not opcoes_processos:
+                    ui.notify('Não há processos válidos para criar desdobramento.', type='warning')
+                    return
+                
+                # Diálogo de seleção de processo pai
+                with ui.dialog() as selecao_dialog, ui.card().classes('w-full max-w-md p-6'):
+                    ui.label('Selecionar Processo Pai').classes('text-xl font-bold mb-4')
+                    ui.label('Escolha o processo que será o pai do novo desdobramento:').classes('text-gray-600 mb-4')
+                    
+                    processo_pai_sel = ui.select(
+                        options=opcoes_processos,
+                        label='Processo Pai',
+                        with_input=True
+                    ).classes('w-full').props('outlined dense use-input filter-input')
+                    processo_pai_sel.tooltip('Selecione o processo que será o pai do desdobramento')
+                    
+                    with ui.row().classes('w-full justify-end gap-2 mt-4'):
+                        ui.button('Cancelar', on_click=selecao_dialog.close).props('flat')
+                        
+                        def confirmar_selecao():
+                            processo_pai_id = processo_pai_sel.value
+                            if processo_pai_id:
+                                selecao_dialog.close()
+                                # Abrir modal de novo processo com parent_process_id
+                                open_process_modal(parent_process_id=processo_pai_id)
+                            else:
+                                ui.notify('Por favor, selecione um processo pai.', type='warning')
+                        
+                        ui.button('Confirmar', icon='check', on_click=confirmar_selecao).props('color=primary')
+                
+                selecao_dialog.open()
             
-            ui.button('+ Novo Protocolo', icon='history', on_click=lambda: open_protocol_modal()).props('outlined color=primary').classes('whitespace-nowrap w-full sm:w-auto')
+            # Botão único "+ NOVO" com menu dropdown
+            with ui.button('+ NOVO', icon='add').props('color=primary').classes('whitespace-nowrap w-full sm:w-auto'):
+                with ui.menu().props('anchor="bottom left" self="top left"'):
+                    with ui.menu_item(on_click=lambda: open_process_modal()):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.icon('gavel', size='xs')
+                            ui.label('Novo Processo')
+                    with ui.menu_item(on_click=lambda: open_future_process_modal()):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.icon('schedule', size='xs')
+                            ui.label('Novo Processo Futuro')
+                    with ui.menu_item(on_click=lambda: open_third_party_modal()):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.icon('link', size='xs')
+                            ui.label('Novo Acompanhamento de Terceiro')
+                    with ui.menu_item(on_click=novo_desdobramento):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.icon('call_split', size='xs')
+                            ui.label('Novo Desdobramento de Processo')
+                    with ui.menu_item(on_click=lambda: open_protocol_modal()):
+                        with ui.row().classes('items-center gap-2'):
+                            ui.icon('history', size='xs')
+                            ui.label('Novo Protocolo')
             
             # Botão para acessar a visualização "Acesso aos Processos"
             ui.button('Acesso aos Processos', icon='lock_open', on_click=lambda: ui.navigate.to('/processos/acesso')).props('flat').classes('w-full sm:w-auto')
@@ -1477,6 +1428,164 @@ def processos():
             
             table.on('titleClick', handle_title_click)
             
+            # Handler para duplicar processo (via context menu)
+            def handle_duplicate_process(process_id: str):
+                """
+                Duplica um processo e abre o modal de edição automaticamente.
+                
+                Args:
+                    process_id: ID do processo a duplicar (string)
+                """
+                try:
+                    print(f"[DUPLICAR] Iniciando duplicação do processo: {process_id}")
+                    
+                    # Verificar se é acompanhamento de terceiro (não pode duplicar)
+                    all_processes = get_processes_list()
+                    is_third_party = False
+                    for proc in all_processes:
+                        if proc.get('_id') == process_id:
+                            is_third_party = proc.get('_is_third_party_monitoring', False)
+                            break
+                    
+                    if is_third_party:
+                        ui.notify('Não é possível duplicar acompanhamentos de terceiros.', type='warning')
+                        return
+                    
+                    # Importar função de duplicação
+                    from ..database import duplicar_processo
+                    
+                    # Duplicar processo
+                    novo_id, mensagem = duplicar_processo(process_id)
+                    
+                    # Invalidar cache para garantir que temos os dados atualizados
+                    invalidate_cache('processes')
+                    
+                    # Buscar o processo recém-duplicado para abrir o modal
+                    # Tenta primeiro pelo ID, depois pelo título
+                    process_idx = None
+                    
+                    if novo_id:
+                        # Sucesso - buscar o novo processo pelo ID
+                        print(f"[DUPLICAR] ✓ Processo duplicado com sucesso. Novo ID: {novo_id}")
+                        
+                        # Buscar diretamente do Firestore para garantir que temos o processo
+                        from ...firebase_config import get_db
+                        db = get_db()
+                        doc = db.collection('processes').document(novo_id).get()
+                        
+                        if doc.exists:
+                            # Processo existe no Firestore, agora busca na lista
+                            all_processes_updated = get_processes_list()
+                            
+                            for idx, proc in enumerate(all_processes_updated):
+                                if proc.get('_id') == novo_id:
+                                    process_idx = idx
+                                    break
+                    
+                    # Se não encontrou pelo ID, busca pelo título com [CÓPIA]
+                    if process_idx is None:
+                        print(f"[DUPLICAR] Buscando processo pelo título com [CÓPIA]...")
+                        from ..database import get_all_processes
+                        processos_atualizados = get_all_processes()
+                        
+                        # Busca processos com [CÓPIA] no título (excluindo o original)
+                        processos_copia = []
+                        for idx, proc in enumerate(processos_atualizados):
+                            titulo = proc.get('title', '')
+                            proc_id = proc.get('_id')
+                            if '[CÓPIA]' in titulo and proc_id != process_id:
+                                processos_copia.append((idx, proc, proc_id))
+                        
+                        if processos_copia:
+                            # Ordena por _id (mais recente geralmente tem ID maior ou mais recente)
+                            # Pega o primeiro da lista (assumindo que está ordenado)
+                            process_idx = processos_copia[0][0]
+                            print(f"[DUPLICAR] Processo encontrado pelo título (índice: {process_idx})")
+                    
+                    # Abrir modal se encontrou o processo
+                    if process_idx is not None:
+                        print(f"[DUPLICAR] Abrindo modal de edição para processo duplicado (índice: {process_idx})")
+                        open_process_modal(process_idx)
+                        ui.notify('Processo duplicado! Edite os dados e salve.', type='positive')
+                    else:
+                        # Se não encontrou, mostra mensagem e recarrega tabela
+                        if novo_id:
+                            ui.notify('Processo duplicado! Recarregue a página para ver.', type='info')
+                        else:
+                            ui.notify(mensagem, type='info')
+                        refresh_table(force_reload=True)
+                else:
+                    # Erro na duplicação
+                    ui.notify(mensagem, type='negative')
+                    print(f"[DUPLICAR] ❌ Erro ao duplicar: {mensagem}")
+                
+                except Exception as e:
+                    error_msg = f"Erro ao duplicar processo: {str(e)}"
+                    ui.notify(error_msg, type='negative')
+                    print(f"[DUPLICAR] ❌ {error_msg}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Usar lambda para extrair o valor de e.args diretamente
+            table.on('duplicateProcess', lambda e: handle_duplicate_process(e.args))
+            
+            # JavaScript para garantir que context menu funcione
+            ui.run_javascript('''
+                (function() {
+                    function setupContextMenu() {
+                        const table = document.querySelector('.q-table tbody');
+                        if (!table) return;
+                        
+                        // Remove listeners anteriores
+                        table.removeEventListener('contextmenu', handleContextMenu);
+                        
+                        // Handler para context menu
+                        function handleContextMenu(e) {
+                            const td = e.target.closest('td');
+                            if (!td) return;
+                            
+                            // Verifica se é a célula de título
+                            const span = td.querySelector('span.cursor-pointer');
+                            if (!span) return;
+                            
+                            // Busca o menu dentro da célula
+                            const menu = td.querySelector('q-menu');
+                            if (!menu) return;
+                            
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            // Mostra o menu usando a API do Quasar
+                            const qMenu = menu.__vueParentComponent || menu.__vue__;
+                            if (qMenu && qMenu.exposed && qMenu.exposed.show) {
+                                qMenu.exposed.show(e);
+                            } else if (qMenu && qMenu.show) {
+                                qMenu.show(e);
+                            } else {
+                                // Fallback: usa método direto do Quasar
+                                const QMenu = Quasar?.components?.QMenu;
+                                if (QMenu) {
+                                    menu.show(e);
+                                }
+                            }
+                        }
+                        
+                        // Adiciona listener
+                        table.addEventListener('contextmenu', handleContextMenu, true);
+                    }
+                    
+                    // Executa após renderização
+                    setTimeout(setupContextMenu, 500);
+                    
+                    // Re-executa após mudanças na tabela
+                    const observer = new MutationObserver(setupContextMenu);
+                    const tableContainer = document.querySelector('.q-table');
+                    if (tableContainer) {
+                        observer.observe(tableContainer, { childList: true, subtree: true });
+                    }
+                })();
+            ''')
+            
             # JavaScript para aplicar estilos nas linhas
             # Lê atributos data-* da primeira célula (data_abertura) e aplica na row pai
             def apply_row_styles():
@@ -1579,12 +1688,47 @@ def processos():
             # Slot para área com chips coloridos (pastel)
             table.add_slot('body-cell-area', BODY_SLOT_AREA)
             
-            # Slot para título - clicável para abrir modal de edição
+            # Slot para título - clicável para abrir modal de edição + context menu para duplicar
             table.add_slot('body-cell-title', '''
-                <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 280px; padding: 8px 12px; vertical-align: middle;">
-                    <span class="text-sm cursor-pointer font-medium" 
-                          style="line-height: 1.4; color: #223631;"
-                          @click="$parent.$emit('titleClick', props.row)">
+                <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 280px; padding: 8px 12px; vertical-align: middle; position: relative;">
+                    <q-menu 
+                        :ref="'contextMenu_' + props.row._id"
+                        context-menu
+                        touch-position
+                    >
+                        <q-list style="min-width: 200px">
+                            <q-item 
+                                clickable 
+                                v-close-popup
+                                @click="$parent.$emit('duplicateProcess', props.row._id)"
+                            >
+                                <q-item-section avatar>
+                                    <q-icon name="content_copy" color="primary" />
+                                </q-item-section>
+                                <q-item-section>
+                                    <q-item-label>Duplicar Processo</q-item-label>
+                                </q-item-section>
+                            </q-item>
+                            <q-item 
+                                clickable 
+                                v-close-popup
+                                @click="$parent.$emit('titleClick', props.row)"
+                            >
+                                <q-item-section avatar>
+                                    <q-icon name="edit" color="primary" />
+                                </q-item-section>
+                                <q-item-section>
+                                    <q-item-label>Editar</q-item-label>
+                                </q-item-section>
+                            </q-item>
+                        </q-list>
+                    </q-menu>
+                    <span 
+                        class="text-sm cursor-pointer font-medium" 
+                        style="line-height: 1.4; color: #223631; user-select: none;"
+                        @click="$parent.$emit('titleClick', props.row)"
+                        @contextmenu.prevent.stop
+                    >
                         {{ props.value }}
                     </span>
                 </q-td>

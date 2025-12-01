@@ -14,3 +14,4 @@ echo "3. No navegador: Cmd+Shift+R (Mac) ou Ctrl+Shift+R (Windows/Linux)"
 echo ""
 
 
+

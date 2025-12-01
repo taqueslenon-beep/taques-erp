@@ -832,7 +832,14 @@ def render_process_dialog(on_success=None):
         render_protocols.refresh()
         toggle_result()
 
-    def open_modal(process_idx=None):
+    def open_modal(process_idx=None, parent_process_id=None):
+        """
+        Abre o modal de processo.
+        
+        Args:
+            process_idx: Índice do processo para edição (None para novo processo)
+            parent_process_id: ID do processo pai para criar desdobramento (None para processo independente)
+        """
         clear_form()
         
         # Atualizar opções de casos sempre que o modal abre
@@ -906,8 +913,21 @@ def render_process_dialog(on_success=None):
             state['scenarios'] = list(p.get('scenarios', [])) if p.get('scenarios') else []
             state['protocols'] = list(p.get('protocols', [])) if p.get('protocols') else []
             state['selected_clients'] = list(p.get('clients', [])) if p.get('clients') else []
-            state['selected_opposing'] = list(p.get('opposing_parties', [])) if p.get('opposing_parties') else []
-            state['selected_others'] = list(p.get('other_parties', [])) if p.get('other_parties') else []
+            
+            # CORREÇÃO: Normaliza opposing_parties para usar nome_exibicao em vez de nome_completo
+            # Converte valores antigos (nome_completo) para nome_exibicao ao carregar
+            opposing_raw = list(p.get('opposing_parties', [])) if p.get('opposing_parties') else []
+            opposing_list = get_opposing_parties_list()
+            state['selected_opposing'] = [
+                get_short_name(opp, opposing_list) for opp in opposing_raw
+            ] if opposing_raw else []
+            
+            # CORREÇÃO: Normaliza other_parties também
+            others_raw = list(p.get('other_parties', [])) if p.get('other_parties') else []
+            state['selected_others'] = [
+                get_short_name(other, opposing_list) for other in others_raw
+            ] if others_raw else []
+            
             state['selected_cases'] = list(p.get('cases', [])) if p.get('cases') else []
             
             # Atualizar chips e renderizações
@@ -924,13 +944,24 @@ def render_process_dialog(on_success=None):
             state['is_editing'] = False
             state['edit_index'] = None
             state['process_id'] = None
-            dialog_title.text = 'NOVO PROCESSO'
+            
+            # Verificar se é um desdobramento
+            if parent_process_id:
+                dialog_title.text = 'NOVO DESDOBRAMENTO DE PROCESSO'
+                # Pré-configurar o processo pai
+                state['parent_ids'] = [parent_process_id]
+            else:
+                dialog_title.text = 'NOVO PROCESSO'
+                state['parent_ids'] = []
+            
             delete_btn.classes(add='hidden')
         
         # DEPOIS: Carregar opções de processo pai (agora que temos os dados corretos)
         all_procs = get_processes_list()
         parent_options = []
         current_id = state.get('process_id')  # Agora tem o ID correto
+        selected_parent_display = None
+        
         for p in all_procs:
             proc_id = p.get('_id')
             if proc_id and proc_id != current_id:  # Não incluir o próprio processo
@@ -938,9 +969,17 @@ def render_process_dialog(on_success=None):
                 number = p.get('number', '')
                 display = f"{title}" + (f" ({number})" if number else "") + f" | {proc_id}"
                 parent_options.append(display)
+                
+                # Se este é o processo pai pré-selecionado, guardar o display
+                if parent_process_id and proc_id == parent_process_id:
+                    selected_parent_display = display
         
         parent_process_sel.options = parent_options if parent_options else ['— Nenhum (processo raiz) —']
         parent_process_sel.update()
+        
+        # Se há um processo pai pré-selecionado, atualizar chips (não precisa setar o seletor)
+        if parent_process_id and state.get('parent_ids'):
+            refresh_parent_chips(parent_process_chips, state['parent_ids'])
         
         dialog.open()
 

@@ -471,3 +471,4 @@ python3 scripts/check_duplicates.py
 _Última atualização: Novembro 2024_
 
 
+

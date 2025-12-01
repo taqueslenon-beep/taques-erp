@@ -31,24 +31,52 @@ def get_short_name(full_name: str, source_list: List[Dict[str, Any]]) -> str:
     """
     Retorna nome de exibição usando a regra centralizada.
     
-    MIGRADO: Agora usa get_display_name() para consistência em todo o sistema.
+    CORREÇÃO: Garante que SEMPRE retorna nome_exibicao (não nome_completo).
+    Melhora busca para incluir nome_completo na comparação.
     
     Args:
-        full_name: Nome completo da pessoa
+        full_name: Nome completo da pessoa (pode ser nome_completo ou full_name)
         source_list: Lista de pessoas (clientes ou partes contrárias)
     
     Returns:
-        Nome de exibição da pessoa
+        Nome de exibição da pessoa (nome_exibicao se disponível)
     """
+    if not full_name or not source_list:
+        return full_name.split()[0] if full_name else full_name
+    
     target_normalized = normalize_name_for_display(full_name)
     
     # Busca pessoa na lista fornecida
     for item in source_list:
-        # Suporta tanto 'name' quanto 'full_name' para compatibilidade
+        # Suporta name, full_name e nome_completo para compatibilidade
         item_name = item.get('name') or item.get('full_name', '')
-        if target_normalized and normalize_name_for_display(item_name) == target_normalized:
+        item_nome_completo = item.get('nome_completo', '')
+        item_display = get_display_name(item)
+        
+        # Normaliza para comparação
+        normalized_item_name = normalize_name_for_display(item_name)
+        normalized_nome_completo = normalize_name_for_display(item_nome_completo) if item_nome_completo else ''
+        normalized_display = normalize_name_for_display(item_display)
+        
+        # Busca por nome completo, nome_completo ou nome de exibição (com fallback normalizado)
+        if (
+            item_name == full_name or
+            item_nome_completo == full_name or
+            item_display == full_name or
+            (target_normalized and (
+                normalized_item_name == target_normalized or
+                normalized_nome_completo == target_normalized or
+                normalized_display == target_normalized
+            ))
+        ):
             # Usa função centralizada para obter nome de exibição
-            return get_display_name(item)
+            display_name = get_display_name(item)
+            if display_name:
+                return display_name
+            # Fallback para nome_exibicao direto
+            nome_exibicao = item.get('nome_exibicao', '').strip()
+            if nome_exibicao:
+                return nome_exibicao
     
     # Se não encontrou na lista, retorna primeiro nome como fallback
     return full_name.split()[0] if full_name else full_name
@@ -90,14 +118,24 @@ def get_short_opposing(opposing: List[str], opposing_list: List[Dict[str, Any]])
 
 def format_option_for_search(item: Dict[str, Any]) -> str:
     """
-    Formata opção para busca: inclui nome e sigla/apelido.
+    Formata opção para busca: exibe apenas nome de exibição para melhor legibilidade.
+    
+    CORREÇÃO: Agora usa get_display_name() que prioriza nome_exibicao em vez de nome_completo.
+    Isso garante que dropdowns mostrem apenas siglas/abreviações (ex: "IBAMA", "PMA/SC")
+    em vez de nomes completos longos.
     
     Args:
-        item: Dicionário com dados da pessoa (name, nickname, etc)
+        item: Dicionário com dados da pessoa (name, nome_exibicao, etc)
     
     Returns:
-        String formatada "Nome (Apelido)" ou apenas "Nome"
+        Nome de exibição da pessoa (nome_exibicao se disponível)
     """
+    # Usa função centralizada que prioriza nome_exibicao
+    display_name = get_display_name(item)
+    if display_name:
+        return display_name
+    
+    # Fallback para compatibilidade com dados antigos
     name = item.get('name', '')
     nickname = item.get('nickname', '')
     if nickname and nickname != name:

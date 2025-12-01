@@ -172,3 +172,4 @@ tr.future-process-row
 - **CHANGELOG**: `CHANGELOG_COLORACAO_ACOMPANHAMENTOS.md`
 
 
+

@@ -88,3 +88,4 @@ mini_erp/pages/processos/
 
 **NOTA**: O sistema está funcionando e organizado. Os itens pendentes são melhorias incrementais, não bloqueantes.
 
+

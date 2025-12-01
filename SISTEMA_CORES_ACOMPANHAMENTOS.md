@@ -343,3 +343,4 @@ Para adicionar um novo tipo com cores próprias:
 **Última atualização:** 2025-01-XX  
 **Versão:** 1.0.0
 
+

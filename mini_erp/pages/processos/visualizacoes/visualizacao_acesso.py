@@ -20,9 +20,12 @@ def _get_priority_name(name: str, people_list: list) -> str:
     """
     Busca pessoa na lista e retorna nome de exibição usando regra centralizada.
     
-    MIGRADO: Agora usa get_display_name() para consistência em todo o sistema.
+    CORREÇÃO: Garante que SEMPRE retorna nome_exibicao (não nome_completo).
     Faz busca bidirecional (nome completo → display_name e display_name → nome completo).
     Sempre em MAIÚSCULAS.
+    
+    IMPORTANTE: Se a pessoa não for encontrada, tenta buscar por nome_completo também
+    para garantir que encontre mesmo quando o processo tem nome_completo salvo.
     """
     from ....core import get_display_name
     
@@ -35,18 +38,23 @@ def _get_priority_name(name: str, people_list: list) -> str:
     person = None
     for p in people_list:
         full_name = p.get('full_name') or p.get('name', '')
+        # CORREÇÃO: Também verifica nome_completo se existir
+        nome_completo = p.get('nome_completo', '')
         display_name = get_display_name(p)
         normalized_full = normalize_name_for_display(full_name)
+        normalized_completo = normalize_name_for_display(nome_completo) if nome_completo else ''
         normalized_display = normalize_name_for_display(display_name)
         
-        # Busca por nome completo, ID ou nome de exibição (com fallback normalizado)
+        # Busca por nome completo, ID, nome_completo ou nome de exibição (com fallback normalizado)
         if (
             full_name == name or 
+            nome_completo == name or
             p.get('_id') == name or 
             display_name == name or
             display_name.upper() == name.upper() or
             (normalized_input and (
                 normalized_full == normalized_input or
+                normalized_completo == normalized_input or
                 normalized_display == normalized_input
             ))
         ):
@@ -54,11 +62,21 @@ def _get_priority_name(name: str, people_list: list) -> str:
             break
     
     if person:
-        # Usa função centralizada para obter nome de exibição
+        # CORREÇÃO: SEMPRE usa get_display_name que prioriza nome_exibicao
+        # Nunca retorna nome_completo diretamente
         display_name = get_display_name(person)
-        return display_name.upper() if display_name else name.upper()
+        if display_name:
+            return display_name.upper()
+        # Se get_display_name retornou vazio, tenta nome_exibicao diretamente
+        nome_exibicao = person.get('nome_exibicao', '').strip()
+        if nome_exibicao:
+            return nome_exibicao.upper()
+        # Último fallback: usa full_name apenas se não houver nome_exibicao
+        fallback_name = person.get('full_name') or person.get('name', '')
+        return fallback_name.upper() if fallback_name else name.upper()
     
     # Se não encontrou, retorna o nome original em maiúsculas
+    # (mas idealmente isso não deveria acontecer se os dados estiverem corretos)
     return name.upper() if name else ''
 
 

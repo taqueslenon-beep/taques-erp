@@ -187,3 +187,4 @@ Ao abrir a página de processos, verificar no console:
 - **Performance:** Validação completa leva ~1-2 segundos para ~20-30 processos.
 
 
+

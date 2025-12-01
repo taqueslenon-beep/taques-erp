@@ -8,7 +8,7 @@ Contém as três páginas NiceGUI principais:
 """
 
 from datetime import datetime
-from nicegui import ui, run
+from nicegui import ui
 import asyncio
 
 # Imports do core
@@ -975,13 +975,11 @@ def case_detail(case_slug: str):
                                 ).classes('w-full processes-table-modal')
                                 
                                 # Handler para clique no título (abre modal de edição)
-                                def handle_title_click(e):
+                                async def handle_title_click(e):
                                     clicked_row = e.args
                                     if clicked_row and '_id' in clicked_row:
                                         process_id = clicked_row['_id']
-                                        async def _open():
-                                            await open_edit_process_from_case(process_id)
-                                        run.coroutine(_open())
+                                        await open_edit_process_from_case(process_id)
                                 
                                 processes_table.on('titleClick', handle_title_click)
                                 

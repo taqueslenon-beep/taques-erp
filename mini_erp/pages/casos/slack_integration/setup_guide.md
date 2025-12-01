@@ -269,3 +269,4 @@ Se encontrar problemas não listados aqui:
 3. Revise o arquivo `SLACK_INTEGRATION.md` na raiz do projeto
 
 
+

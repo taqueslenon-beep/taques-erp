@@ -86,3 +86,4 @@ def obter_opcoes_casos(rows: List[Dict[str, Any]]) -> List[str]:
     
     return [''] + sorted(all_cases, key=str.lower)
 
+

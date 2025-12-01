@@ -2107,6 +2107,7 @@ def layout(page_title: str, breadcrumbs: list = None):
     with ui.left_drawer(value=True).props('width=190 bordered persistent').classes('border-r border-gray-200').style(f'background-color: {PRIMARY_COLOR}'):
         with ui.column().classes('w-full px-2 pt-4 gap-1'):
             menu_item('Painel', 'dashboard', '/')
+            menu_item('Inteligência', 'psychology', '/inteligencia')
             # menu_item('Governança', 'shield', '/governanca')  # Em desenvolvimento
             
             menu_item('Casos', 'folder', '/casos')

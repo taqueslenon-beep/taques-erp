@@ -31,3 +31,4 @@ def aplicar_filtro_pesquisa(rows: List[Dict[str, Any]], termo: str) -> List[Dict
     
     return filtrados
 
+

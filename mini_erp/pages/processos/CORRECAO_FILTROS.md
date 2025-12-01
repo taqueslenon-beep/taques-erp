@@ -161,3 +161,4 @@ filtered = [
 4. **Performance**: Implementar debounce em filtros se necessário
 
 
+

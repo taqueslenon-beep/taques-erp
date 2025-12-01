@@ -414,3 +414,4 @@ O sistema suporta múltiplos nomes de campos para compatibilidade:
 **Última atualização:** 2025-01-XX  
 **Versão:** 1.0.0
 
+

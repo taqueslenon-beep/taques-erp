@@ -48,3 +48,4 @@ def obter_opcoes_area(rows: List[Dict[str, Any]]) -> List[str]:
     
     return [''] + sorted(areas)
 
+

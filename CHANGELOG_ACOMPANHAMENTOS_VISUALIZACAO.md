@@ -252,3 +252,4 @@ if filter_case['value']:
 **Data:** 2025-01-XX  
 **Status:** ✅ CORRIGIDO
 
+

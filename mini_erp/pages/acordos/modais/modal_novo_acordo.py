@@ -3,8 +3,8 @@ modal_novo_acordo.py - Modal para criar novo acordo.
 """
 
 from nicegui import ui
-from typing import Optional, Callable
-from ....core import (
+from typing import Optional, Callable, Dict
+from mini_erp.core import (
     get_cases_list, 
     get_processes_list,
     get_clients_list,
@@ -49,28 +49,33 @@ def format_pessoa_simples(pessoa: dict) -> str:
     return get_display_name(pessoa)
 
 
-def render_acordo_dialog(on_success: Optional[Callable] = None):
+def render_acordo_dialog(on_success: Optional[Callable] = None, acordo_inicial: Optional[Dict] = None):
     """
-    Renderiza dialog para criar novo acordo.
+    Renderiza dialog para criar ou editar acordo.
     
     Args:
         on_success: Callback executado após salvar
+        acordo_inicial: Dicionário com dados do acordo para edição (None para novo)
     
     Returns:
         tuple: (dialog, open_function)
     """
     
-    # Estado do formulário
+    # Determinar se é edição ou criação
+    is_edicao = acordo_inicial is not None
+    acordo_id = acordo_inicial.get('_id') if is_edicao else None
+    
+    # Estado do formulário - preencher com dados iniciais se for edição
     state = {
-        'titulo': '',
-        'data_celebracao': '',
-        'status': 'Em andamento',  # Status padrão
-        'casos': [],  # Armazena objetos completos de casos
-        'processos': [],
-        'clientes': [],
-        'partes_contrarias': [],
-        'outros_envolvidos': [],
-        'clausulas': [],  # Armazena cláusulas do acordo
+        'titulo': acordo_inicial.get('titulo', '') if is_edicao else '',
+        'data_celebracao': acordo_inicial.get('data_celebracao', '') or acordo_inicial.get('data_assinatura', '') if is_edicao else '',
+        'status': acordo_inicial.get('status', 'Em andamento') if is_edicao else 'Em andamento',
+        'casos': acordo_inicial.get('casos', []) if is_edicao else [],
+        'processos': acordo_inicial.get('processos', []) if is_edicao else [],
+        'clientes': acordo_inicial.get('clientes', []) if is_edicao else [],
+        'partes_contrarias': acordo_inicial.get('partes_contrarias', []) if is_edicao else [],
+        'outros_envolvidos': acordo_inicial.get('outros_envolvidos', []) if is_edicao else [],
+        'clausulas': acordo_inicial.get('clausulas', []) if is_edicao else [],
     }
     
     # Referência para função de renderização (será definida depois)
@@ -180,7 +185,7 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
                 
                 # ===== SIDEBAR ESQUERDA =====
                 with ui.column().classes('h-full').style('width: 180px; background: #2d5a5a; padding: 16px 0;'):
-                    ui.label('NOVO ACORDO').classes('text-white text-sm font-bold px-4 mb-4')
+                    ui.label('EDITAR ACORDO' if is_edicao else 'NOVO ACORDO').classes('text-white text-sm font-bold px-4 mb-4')
                     
                     with ui.tabs().props('vertical dense no-caps').classes('w-full acordo-sidebar-tabs') as tabs:
                         tab_dados = ui.tab('Dados básicos', icon='description')
@@ -204,20 +209,45 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
                                         # Row 1: Título
                                         titulo_input = ui.input(
                                         label='Título do Acordo *',
-                                        placeholder='Digite o título'
+                                        placeholder='Digite o título',
+                                        value=state['titulo']
                                     ).classes('w-full').props('outlined dense')
                                     
                                     # Row 2: Data e Status (lado a lado)
                                     with ui.row().classes('w-full gap-2'):
+                                        # Formatar data para input type=date (YYYY-MM-DD)
+                                        data_value = ''
+                                        if state['data_celebracao']:
+                                            try:
+                                                # Tenta converter de DD/MM/YYYY ou timestamp
+                                                if isinstance(state['data_celebracao'], str):
+                                                    if '/' in state['data_celebracao']:
+                                                        # DD/MM/YYYY -> YYYY-MM-DD
+                                                        parts = state['data_celebracao'].split('/')
+                                                        if len(parts) == 3:
+                                                            data_value = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                                                    elif '-' in state['data_celebracao'] and len(state['data_celebracao']) >= 10:
+                                                        # Já está em YYYY-MM-DD
+                                                        data_value = state['data_celebracao'][:10]
+                                                elif isinstance(state['data_celebracao'], (int, float)):
+                                                    from datetime import datetime
+                                                    dt = datetime.fromtimestamp(state['data_celebracao'])
+                                                    data_value = dt.strftime('%Y-%m-%d')
+                                            except:
+                                                pass
+                                        
                                         data_input = ui.input(
                                             label='Data de Celebração',
-                                            placeholder='Selecione a data'
+                                            placeholder='Selecione a data',
+                                            value=data_value
                                         ).classes('flex-grow').props('outlined dense type=date')
                                         
+                                        # Opções de status
+                                        status_options = ['Em andamento', 'Concluído', 'Rascunho', 'Ativo', 'Rescindido']
                                         status_input = ui.select(
-                                            ['Em andamento', 'Concluído'],
+                                            status_options,
                                             label='Status *',
-                                            value='Em andamento'
+                                            value=state['status'] if state['status'] in status_options else 'Em andamento'
                                         ).classes('flex-grow').props('outlined dense')
                                 
                                 # Casos e Processos
@@ -323,7 +353,7 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
                                         'color: #9C27B0;'
                                     )
                                 
-                                    # Renderizar chips inicialmente (vazio)
+                                    # Renderizar chips inicialmente (com dados se for edição)
                                     refresh_casos_chips()
                                     
                                     ui.separator().classes('my-2')
@@ -426,7 +456,7 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
                                         'color: #FF9800;'
                                     )
                                     
-                                    # Renderizar chips inicialmente (vazio)
+                                    # Renderizar chips inicialmente (com dados se for edição)
                                     refresh_processos_chips()
                             
                             # Partes
@@ -549,15 +579,16 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
         with ui.row().classes('w-full gap-4 p-6 justify-between items-center').style(
             'border-top: 1px solid #e5e7eb; background-color: white; flex-shrink: 0;'
         ):
-            # Botão EXCLUIR (à esquerda)
-            def on_delete():
-                """Deleta o acordo (apenas para edição)."""
-                ui.notify('Funcionalidade de exclusão será implementada', type='info')
-                # Será implementado quando for editar acordo existente
-            
-            ui.button('EXCLUIR', icon='delete', on_click=on_delete).props(
-                'color=negative'
-            ).classes('font-bold')
+            # Botão EXCLUIR (à esquerda) - apenas em modo edição
+            if is_edicao:
+                def on_delete():
+                    """Deleta o acordo."""
+                    ui.notify('Funcionalidade de exclusão será implementada', type='info')
+                    # Será implementado quando for editar acordo existente
+                
+                ui.button('EXCLUIR', icon='delete', on_click=on_delete).props(
+                    'color=negative'
+                ).classes('font-bold')
             
             # Espaço para separar
             with ui.row().classes('flex-grow'):
@@ -593,6 +624,10 @@ def render_acordo_dialog(on_success: Optional[Callable] = None):
                         'outros_envolvidos': state['outros_envolvidos'],
                         'clausulas': state['clausulas'],
                     }
+                    
+                    # Adicionar ID se for edição
+                    if is_edicao and acordo_id:
+                        acordo_data['_id'] = acordo_id
                     
                     # Validar se há cláusulas (opcional)
                     if not state['clausulas']:

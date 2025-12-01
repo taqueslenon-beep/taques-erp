@@ -7,7 +7,7 @@ Este módulo contém:
 - Acesso a listas de dados
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import uuid
 
@@ -38,6 +38,83 @@ def get_all_processes() -> List[Dict[str, Any]]:
         Lista de dicionários com dados dos processos
     """
     return get_processes_list()
+
+
+def get_processes_with_children() -> List[Dict[str, Any]]:
+    """
+    Retorna processos agrupados por hierarquia (pai + desdobramentos).
+    
+    Estrutura de retorno:
+    [
+        {
+            'processo_principal': {id: '123', titulo: 'Processo 1', ...},
+            'desdobramentos': [
+                {id: '456', titulo: 'Desdobramento 1', ...},
+                {id: '789', titulo: 'Desdobramento 2', ...}
+            ]
+        },
+        {
+            'processo_principal': {id: '999', titulo: 'Processo 2', ...},
+            'desdobramentos': []
+        }
+    ]
+    
+    Returns:
+        Lista de dicionários com processo principal e seus desdobramentos
+    """
+    all_processes = get_processes_list()
+    
+    # Criar mapa de processos por ID para busca rápida
+    process_map = {p.get('_id'): p for p in all_processes if p.get('_id')}
+    
+    # Separar processos principais (sem parent_ids ou parent_ids vazio)
+    # e processos filhos (com parent_ids não vazio)
+    main_processes = []
+    child_processes = []
+    
+    for proc in all_processes:
+        parent_ids = proc.get('parent_ids', [])
+        # Compatibilidade: verificar também parent_id (campo antigo)
+        if not parent_ids:
+            old_parent_id = proc.get('parent_id')
+            if old_parent_id:
+                parent_ids = [old_parent_id]
+        
+        # Se não tem parent_ids ou parent_ids está vazio, é processo principal
+        if not parent_ids or (isinstance(parent_ids, list) and len(parent_ids) == 0):
+            main_processes.append(proc)
+        else:
+            child_processes.append(proc)
+    
+    # Agrupar desdobramentos por processo pai
+    # Um desdobramento pode ter múltiplos pais, mas vamos agrupar pelo primeiro pai
+    children_by_parent = {}
+    for child in child_processes:
+        parent_ids = child.get('parent_ids', [])
+        if not parent_ids:
+            old_parent_id = child.get('parent_id')
+            if old_parent_id:
+                parent_ids = [old_parent_id]
+        
+        # Agrupa pelo primeiro pai (ou pode ser modificado para agrupar por todos os pais)
+        if parent_ids:
+            first_parent_id = parent_ids[0]
+            if first_parent_id not in children_by_parent:
+                children_by_parent[first_parent_id] = []
+            children_by_parent[first_parent_id].append(child)
+    
+    # Construir estrutura hierárquica
+    result = []
+    for main_proc in main_processes:
+        proc_id = main_proc.get('_id')
+        desdobramentos = children_by_parent.get(proc_id, [])
+        
+        result.append({
+            'processo_principal': main_proc,
+            'desdobramentos': desdobramentos
+        })
+    
+    return result
 
 
 def get_all_cases() -> List[Dict[str, Any]]:
@@ -179,6 +256,174 @@ def delete_process(doc_id: str) -> Optional[str]:
         import traceback
         traceback.print_exc()
         return None
+
+
+def duplicar_processo(id_processo_original: str) -> Tuple[Optional[str], str]:
+    """
+    Duplica um processo no Firestore, criando uma cópia com novo ID e timestamps atualizados.
+    
+    Campos que NÃO são copiados (resetados):
+    - _id (ID do documento - gerado automaticamente)
+    - id (campo legado - removido)
+    - created_at, updated_at, criado_em, atualizado_em (resetados para agora)
+    
+    Campos que SÃO copiados:
+    - Título (com sufixo "[CÓPIA]")
+    - Tipo de processo
+    - Data de abertura (mantida - é dado importante)
+    - Partes envolvidas (clientes, parte contrária, outros envolvidos)
+    - Vínculos (casos, processos pais)
+    - Status (mantido)
+    - Descrições/comentários
+    - Todos os outros campos do processo
+    
+    Args:
+        id_processo_original: ID do documento do processo original no Firestore
+    
+    Returns:
+        Tupla (novo_id, mensagem):
+        - novo_id: ID do novo processo criado ou None se falhou
+        - mensagem: Mensagem de sucesso ou erro
+    """
+    try:
+        db = get_db()
+        
+        # Buscar processo original
+        doc_ref = db.collection('processes').document(id_processo_original)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return None, "Processo não encontrado"
+        
+        dados_original = doc.to_dict()
+        
+        # Criar cópia dos dados
+        dados_copia = dados_original.copy()
+        
+        # Remover campos que não devem ser duplicados
+        campos_nao_copiar = [
+            '_id',           # ID do documento (gerado automaticamente)
+            'id',            # Campo legado
+            'created_at',    # Timestamp de criação
+            'updated_at',    # Timestamp de atualização
+            'criado_em',    # Timestamp legado
+            'atualizado_em' # Timestamp legado
+        ]
+        
+        for campo in campos_nao_copiar:
+            dados_copia.pop(campo, None)
+        
+        # Adicionar sufixo ao título
+        titulo_original = dados_copia.get('title', 'Processo')
+        # Evita adicionar múltiplos sufixos se já tiver "[CÓPIA]"
+        if '[CÓPIA]' not in titulo_original:
+            dados_copia['title'] = f"{titulo_original} [CÓPIA]"
+        else:
+            # Se já tem [CÓPIA], adiciona número sequencial
+            dados_copia['title'] = f"{titulo_original} [CÓPIA 2]"
+        
+        # Atualizar campo de busca
+        if 'title' in dados_copia:
+            dados_copia['title_searchable'] = dados_copia['title'].lower()
+        
+        # Adicionar timestamps novos
+        agora = datetime.now()
+        dados_copia['created_at'] = agora.isoformat()
+        dados_copia['updated_at'] = agora.isoformat()
+        dados_copia['criado_em'] = agora.isoformat()
+        dados_copia['atualizado_em'] = agora.isoformat()
+        
+        # Resetar status para "Aberto" (opcional - pode manter o status original)
+        # Comentado para manter o status original
+        # dados_copia['status'] = 'Aberto'
+        
+        # Salvar usando save_process do core (garante validações e sincronização)
+        # Mas precisamos obter o ID depois
+        novo_titulo = dados_copia.get('title', '')
+        save_process_to_firestore(dados_copia, doc_id=None, sync=True)
+        
+        # Buscar o ID do novo documento criado
+        # Busca pelo título exato (que tem [CÓPIA]) criado recentemente
+        novo_id = None
+        
+        # Busca processos com o título exato criados nos últimos 3 segundos
+        query = db.collection('processes').where('title', '==', novo_titulo).stream()
+        processos_encontrados = []
+        
+        for doc in query:
+            doc_data = doc.to_dict()
+            # Verifica se foi criado recentemente (últimos 3 segundos)
+            created_at = doc_data.get('created_at') or doc_data.get('criado_em', '')
+            if created_at:
+                try:
+                    from datetime import datetime as dt
+                    # Parse do timestamp
+                    if isinstance(created_at, str):
+                        # Remove timezone se presente
+                        created_at_clean = created_at.replace('Z', '').split('+')[0].split('.')[0]
+                        doc_time = dt.fromisoformat(created_at_clean)
+                    else:
+                        doc_time = created_at
+                    
+                    # Calcula diferença
+                    if hasattr(doc_time, 'tzinfo') and doc_time.tzinfo:
+                        doc_time = doc_time.replace(tzinfo=None)
+                    time_diff = abs((agora - doc_time).total_seconds())
+                    
+                    if time_diff < 3:  # Criado nos últimos 3 segundos
+                        processos_encontrados.append((doc.id, doc_data, time_diff))
+                except Exception as ex:
+                    print(f"[DUPLICAR_PROCESSO] Erro ao processar timestamp: {ex}")
+                    pass
+        
+        # Se encontrou processos, pega o mais recente (menor time_diff)
+        if processos_encontrados:
+            processos_encontrados.sort(key=lambda x: x[2])  # Ordena por time_diff (mais recente primeiro)
+            novo_id = processos_encontrados[0][0]
+        
+        # Se ainda não encontrou, busca qualquer processo com [CÓPIA] no título criado recentemente
+        if not novo_id:
+            # Busca todos os processos com [CÓPIA] no título
+            all_processes = db.collection('processes').stream()
+            for doc in all_processes:
+                if doc.id == id_processo_original:
+                    continue  # Pula o processo original
+                
+                doc_data = doc.to_dict()
+                doc_title = doc_data.get('title', '')
+                if '[CÓPIA]' in doc_title:
+                    created_at = doc_data.get('created_at') or doc_data.get('criado_em', '')
+                    if created_at:
+                        try:
+                            from datetime import datetime as dt
+                            if isinstance(created_at, str):
+                                created_at_clean = created_at.replace('Z', '').split('+')[0].split('.')[0]
+                                doc_time = dt.fromisoformat(created_at_clean)
+                            else:
+                                doc_time = created_at
+                            
+                            if hasattr(doc_time, 'tzinfo') and doc_time.tzinfo:
+                                doc_time = doc_time.replace(tzinfo=None)
+                            time_diff = abs((agora - doc_time).total_seconds())
+                            
+                            if time_diff < 5:  # Criado nos últimos 5 segundos
+                                novo_id = doc.id
+                                break
+                        except:
+                            pass
+        
+        # Invalida cache para forçar recarregamento
+        invalidate_cache('processes')
+        
+        print(f"[DUPLICAR_PROCESSO] Processo {id_processo_original} duplicado com sucesso. Novo ID: {novo_id}")
+        return novo_id, "Processo duplicado com sucesso!"
+    
+    except Exception as e:
+        error_msg = f"Erro ao duplicar processo: {str(e)}"
+        print(f"[DUPLICAR_PROCESSO] ❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return None, error_msg
 
 
 def restore_process(doc_id: str) -> bool:

@@ -79,3 +79,4 @@ def criar_gerenciador_filtros(refresh_callback: Optional[Callable] = None) -> Fi
     """
     return FiltrosManager(refresh_callback=refresh_callback)
 
+

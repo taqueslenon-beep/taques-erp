@@ -638,3 +638,4 @@ Antes de considerar configurado, verifique:
 
 **Última dica:** Anote seu IP público atual, pois se for dinâmico, pode mudar. Considere usar um serviço de DNS dinâmico para não precisar ficar atualizando o IP.
 
+
