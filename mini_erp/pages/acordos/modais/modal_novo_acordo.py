@@ -1,0 +1,621 @@
+"""
+modal_novo_acordo.py - Modal para criar novo acordo.
+"""
+
+from nicegui import ui
+from typing import Optional, Callable
+from ....core import (
+    get_cases_list, 
+    get_processes_list,
+    get_clients_list,
+    get_opposing_parties_list,
+    get_display_name
+)
+from .modal_nova_clausula import render_clausula_dialog
+
+
+def format_caso(caso: dict) -> str:
+    """Formata caso para exibição."""
+    title = caso.get('title', 'Sem título')
+    number = caso.get('number', '')
+    if number:
+        return f"{title} ({number})"
+    return title
+
+
+def format_processo(processo: dict) -> str:
+    """Formata processo para exibição."""
+    title = processo.get('title', 'Sem título')
+    number = processo.get('number', '')
+    if number:
+        return f"{title} ({number})"
+    return title
+
+
+def format_pessoa(pessoa: dict, tipo: str = '') -> str:
+    """Formata pessoa para exibição com prefixo de tipo."""
+    display = get_display_name(pessoa)
+    
+    if tipo == 'cliente':
+        return f"[C] {display}"
+    elif tipo == 'parte_contraria':
+        return f"[PC] {display}"
+    
+    return display
+
+
+def format_pessoa_simples(pessoa: dict) -> str:
+    """Formata pessoa (sem prefixo de tipo)."""
+    return get_display_name(pessoa)
+
+
+def render_acordo_dialog(on_success: Optional[Callable] = None):
+    """
+    Renderiza dialog para criar novo acordo.
+    
+    Args:
+        on_success: Callback executado após salvar
+    
+    Returns:
+        tuple: (dialog, open_function)
+    """
+    
+    # Estado do formulário
+    state = {
+        'titulo': '',
+        'data_celebracao': '',
+        'status': 'Em andamento',  # Status padrão
+        'casos': [],  # Armazena objetos completos de casos
+        'processos': [],
+        'clientes': [],
+        'partes_contrarias': [],
+        'outros_envolvidos': [],
+        'clausulas': [],  # Armazena cláusulas do acordo
+    }
+    
+    # Referência para função de renderização (será definida depois)
+    render_clausulas_table_ref = {'func': None}
+    
+    # Função para salvar cláusula
+    def on_save_clausula(clausula_data, edit_index=None):
+        """Salva ou atualiza cláusula."""
+        if edit_index is not None and isinstance(edit_index, int):
+            # UPDATE: Atualizar cláusula existente
+            if 0 <= edit_index < len(state['clausulas']):
+                state['clausulas'][edit_index] = clausula_data
+                ui.notify('Cláusula atualizada com sucesso!', type='positive')
+            else:
+                ui.notify('Erro: cláusula não encontrada', type='negative')
+                return
+        else:
+            # CREATE: Adicionar nova cláusula
+            state['clausulas'].append(clausula_data)
+            ui.notify('Cláusula adicionada com sucesso!', type='positive')
+        
+        # Renderizar tabela atualizada
+        if render_clausulas_table_ref['func']:
+            render_clausulas_table_ref['func']()
+    
+    # Função para abrir modal de nova cláusula
+    def open_clausula_dialog():
+        """Abre modal para nova cláusula."""
+        dialog, open_dialog = render_clausula_dialog(
+            on_save=on_save_clausula
+        )
+        open_dialog()
+    
+    # Função para abrir modal de edição de cláusula
+    def open_clausula_dialog_edit(index):
+        """Abre modal para editar cláusula existente."""
+        if 0 <= index < len(state['clausulas']):
+            clausula = state['clausulas'][index]
+            
+            # Criar dialog com dados preenchidos
+            dialog_edit, open_edit = render_clausula_dialog(
+                on_save=lambda data: on_save_clausula(data, edit_index=index),
+                clausula_inicial=clausula
+            )
+            
+            open_edit()
+        else:
+            ui.notify('Erro: cláusula não encontrada', type='negative')
+    
+    # Carregar dados de casos do Firestore
+    casos_list = get_cases_list()  # Lista de todos os casos
+    casos_options = [format_caso(c) for c in casos_list]
+    
+    # Carregar dados de processos do Firestore
+    processos_list = get_processes_list()  # Lista de todos os processos
+    processos_options = [format_processo(p) for p in processos_list]
+    
+    # CSS para sidebar e scrollbar
+    SIDEBAR_CSS = '''
+        .acordo-sidebar-tabs .q-tab {
+            justify-content: flex-start !important;
+            padding: 8px 12px !important;
+            color: white !important;
+            text-align: left !important;
+        }
+        .acordo-sidebar-tabs .q-tab:hover {
+            background: rgba(255,255,255,0.1) !important;
+        }
+        .acordo-sidebar-tabs .q-tab--active {
+            background: rgba(255,255,255,0.2) !important;
+            border-left: 3px solid white !important;
+        }
+        
+        /* Estilo do scrollbar */
+        .acordo-content-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #999 #f0f0f0;
+        }
+        
+        .acordo-content-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .acordo-content-scroll::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        
+        .acordo-content-scroll::-webkit-scrollbar-thumb {
+            background: #999;
+            border-radius: 4px;
+        }
+        
+        .acordo-content-scroll::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+    '''
+    
+    ui.add_head_html(f'<style>{SIDEBAR_CSS}</style>')
+    
+    # Dialog principal
+    with ui.dialog() as dialog, ui.card().classes('w-full max-w-5xl p-0 overflow-hidden relative').style('height: 80vh; display: flex; flex-direction: column;'):
+        
+        # CONTEÚDO PRINCIPAL (COM SCROLL)
+        with ui.column().classes('flex-grow overflow-y-auto').style('min-height: 0;'):
+            with ui.row().classes('w-full h-full gap-0'):
+                
+                # ===== SIDEBAR ESQUERDA =====
+                with ui.column().classes('h-full').style('width: 180px; background: #2d5a5a; padding: 16px 0;'):
+                    ui.label('NOVO ACORDO').classes('text-white text-sm font-bold px-4 mb-4')
+                    
+                    with ui.tabs().props('vertical dense no-caps').classes('w-full acordo-sidebar-tabs') as tabs:
+                        tab_dados = ui.tab('Dados básicos', icon='description')
+                        tab_clausulas = ui.tab('Cláusulas', icon='article')
+                
+                # ===== CONTEÚDO DIREITA COM SCROLL =====
+                with ui.column().classes('flex-grow overflow-y-auto bg-gray-50 p-6 acordo-content-scroll').style(
+                    'overflow-x: hidden;'
+                ):
+                    with ui.tab_panels(tabs, value=tab_dados).classes('w-full'):
+                        
+                        # ABA 1: DADOS BÁSICOS
+                        with ui.tab_panel(tab_dados):
+                            with ui.column().classes('w-full gap-2'):
+                                
+                                # Título do Acordo
+                                with ui.card().classes('w-full p-3').style('border: 1px solid #e5e7eb;'):
+                                    ui.label('📋 Identificação').classes('text-sm font-bold mb-2')
+                                    
+                                    with ui.column().classes('w-full gap-2'):
+                                        # Row 1: Título
+                                        titulo_input = ui.input(
+                                        label='Título do Acordo *',
+                                        placeholder='Digite o título'
+                                    ).classes('w-full').props('outlined dense')
+                                    
+                                    # Row 2: Data e Status (lado a lado)
+                                    with ui.row().classes('w-full gap-2'):
+                                        data_input = ui.input(
+                                            label='Data de Celebração',
+                                            placeholder='Selecione a data'
+                                        ).classes('flex-grow').props('outlined dense type=date')
+                                        
+                                        status_input = ui.select(
+                                            ['Em andamento', 'Concluído'],
+                                            label='Status *',
+                                            value='Em andamento'
+                                        ).classes('flex-grow').props('outlined dense')
+                                
+                                # Casos e Processos
+                                with ui.card().classes('w-full p-3').style('border: 1px solid #e5e7eb;'):
+                                    ui.label('🔗 Vinculações').classes('text-sm font-bold mb-2')
+                                    
+                                    with ui.column().classes('w-full gap-2'):
+                                        # ===== CASOS RELACIONADOS =====
+                                        ui.label('Casos relacionados').classes('text-sm font-medium text-gray-700 mb-1')
+                                    
+                                    # Container para chips de casos selecionados
+                                    casos_chips_container = ui.column().classes('w-full gap-2')
+                                
+                                # Função para atualizar chips de casos
+                                def refresh_casos_chips():
+                                    """Atualiza exibição dos chips de casos."""
+                                    casos_chips_container.clear()
+                                    
+                                    with casos_chips_container:
+                                        if state['casos']:
+                                            for caso in state['casos']:
+                                                caso_id = caso.get('_id') or caso.get('id')
+                                                caso_title = format_caso(caso)
+                                                
+                                                with ui.row().classes('gap-2 items-center'):
+                                                    ui.chip(
+                                                        caso_title[:50] + '...' if len(caso_title) > 50 else caso_title,
+                                                        removable=False
+                                                    ).classes('bg-purple-100 text-purple-900')
+                                                    
+                                                    def remove_caso(cid=caso_id):
+                                                        """Remove caso da seleção."""
+                                                        state['casos'] = [
+                                                            c for c in state['casos']
+                                                            if (c.get('_id') or c.get('id')) != cid
+                                                        ]
+                                                        refresh_casos_chips()
+                                                    
+                                                    ui.button(
+                                                        icon='close',
+                                                        on_click=remove_caso
+                                                    ).props('flat dense size=sm').style('color: #d32f2f;')
+                                        else:
+                                            ui.label('Nenhum caso selecionado').classes(
+                                                'text-gray-400 italic text-sm'
+                                            )
+                                
+                                # Row com select + botão
+                                with ui.row().classes('w-full gap-1 items-center'):
+                                    casos_select = ui.select(
+                                        casos_options or [],
+                                        label='Pesquisar casos...',
+                                        with_input=True
+                                    ).classes('flex-grow').props('outlined dense use-input input-debounce="0"')
+                                    
+                                    # Função de filtro para casos (definida após criar casos_select)
+                                    def filter_casos(e):
+                                        """Filtra opções de casos baseado no texto digitado."""
+                                        search_text = (e.args or '').lower().strip()
+                                        if not search_text:
+                                            casos_select.options = casos_options
+                                        else:
+                                            filtered = [opt for opt in casos_options if search_text in opt.lower()]
+                                            casos_select.options = filtered if filtered else ['Nenhum caso encontrado']
+                                        casos_select.update()
+                                    
+                                    casos_select.on('update:input-value', filter_casos)
+                                    
+                                    def add_caso():
+                                        """Adiciona caso selecionado à lista."""
+                                        if casos_select.value:
+                                            selected_title = casos_select.value
+                                            
+                                            # Verificar se já está na lista
+                                            caso_ids_selecionados = [
+                                                c.get('_id') or c.get('id') 
+                                                for c in state['casos']
+                                            ]
+                                            
+                                            # Encontrar o caso na lista original
+                                            selected_caso = None
+                                            for caso in casos_list:
+                                                if format_caso(caso) == selected_title:
+                                                    selected_caso = caso
+                                                    break
+                                            
+                                            if selected_caso:
+                                                caso_id = selected_caso.get('_id') or selected_caso.get('id')
+                                                
+                                                # Verificar se já está na lista
+                                                if caso_id not in caso_ids_selecionados:
+                                                    state['casos'].append(selected_caso)
+                                                    casos_select.value = None  # Limpar seleção
+                                                    # Restaura opções completas
+                                                    casos_select.options = casos_options
+                                                    refresh_casos_chips()
+                                                else:
+                                                    ui.notify('Este caso já está adicionado!', type='warning')
+                                            else:
+                                                ui.notify('Caso não encontrado!', type='warning')
+                                    
+                                    ui.button(icon='add', on_click=add_caso).props('flat dense round').style(
+                                        'color: #9C27B0;'
+                                    )
+                                
+                                    # Renderizar chips inicialmente (vazio)
+                                    refresh_casos_chips()
+                                    
+                                    ui.separator().classes('my-2')
+                                    
+                                    # ===== PROCESSOS RELACIONADOS =====
+                                    ui.label('Processos relacionados').classes('text-sm font-medium text-gray-700 mb-1')
+                                    
+                                    # Container para chips de processos selecionados
+                                    processos_chips_container = ui.column().classes('w-full gap-2')
+                                
+                                # Função para atualizar chips de processos
+                                def refresh_processos_chips():
+                                    """Atualiza exibição dos chips de processos."""
+                                    processos_chips_container.clear()
+                                    
+                                    with processos_chips_container:
+                                        if state['processos']:
+                                            for processo in state['processos']:
+                                                processo_id = processo.get('_id') or processo.get('id')
+                                                processo_title = format_processo(processo)
+                                                
+                                                with ui.row().classes('gap-2 items-center'):
+                                                    ui.chip(
+                                                        processo_title[:50] + '...' if len(processo_title) > 50 else processo_title,
+                                                        removable=False
+                                                    ).classes('bg-orange-100 text-orange-900')
+                                                    
+                                                    def remove_processo(pid=processo_id):
+                                                        """Remove processo da seleção."""
+                                                        state['processos'] = [
+                                                            p for p in state['processos']
+                                                            if (p.get('_id') or p.get('id')) != pid
+                                                        ]
+                                                        refresh_processos_chips()
+                                                    
+                                                    ui.button(
+                                                        icon='close',
+                                                        on_click=remove_processo
+                                                    ).props('flat dense size=sm').style('color: #d32f2f;')
+                                        else:
+                                            ui.label('Nenhum processo selecionado').classes(
+                                                'text-gray-400 italic text-sm'
+                                            )
+                                
+                                # Row com select + botão
+                                with ui.row().classes('w-full gap-1 items-center'):
+                                    processos_select = ui.select(
+                                        processos_options or [],
+                                        label='Pesquisar processos...',
+                                        with_input=True
+                                    ).classes('flex-grow').props('outlined dense use-input input-debounce="0"')
+                                    
+                                    # Função de filtro para processos (definida após criar processos_select)
+                                    def filter_processos(e):
+                                        """Filtra opções de processos baseado no texto digitado."""
+                                        search_text = (e.args or '').lower().strip()
+                                        if not search_text:
+                                            processos_select.options = processos_options
+                                        else:
+                                            filtered = [opt for opt in processos_options if search_text in opt.lower()]
+                                            processos_select.options = filtered if filtered else ['Nenhum processo encontrado']
+                                        processos_select.update()
+                                    
+                                    processos_select.on('update:input-value', filter_processos)
+                                    
+                                    def add_processo():
+                                        """Adiciona processo selecionado à lista."""
+                                        if processos_select.value:
+                                            selected_title = processos_select.value
+                                            
+                                            # Verificar se já está na lista
+                                            processo_ids_selecionados = [
+                                                p.get('_id') or p.get('id') 
+                                                for p in state['processos']
+                                            ]
+                                            
+                                            # Encontrar o processo na lista original
+                                            selected_processo = None
+                                            for processo in processos_list:
+                                                if format_processo(processo) == selected_title:
+                                                    selected_processo = processo
+                                                    break
+                                            
+                                            if selected_processo:
+                                                processo_id = selected_processo.get('_id') or selected_processo.get('id')
+                                                
+                                                # Verificar se já está na lista
+                                                if processo_id not in processo_ids_selecionados:
+                                                    state['processos'].append(selected_processo)
+                                                    processos_select.value = None  # Limpar seleção
+                                                    # Restaura opções completas
+                                                    processos_select.options = processos_options
+                                                    refresh_processos_chips()
+                                                else:
+                                                    ui.notify('Este processo já está adicionado!', type='warning')
+                                            else:
+                                                ui.notify('Processo não encontrado!', type='warning')
+                                    
+                                    ui.button(icon='add', on_click=add_processo).props('flat dense round').style(
+                                        'color: #FF9800;'
+                                    )
+                                    
+                                    # Renderizar chips inicialmente (vazio)
+                                    refresh_processos_chips()
+                            
+                            # Partes
+                            with ui.card().classes('w-full p-3').style('border: 1px solid #e5e7eb;'):
+                                ui.label('👥 Partes').classes('text-sm font-bold mb-2')
+                                ui.label('Em desenvolvimento').classes('text-xs text-gray-500 italic')
+                    
+                    # ABA 2: CLÁUSULAS
+                    with ui.tab_panel(tab_clausulas):
+                        with ui.column().classes('w-full gap-6'):
+                            # Botão Nova Cláusula
+                            with ui.row().classes('w-full justify-end mb-4'):
+                                ui.button(
+                                    '+ NOVA CLÁUSULA',
+                                    icon='add',
+                                    on_click=open_clausula_dialog
+                                ).props('color=primary').classes('font-bold')
+                            
+                            # Container para tabela de cláusulas
+                            clausulas_table_container = ui.column().classes('w-full')
+                            
+                            # Função de renderização de tabela
+                            def render_clausulas_table():
+                                """Renderiza tabela de cláusulas com cards em grid."""
+                                clausulas_table_container.clear()
+                                
+                                with clausulas_table_container:
+                                    if state['clausulas']:
+                                        # Card com borda para tabela
+                                        with ui.card().classes('w-full p-0').style('border: 1px solid #e5e7eb;'):
+                                            # Cabeçalho da tabela
+                                            with ui.row().classes('w-full bg-gray-100 p-3 font-bold text-sm items-center').style(
+                                                'border-bottom: 2px solid #e0e0e0;'
+                                            ):
+                                                ui.label('Título').classes('flex-grow')
+                                                ui.label('Número').classes('w-24 text-center')
+                                                ui.label('Tipo').classes('w-28 text-center')
+                                                ui.label('Prazo Seg.').classes('w-32 text-center')
+                                                ui.label('Prazo Fatal').classes('w-32 text-center')
+                                                ui.label('Status').classes('w-28 text-center')
+                                                ui.label('Ações').classes('w-32 text-center')
+                                            
+                                            # Linhas da tabela
+                                            for idx, clausula in enumerate(state['clausulas']):
+                                                with ui.row().classes('w-full p-3 items-center').style(
+                                                    'border-bottom: 1px solid #e0e0e0;'
+                                                ):
+                                                    # Título
+                                                    ui.label(clausula.get('titulo', '-')).classes('flex-grow text-sm')
+                                                    
+                                                    # Número
+                                                    ui.label(clausula.get('numero', '-')).classes('w-24 text-center text-sm')
+                                                    
+                                                    # Tipo
+                                                    ui.label(clausula.get('tipo', '-')).classes('w-28 text-center text-sm')
+                                                    
+                                                    # Prazos (Regular ou valores)
+                                                    if clausula.get('regular'):
+                                                        ui.label('Regular').classes('w-32 text-center text-sm font-semibold').style('color: #4CAF50;')
+                                                        ui.label('-').classes('w-32 text-center text-sm')
+                                                    else:
+                                                        prazo_seg = clausula.get('prazo_seguranca', '-')
+                                                        prazo_fat = clausula.get('prazo_fatal', '-')
+                                                        ui.label(prazo_seg if prazo_seg else '-').classes('w-32 text-center text-sm')
+                                                        ui.label(prazo_fat if prazo_fat else '-').classes('w-32 text-center text-sm')
+                                                    
+                                                    # Status com badge
+                                                    status = clausula.get('status', '-')
+                                                    status_color = {
+                                                        'Cumprida': 'positive',
+                                                        'Pendente': 'warning',
+                                                        'Atrasada': 'negative'
+                                                    }.get(status, 'primary')
+                                                    
+                                                    with ui.row().classes('w-28 justify-center'):
+                                                        ui.badge(status).props(f'color={status_color}').classes('text-xs')
+                                                    
+                                                    # Botões de ação
+                                                    with ui.row().classes('w-32 justify-center gap-1'):
+                                                        def edit_wrapper(index=idx):
+                                                            """Abre modal para editar cláusula."""
+                                                            open_clausula_dialog_edit(index)
+                                                        
+                                                        def delete_wrapper(index=idx):
+                                                            """Remove cláusula."""
+                                                            state['clausulas'].pop(index)
+                                                            render_clausulas_table()
+                                                            ui.notify('Cláusula removida!', type='positive')
+                                                        
+                                                        ui.button(
+                                                            icon='edit',
+                                                            on_click=edit_wrapper
+                                                        ).props('flat color=primary size=sm')
+                                                        
+                                                        ui.button(
+                                                            icon='delete',
+                                                            on_click=delete_wrapper
+                                                        ).props('flat color=negative size=sm')
+                                    else:
+                                        # Mensagem quando vazio
+                                        with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
+                                            ui.icon('note_add', size='48px').classes('text-gray-300 mb-4')
+                                            ui.label('Nenhuma cláusula adicionada').classes(
+                                                'text-gray-400 text-center font-medium'
+                                            )
+                                            ui.label('Clique em "+ NOVA CLÁUSULA" para começar').classes(
+                                                'text-sm text-gray-400 text-center mt-2'
+                                            )
+                            
+                            # Armazenar referência da função
+                            render_clausulas_table_ref['func'] = render_clausulas_table
+                            
+                            # Armazenar referência da função
+                            render_clausulas_table_ref['func'] = render_clausulas_table
+                            
+                            # Renderizar tabela inicial (vazia)
+                            render_clausulas_table()
+        
+        # ===== BOTÕES FIXOS NA BASE =====
+        with ui.row().classes('w-full gap-4 p-6 justify-between items-center').style(
+            'border-top: 1px solid #e5e7eb; background-color: white; flex-shrink: 0;'
+        ):
+            # Botão EXCLUIR (à esquerda)
+            def on_delete():
+                """Deleta o acordo (apenas para edição)."""
+                ui.notify('Funcionalidade de exclusão será implementada', type='info')
+                # Será implementado quando for editar acordo existente
+            
+            ui.button('EXCLUIR', icon='delete', on_click=on_delete).props(
+                'color=negative'
+            ).classes('font-bold')
+            
+            # Espaço para separar
+            with ui.row().classes('flex-grow'):
+                pass
+            
+            # Botões à direita
+            with ui.row().classes('gap-4'):
+                # Botão CANCELAR
+                ui.button('CANCELAR', icon='cancel', on_click=dialog.close).props('flat').classes('font-bold')
+                
+                # Botão SALVAR
+                def on_save():
+                    """Salva o acordo."""
+                    # Validar título
+                    if not titulo_input.value:
+                        ui.notify('Título do acordo é obrigatório!', type='warning')
+                        return
+                    
+                    # Validar status
+                    if not status_input.value:
+                        ui.notify('Status do acordo é obrigatório!', type='warning')
+                        return
+                    
+                    # Preparar dados
+                    acordo_data = {
+                        'titulo': titulo_input.value,
+                        'data_celebracao': data_input.value,
+                        'status': status_input.value,
+                        'casos': state['casos'],
+                        'processos': state['processos'],
+                        'clientes': state['clientes'],
+                        'partes_contrarias': state['partes_contrarias'],
+                        'outros_envolvidos': state['outros_envolvidos'],
+                        'clausulas': state['clausulas'],
+                    }
+                    
+                    # Validar se há cláusulas (opcional)
+                    if not state['clausulas']:
+                        ui.notify('Adicione pelo menos uma cláusula ao acordo', type='warning')
+                        return
+                    
+                    # Chamar callback se fornecido
+                    if on_success:
+                        on_success(acordo_data)
+                    
+                    # Notificar sucesso
+                    ui.notify('Acordo salvo com sucesso!', type='positive')
+                    
+                    # Fechar dialog
+                    dialog.close()
+                
+                ui.button('SALVAR', icon='save', on_click=on_save).props(
+                    'color=primary'
+                ).classes('font-bold')
+    
+    def open_dialog():
+        """Abre o dialog."""
+        dialog.open()
+    
+    return dialog, open_dialog
+

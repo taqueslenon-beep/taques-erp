@@ -33,6 +33,7 @@ SYSTEM_OPTIONS = [
     'SEI - Ibama',
     'SGPE',
     'SinFAT',
+    'SAT/PGE-Net',
     # Sistemas internos do Ministério Público
     'Sistema Interno - MPPR',  # Ministério Público do Paraná
     'Sistema Interno - MPSC',  # Ministério Público de Santa Catarina

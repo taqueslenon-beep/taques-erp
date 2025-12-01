@@ -43,7 +43,8 @@ PROCESS_SYSTEMS = [
     'Projudi - TJPR',
     'SGPE',
     'eProtocolo',
-    'SEI - IBAMA'
+    'SEI - IBAMA',
+    'SAT/PGE-Net'
 ]
 
 

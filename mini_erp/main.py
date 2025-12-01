@@ -122,6 +122,13 @@ def start_server_safe():
     # Detecta se está sendo executado via dev_server.py
     is_dev_server = os.environ.get('DEV_SERVER', '').lower() == 'true'
     
+    # Hot Reload: ativa quando rodando diretamente (não via dev_server)
+    # O dev_server.py já cuida do reload, então desabilita para evitar conflito
+    enable_reload = not is_dev_server
+    
+    if enable_reload:
+        print("🔄 Hot Reload ATIVADO - mudanças em arquivos .py recarregam automaticamente")
+    
     try:
         print(f"\n🚀 NiceGUI running on http://localhost:{port}\n")
         ui.run(
@@ -129,7 +136,7 @@ def start_server_safe():
             favicon='💼', 
             port=port,
             host='0.0.0.0',  # Aceita conexões de qualquer IP
-            reload=False,  # SEMPRE desabilitado - watchfiles do dev_server cuida disso
+            reload=enable_reload,  # Hot reload automático quando não via dev_server
             show=False if is_dev_server else True,  # Desabilita auto-open quando via dev_server
             show_welcome_message=False,
             storage_secret='taques-erp-secret-key-2024',  # Necessário para sessões
@@ -157,10 +164,11 @@ def start_server_safe():
 
 
 # IMPORTANTE:
-# Em desenvolvimento, usamos reload=True para que mudanças no código
-# sejam detectadas automaticamente e o servidor reinicie.
-# Isso pode desconectar temporariamente o navegador, mas facilita o desenvolvimento.
+# Hot Reload está configurado automaticamente:
+# - Se rodar diretamente (python3 -m mini_erp.main): reload=True (hot reload ativo)
+# - Se rodar via dev_server.py: reload=False (dev_server cuida do reload)
 # 
-# Em produção, trocar para reload=False.
+# O NiceGUI detecta mudanças em arquivos .py e recarrega automaticamente.
+# A página do navegador pode precisar de refresh manual (F5) após mudanças.
 if __name__ in {"__main__", "__mp_main__"}:
     start_server_safe()
