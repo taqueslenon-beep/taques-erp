@@ -5,3 +5,5 @@ from .inteligencia_page import inteligencia
 
 __all__ = ['inteligencia']
 
+
+

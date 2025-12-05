@@ -1469,7 +1469,7 @@ def processos():
                         print(f"[DUPLICAR] ✓ Processo duplicado com sucesso. Novo ID: {novo_id}")
                         
                         # Buscar diretamente do Firestore para garantir que temos o processo
-                        from ...firebase_config import get_db
+                        from mini_erp.firebase_config import get_db
                         db = get_db()
                         doc = db.collection('processes').document(novo_id).get()
                         
@@ -1514,11 +1514,7 @@ def processos():
                         else:
                             ui.notify(mensagem, type='info')
                         refresh_table(force_reload=True)
-                else:
-                    # Erro na duplicação
-                    ui.notify(mensagem, type='negative')
-                    print(f"[DUPLICAR] ❌ Erro ao duplicar: {mensagem}")
-                
+
                 except Exception as e:
                     error_msg = f"Erro ao duplicar processo: {str(e)}"
                     ui.notify(error_msg, type='negative')

@@ -39,3 +39,5 @@ def inteligencia():
         import traceback
         traceback.print_exc()
 
+
+

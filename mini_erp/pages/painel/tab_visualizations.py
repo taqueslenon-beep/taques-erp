@@ -668,29 +668,63 @@ def render_tab_cliente(ds: PainelDataService, primary_color: str) -> None:
         else:
             create_empty_chart_state('Nenhum cliente vinculado a casos.')
     
-    # Gráfico de Processos por Cliente
+    # Gráfico de Processos por Cliente (com filtro de status)
     with ui.card().classes('w-full p-4'):
-        ui.label('Processos por Cliente').classes('text-lg font-semibold text-gray-700 mb-4')
+        # Cabeçalho com título e filtro
+        with ui.row().classes('w-full items-center justify-between mb-4'):
+            ui.label('Processos por Cliente').classes('text-lg font-semibold text-gray-700')
+            
+            # Estado reativo para o filtro
+            filter_status = {'value': 'todos'}
+            
+            # Dropdown de filtro
+            status_filter_options = ['Todos', 'Em Andamento', 'Concluídos']
+            status_filter_values = {
+                'Todos': 'todos',
+                'Em Andamento': 'em_andamento',
+                'Concluídos': 'concluidos'
+            }
+            
+            status_select = ui.select(
+                options=status_filter_options,
+                value='Todos',
+                label='Filtro'
+            ).classes('max-w-[200px]').props('dense outlined')
         
-        sorted_clients = ds.get_processes_by_client()
+        # Gráfico reativo que atualiza ao mudar o filtro
+        @ui.refreshable
+        def processos_chart():
+            # Obter dados filtrados
+            sorted_clients = ds.get_processes_by_client_filtered(filter_status['value'])
+            
+            if sorted_clients:
+                client_names = [get_short_name(item[0], ds.clients) for item in sorted_clients]
+                client_values = [item[1] for item in sorted_clients]
+                
+                chart_height = max(200, len(client_names) * 40)
+                
+                config = build_bar_chart_config(
+                    categories=client_names,
+                    values=client_values,
+                    series_name='Processos',
+                    horizontal=True,
+                )
+                config['series'][0]['itemStyle'] = {'color': primary_color}
+                
+                ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+            else:
+                create_empty_chart_state('Nenhum cliente vinculado a processos com o filtro selecionado.')
         
-        if sorted_clients:
-            client_names = [get_short_name(item[0], ds.clients) for item in sorted_clients]
-            client_values = [item[1] for item in sorted_clients]
-            
-            chart_height = max(200, len(client_names) * 40)
-            
-            config = build_bar_chart_config(
-                categories=client_names,
-                values=client_values,
-                series_name='Processos',
-                horizontal=True,
-            )
-            config['series'][0]['itemStyle'] = {'color': primary_color}
-            
-            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
-        else:
-            create_empty_chart_state('Nenhum cliente vinculado a processos.')
+        # Handler para atualizar o gráfico quando o filtro mudar
+        def on_filter_change():
+            selected_label = status_select.value
+            filter_status['value'] = status_filter_values.get(selected_label, 'todos')
+            processos_chart.refresh()
+        
+        status_select.on('update:model-value', lambda: on_filter_change())
+        
+        # Renderizar o gráfico inicial
+        processos_chart()
 
 
 # =============================================================================
@@ -699,27 +733,61 @@ def render_tab_cliente(ds: PainelDataService, primary_color: str) -> None:
 def render_tab_parte(ds: PainelDataService) -> None:
     """Renderiza a aba de Parte Contrária."""
     with ui.card().classes('w-full p-4'):
-        ui.label('Processos por Parte Contrária').classes('text-lg font-semibold text-gray-700 mb-4')
+        # Cabeçalho com título e filtro
+        with ui.row().classes('w-full items-center justify-between mb-4'):
+            ui.label('Processos por Parte Contrária').classes('text-lg font-semibold text-gray-700')
+            
+            # Estado reativo para o filtro
+            filter_status = {'value': 'todos'}
+            
+            # Dropdown de filtro
+            status_filter_options = ['Todos', 'Em Andamento', 'Concluídos']
+            status_filter_values = {
+                'Todos': 'todos',
+                'Em Andamento': 'em_andamento',
+                'Concluídos': 'concluidos'
+            }
+            
+            status_select = ui.select(
+                options=status_filter_options,
+                value='Todos',
+                label='Filtro'
+            ).classes('max-w-[200px]').props('dense outlined')
         
-        sorted_opposing = ds.get_processes_by_opposing_party()
+        # Gráfico reativo que atualiza ao mudar o filtro
+        @ui.refreshable
+        def processos_chart():
+            # Obter dados filtrados
+            sorted_opposing = ds.get_processes_by_opposing_party_filtered(filter_status['value'])
+            
+            if sorted_opposing:
+                opposing_names = [get_short_name(item[0], ds.opposing_parties) for item in sorted_opposing]
+                opposing_values = [item[1] for item in sorted_opposing]
+                
+                chart_height = max(200, len(opposing_names) * 40)
+                
+                config = build_bar_chart_config(
+                    categories=opposing_names,
+                    values=opposing_values,
+                    series_name='Processos',
+                    horizontal=True,
+                )
+                config['series'][0]['itemStyle'] = {'color': '#dc2626'}
+                
+                ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+            else:
+                create_empty_chart_state('Nenhuma parte contrária vinculada a processos com o filtro selecionado.')
         
-        if sorted_opposing:
-            opposing_names = [get_short_name(item[0], ds.opposing_parties) for item in sorted_opposing]
-            opposing_values = [item[1] for item in sorted_opposing]
-            
-            chart_height = max(200, len(opposing_names) * 40)
-            
-            config = build_bar_chart_config(
-                categories=opposing_names,
-                values=opposing_values,
-                series_name='Processos',
-                horizontal=True,
-            )
-            config['series'][0]['itemStyle'] = {'color': '#dc2626'}
-            
-            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
-        else:
-            create_empty_chart_state('Nenhuma parte contrária vinculada a processos.')
+        # Handler para atualizar o gráfico quando o filtro mudar
+        def on_filter_change():
+            selected_label = status_select.value
+            filter_status['value'] = status_filter_values.get(selected_label, 'todos')
+            processos_chart.refresh()
+        
+        status_select.on('update:model-value', lambda: on_filter_change())
+        
+        # Renderizar o gráfico inicial
+        processos_chart()
 
 
 # =============================================================================

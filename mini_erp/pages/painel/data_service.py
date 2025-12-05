@@ -208,6 +208,44 @@ class PainelDataService:
                 counter[client] += 1
         return sorted(counter.items(), key=lambda x: x[1], reverse=True)
     
+    def get_processes_by_client_filtered(self, status_filter: str) -> List[Tuple[str, int]]:
+        """
+        Conta processos por cliente com filtro de status, ordenado do maior para menor.
+        
+        Args:
+            status_filter: 'todos' | 'em_andamento' | 'concluidos'
+                - 'todos': retorna todos os processos
+                - 'em_andamento': filtra por status in {'Em andamento', 'Em monitoramento'}
+                - 'concluidos': filtra por status in {'Concluído', 'Concluído com pendências'}
+        
+        Returns:
+            Lista de tuplas (cliente, quantidade) ordenada do maior para menor
+        """
+        counter = Counter()
+        
+        # Definir status permitidos baseado no filtro
+        if status_filter == 'todos':
+            # Não filtra - inclui todos os processos
+            allowed_statuses = None
+        elif status_filter == 'em_andamento':
+            allowed_statuses = {'Em andamento', 'Em monitoramento'}
+        elif status_filter == 'concluidos':
+            allowed_statuses = {'Concluído', 'Concluído com pendências'}
+        else:
+            # Filtro inválido - retorna vazio
+            return []
+        
+        # Contar processos por cliente aplicando o filtro
+        for proc in self._processes:
+            proc_status = proc.get('status', '')
+            
+            # Se não há filtro ou o status está permitido, conta o processo
+            if allowed_statuses is None or proc_status in allowed_statuses:
+                for client in proc.get('clients', []):
+                    counter[client] += 1
+        
+        return sorted(counter.items(), key=lambda x: x[1], reverse=True)
+    
     # =========================================================================
     # CONTAGENS POR PARTE CONTRÁRIA
     # =========================================================================
@@ -217,6 +255,44 @@ class PainelDataService:
         for proc in self._processes:
             for opposing in proc.get('opposing_parties', []):
                 counter[opposing] += 1
+        return sorted(counter.items(), key=lambda x: x[1], reverse=True)
+    
+    def get_processes_by_opposing_party_filtered(self, status_filter: str) -> List[Tuple[str, int]]:
+        """
+        Conta processos por parte contrária com filtro de status, ordenado do maior para menor.
+        
+        Args:
+            status_filter: 'todos' | 'em_andamento' | 'concluidos'
+                - 'todos': retorna todos os processos
+                - 'em_andamento': filtra por status in {'Em andamento', 'Em monitoramento'}
+                - 'concluidos': filtra por status in {'Concluído', 'Concluído com pendências'}
+        
+        Returns:
+            Lista de tuplas (parte contrária, quantidade) ordenada do maior para menor
+        """
+        counter = Counter()
+        
+        # Definir status permitidos baseado no filtro
+        if status_filter == 'todos':
+            # Não filtra - inclui todos os processos
+            allowed_statuses = None
+        elif status_filter == 'em_andamento':
+            allowed_statuses = {'Em andamento', 'Em monitoramento'}
+        elif status_filter == 'concluidos':
+            allowed_statuses = {'Concluído', 'Concluído com pendências'}
+        else:
+            # Filtro inválido - retorna vazio
+            return []
+        
+        # Contar processos por parte contrária aplicando o filtro
+        for proc in self._processes:
+            proc_status = proc.get('status', '')
+            
+            # Se não há filtro ou o status está permitido, conta o processo
+            if allowed_statuses is None or proc_status in allowed_statuses:
+                for opposing in proc.get('opposing_parties', []):
+                    counter[opposing] += 1
+        
         return sorted(counter.items(), key=lambda x: x[1], reverse=True)
     
     # =========================================================================

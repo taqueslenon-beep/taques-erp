@@ -494,3 +494,5 @@ mini_erp/pages/acordos/
 **Status:** Planejamento completo - Pronto para implementação
 
 
+
+

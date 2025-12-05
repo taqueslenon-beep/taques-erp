@@ -46,14 +46,24 @@ def configuracoes():
                     with ui.column().classes('items-center gap-4'):
                         avatar_img = ui.image('https://cdn.quasar.dev/img/boy-avatar.png').classes('w-32 h-32 rounded-full shadow-md object-cover')
                         
+                        # Estado de carregamento do avatar
+                        avatar_loading = {'status': False}
+                        
                         # Carrega avatar atual
                         async def load_current_avatar():
+                            """Carrega o avatar do usuário do Firebase Storage"""
                             try:
                                 if not user_uid:
                                     raise ValueError("UID do usuário não disponível")
                                 
+                                if avatar_loading['status']:
+                                    return  # Evita múltiplas chamadas simultâneas
+                                
+                                avatar_loading['status'] = True
+                                
                                 url = await run.io_bound(obter_url_avatar, user_uid)
                                 if url:
+                                    # URL já vem com timestamp do storage.py
                                     avatar_img.source = url
                                 else:
                                     # Avatar padrão baseado nas iniciais ou imagem genérica
@@ -62,6 +72,8 @@ def configuracoes():
                                 print(f"Erro ao carregar avatar: {e}")
                                 # Fallback para avatar padrão
                                 avatar_img.source = f'https://ui-avatars.com/api/?name={user_email}&background=random&size=200'
+                            finally:
+                                avatar_loading['status'] = False
 
                         ui.timer(0.1, load_current_avatar, once=True)
 
@@ -180,6 +192,7 @@ def configuracoes():
                             await update_preview()
 
                         async def salvar_avatar_editado():
+                            """Salva o avatar editado no Firebase Storage"""
                             if not avatar_state['imagem_bytes']:
                                 ui.notify('Nenhuma imagem para salvar.', type='warning')
                                 return
@@ -188,7 +201,14 @@ def configuracoes():
                                 ui.notify('Erro: Usuário não identificado.', type='negative')
                                 return
 
-                            ui.notify('Processando e salvando...', type='info', spinner=True)
+                            # Feedback visual: mostra spinner de carregamento
+                            loading_notify = ui.notify(
+                                'Processando imagem...', 
+                                type='info', 
+                                spinner=True,
+                                position='top',
+                                timeout=0  # Não fecha automaticamente
+                            )
                             
                             try:
                                 # Processa imagem final
@@ -201,36 +221,56 @@ def configuracoes():
                                 )
                                 
                                 if not img_bytes:
+                                    loading_notify.dismiss()
                                     ui.notify('Erro ao processar imagem.', type='negative')
                                     return
 
-                                # Fecha dialog
+                                # Fecha dialog antes do upload
                                 if avatar_state['dialog']:
                                     avatar_state['dialog'].close()
+                                
+                                # Atualiza notificação
+                                loading_notify.message = 'Salvando no servidor...'
                                 
                                 # Salva no storage
                                 file_obj = io.BytesIO(img_bytes)
                                 url = await run.io_bound(fazer_upload_avatar, user_uid, file_obj)
                                 
+                                loading_notify.dismiss()
+                                
                                 if url:
-                                    # Atualiza avatar na página
+                                    # URL já vem com timestamp do storage.py para evitar cache
+                                    # Atualiza avatar na página de configurações
                                     avatar_img.source = url
                                     
-                                    # Força atualização imediata adicionando timestamp
-                                    import time
-                                    avatar_img.source = f"{url}?t={int(time.time())}"
+                                    # Dispara evento customizado para atualizar navbar
+                                    # sem recarregar toda a página
+                                    ui.run_javascript(f'''
+                                        if (window.dispatchEvent) {{
+                                            window.dispatchEvent(new CustomEvent('avatar-updated', {{
+                                                detail: {{ url: "{url}" }}
+                                            }}));
+                                        }}
+                                    ''')
                                     
-                                    ui.notify('Avatar atualizado com sucesso!', type='positive')
-                                    
-                                    # Recarrega página após 1 segundo para atualizar navbar
-                                    ui.timer(1.0, lambda: ui.navigate.reload(), once=True)
+                                    ui.notify('Avatar atualizado com sucesso!', type='positive', position='top')
                                 else:
-                                    ui.notify('Erro ao salvar imagem no servidor. Verifique as permissões.', type='negative')
+                                    ui.notify(
+                                        'Erro ao salvar imagem no servidor. '
+                                        'Verifique sua conexão e tente novamente.',
+                                        type='negative',
+                                        position='top'
+                                    )
                             except Exception as ex:
+                                loading_notify.dismiss()
                                 print(f"Erro ao salvar avatar: {ex}")
                                 import traceback
                                 traceback.print_exc()
-                                ui.notify(f'Erro ao salvar: {str(ex)}', type='negative')
+                                ui.notify(
+                                    f'Erro ao salvar: {str(ex)}',
+                                    type='negative',
+                                    position='top'
+                                )
 
                         def abrir_editor(imagem_bytes):
                             avatar_state['imagem_bytes'] = imagem_bytes
@@ -320,9 +360,9 @@ def configuracoes():
                                         return
                                 
                                 # Lê os bytes do arquivo
-                                # FileUpload é um objeto file-like com método read()
+                                # FileUpload é um objeto file-like com método read() assíncrono
                                 # SmallFileUpload não tem seek(), então lemos diretamente
-                                img_bytes = file_upload.read()
+                                img_bytes = await file_upload.read()
                                 
                                 # Validação de tamanho (5MB)
                                 if len(img_bytes) > 5 * 1024 * 1024:

@@ -49,3 +49,5 @@ def obter_opcoes_status(rows: List[Dict[str, Any]]) -> List[str]:
     return [''] + sorted(statuses)
 
 
+
+

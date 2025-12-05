@@ -344,3 +344,5 @@ Para adicionar um novo tipo com cores próprias:
 **Versão:** 1.0.0
 
 
+
+

@@ -93,6 +93,18 @@ TABELA_PROCESSOS_CSS = '''
     .q-table tbody tr.future-process-row:hover {
         background-color: #E1BEE7 !important;
     }
+    /* LINHA VERDE CLARO PASTEL PARA PROCESSOS CONCLUÍDOS */
+    .q-table tbody tr[data-status="Concluído"],
+    .q-table tbody tr[data-status="Finalizado"],
+    .q-table tbody tr.completed-process-row {
+        background-color: #E8F5E9 !important;
+        border-left: 4px solid #4CAF50 !important;
+    }
+    .q-table tbody tr[data-status="Concluído"]:hover,
+    .q-table tbody tr[data-status="Finalizado"]:hover,
+    .q-table tbody tr.completed-process-row:hover {
+        background-color: #C8E6C9 !important;
+    }
     /* LINHA AZUL CLARO PARA ACOMPANHAMENTOS DE TERCEIROS */
     .q-table tbody tr[data-type="third_party_monitoring"],
     .q-table tbody tr.third-party-monitoring-row {

@@ -2076,8 +2076,17 @@ def layout(page_title: str, breadcrumbs: list = None):
                                 ui.icon('logout', size='xs')
                                 ui.label('Sair')
 
+                    # Estado para evitar múltiplas carregamentos simultâneos
+                    avatar_navbar_loading = {'status': False}
+                    
                     async def load_user_avatar():
+                        """Carrega o avatar do usuário na navbar"""
                         try:
+                            if avatar_navbar_loading['status']:
+                                return  # Evita múltiplas chamadas simultâneas
+                            
+                            avatar_navbar_loading['status'] = True
+                            
                             from .auth import get_current_user
                             from .storage import obter_url_avatar
                             
@@ -2100,8 +2109,41 @@ def layout(page_title: str, breadcrumbs: list = None):
                                         ui.image(url).classes('w-full h-full object-cover')
                         except Exception as e:
                             print(f"Erro ao carregar avatar: {e}")
+                        finally:
+                            avatar_navbar_loading['status'] = False
 
                     ui.timer(0.1, load_user_avatar, once=True)
+                    
+                    # Escuta evento customizado para atualizar avatar quando alterado
+                    # Usa polling suave para detectar mudanças sem recarregar página
+                    async def check_avatar_update():
+                        """Verifica se o avatar foi atualizado e recarrega se necessário"""
+                        try:
+                            from .auth import get_current_user
+                            from .storage import obter_url_avatar
+                            
+                            user = get_current_user()
+                            if not user:
+                                return
+                                
+                            uid = user.get('uid')
+                            if uid:
+                                url = await run.io_bound(obter_url_avatar, uid)
+                                if url:
+                                    # Verifica se a URL mudou (compara sem timestamp)
+                                    current_src = getattr(avatar_comp, '_last_avatar_url', None)
+                                    url_base = url.split('?')[0]  # Remove timestamp
+                                    
+                                    if current_src != url_base:
+                                        avatar_comp.clear()
+                                        with avatar_comp:
+                                            ui.image(url).classes('w-full h-full object-cover')
+                                        avatar_comp._last_avatar_url = url_base
+                        except Exception as e:
+                            print(f"Erro ao verificar atualização de avatar: {e}")
+                    
+                    # Verifica atualizações a cada 2 segundos quando na página
+                    ui.timer(2.0, check_avatar_update)
 
     # Sidebar - Fixo permanentemente
     with ui.left_drawer(value=True).props('width=190 bordered persistent').classes('border-r border-gray-200').style(f'background-color: {PRIMARY_COLOR}'):

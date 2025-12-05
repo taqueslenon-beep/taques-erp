@@ -96,3 +96,5 @@ def aplicar_todos_filtros(
     return filtrados
 
 
+
+

@@ -18,7 +18,7 @@ from ..utils import (
 from ..business_logic import (
     validate_process, should_show_result_field, build_process_data
 )
-from ..database import save_process, delete_process
+from ..database import save_process, delete_process, get_process_passwords, save_process_password, delete_process_password
 
 def make_required_label(text: str) -> str:
     """
@@ -31,6 +31,19 @@ def make_required_label(text: str) -> str:
         Label com asterisco simples (sem HTML)
     """
     return f'{text} *'
+
+class DummyField:
+    """Helper class para campos dummy que mantém compatibilidade com código existente."""
+    def __init__(self, default_value):
+        self._value = default_value
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
 
 def render_process_dialog(on_success=None):
     """
@@ -80,8 +93,19 @@ def render_process_dialog(on_success=None):
                         tab_strategy = ui.tab('Estratégia', icon='lightbulb')
                         tab_scenarios = ui.tab('Cenários', icon='analytics')
                         tab_protocols = ui.tab('Protocolos', icon='history')
-                        tab_access = ui.tab('Chave/acesso', icon='key')
+                        tab_access = ui.tab('Senhas de acesso', icon='key')
                         tab_slack = ui.tab('Slack', icon='tag')
+            
+            # Variáveis dummy para campos de acesso (mantidas para compatibilidade com código de salvamento)
+            access_lawyer_requested = DummyField(False)
+            access_lawyer_granted = DummyField(False)
+            access_technicians_requested = DummyField(False)
+            access_technicians_granted = DummyField(False)
+            access_client_requested = DummyField(False)
+            access_client_granted = DummyField(False)
+            access_lawyer_comment = DummyField('')
+            access_technicians_comment = DummyField('')
+            access_client_comment = DummyField('')
             
             # Content
             with ui.column().classes('flex-grow h-full overflow-auto bg-gray-50'):
@@ -434,6 +458,23 @@ def render_process_dialog(on_success=None):
                             
                             status_select = ui.select(STATUS_OPTIONS, label='Status', value='Em andamento').classes('w-full')
                             
+                            # Campo: Envolve Dano em APP?
+                            envolve_dano_app_switch = ui.switch(
+                                'Envolve Dano em Área de Preservação Permanente (APP)?',
+                                value=False
+                            ).classes('w-full')
+                            envolve_dano_app_switch.tooltip('Marque se o processo envolve dano em APP conforme Código Florestal')
+                            
+                            # Campo: Área Total Discutida (ha)
+                            area_total_discutida_input = ui.number(
+                                label='Área Total Discutida (ha)',
+                                placeholder='Ex: 150.5',
+                                format='%.2f',
+                                min=0,
+                                step=0.01
+                            ).classes('w-full').props('outlined dense')
+                            area_total_discutida_input.tooltip('Área total discutida no processo em hectares. Ex: 150.5')
+                            
                             result_container = ui.column().classes('w-full gap-2 hidden')
                             with result_container:
                                 result_select = ui.select(RESULT_OPTIONS, label='Resultado do processo').classes('w-full').props('dense outlined')
@@ -652,55 +693,231 @@ def render_process_dialog(on_success=None):
                                             ui.icon('link').classes('text-blue-400 text-lg')
                         render_protocols()
 
-                    # --- TAB 7: CHAVE/ACESSO ---
+                    # --- TAB 7: SENHAS DE ACESSO ---
                     with ui.tab_panel(tab_access):
-                        with ui.column().classes('w-full gap-6'):
-                            ui.label('🔑 Controle de Acesso ao Processo').classes('text-lg font-bold text-gray-800 mb-4')
+                        # Dialog de confirmação de exclusão
+                        with ui.dialog() as delete_senha_dialog, ui.card().classes('p-4 w-96'):
+                            ui.label('Confirmar exclusão').classes('text-lg font-bold mb-3')
+                            ui.label('Deseja realmente excluir esta senha? Esta ação não pode ser desfeita.').classes('text-gray-700 mb-4')
+                            delete_senha_id_ref = {'val': None}
                             
-                            # SEÇÃO ADVOGADO
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('👨‍💼 Acesso do Advogado').classes('text-base font-semibold text-gray-700 mb-3')
-                                
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_lawyer_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_lawyer_granted = ui.checkbox('Acesso concedido').classes('text-sm')
-                                    
-                                    with ui.column().classes('flex-2'):
-                                        access_lawyer_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso do advogado...'
-                                        ).classes('w-full').props('outlined dense rows=3')
+                            with ui.row().classes('w-full justify-end gap-2'):
+                                ui.button('Cancelar', on_click=delete_senha_dialog.close).props('flat')
+                                def confirm_delete_senha():
+                                    pid = delete_senha_id_ref['val']
+                                    if pid:
+                                        success, message = delete_process_password(state['process_id'], pid)
+                                        if success:
+                                            ui.notify(message, type='positive')
+                                            render_passwords.refresh()
+                                        else:
+                                            ui.notify(message, type='negative')
+                                    delete_senha_dialog.close()
+                                ui.button('Excluir', on_click=confirm_delete_senha).props('color=red')
+                        
+                        # Dialog para cadastrar/editar senha
+                        with ui.dialog() as senha_dialog, ui.card().classes('p-4 w-[500px]'):
+                            senha_title_label = ui.label('Nova senha').classes('text-lg font-bold mb-3')
                             
-                            # SEÇÃO TÉCNICOS
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('🔧 Acesso dos Técnicos').classes('text-base font-semibold text-gray-700 mb-3')
-                                
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_technicians_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_technicians_granted = ui.checkbox('Acesso concedido').classes('text-sm')
-                                    
-                                    with ui.column().classes('flex-2'):
-                                        access_technicians_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso dos técnicos...'
-                                        ).classes('w-full').props('outlined dense rows=3')
+                            senha_titulo_input = ui.input('Título *', placeholder='Ex: Acesso ao sistema SEI').classes('w-full').props('dense outlined')
+                            senha_usuario_input = ui.input('Usuário', placeholder='Nome de usuário para login').classes('w-full').props('dense outlined')
                             
-                            # SEÇÃO CLIENTE
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('👤 Acesso do Cliente').classes('text-base font-semibold text-gray-700 mb-3')
+                            # Campo de senha com toggle mostrar/ocultar
+                            with ui.row().classes('w-full items-end gap-2'):
+                                senha_password_input = ui.input('Senha *', placeholder='Senha para login', password=True).classes('flex-grow').props('dense outlined')
+                                senha_toggle_btn = ui.button(icon='visibility_off', on_click=lambda: toggle_password_visibility()).props('flat dense').tooltip('Mostrar/ocultar senha')
+                            
+                            senha_link_input = ui.input('Link de acesso', placeholder='https://...').classes('w-full').props('dense outlined')
+                            senha_obs_textarea = ui.textarea('Observações', placeholder='Notas adicionais...').classes('w-full').props('dense outlined rows=3')
+                            
+                            senha_id_ref = {'val': None}
+                            senha_show_password = {'val': False}
+                            
+                            def toggle_password_visibility():
+                                senha_show_password['val'] = not senha_show_password['val']
+                                if senha_show_password['val']:
+                                    senha_password_input.props(remove='password')
+                                    senha_toggle_btn.props(remove='icon=visibility_off')
+                                    senha_toggle_btn.props(add='icon=visibility')
+                                    senha_toggle_btn.tooltip('Ocultar senha')
+                                else:
+                                    senha_password_input.props(add='password')
+                                    senha_toggle_btn.props(remove='icon=visibility')
+                                    senha_toggle_btn.props(add='icon=visibility_off')
+                                    senha_toggle_btn.tooltip('Mostrar senha')
+                            
+                            def save_password():
+                                if not senha_titulo_input.value or not senha_titulo_input.value.strip():
+                                    ui.notify('Título é obrigatório!', type='warning')
+                                    return
                                 
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_client_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_client_granted = ui.checkbox('Acesso concedido').classes('text-sm')
+                                if not senha_password_input.value or not senha_password_input.value.strip():
+                                    ui.notify('Senha é obrigatória!', type='warning')
+                                    return
+                                
+                                # Validar URL se fornecida
+                                link = senha_link_input.value.strip()
+                                if link and not (link.startswith('http://') or link.startswith('https://')):
+                                    ui.notify('Link deve começar com http:// ou https://', type='warning')
+                                    return
+                                
+                                if not state.get('process_id'):
+                                    ui.notify('Processo não identificado. Salve o processo primeiro.', type='warning')
+                                    return
+                                
+                                password_data = {
+                                    'titulo': senha_titulo_input.value.strip(),
+                                    'usuario': senha_usuario_input.value.strip() if senha_usuario_input.value else '',
+                                    'senha': senha_password_input.value,
+                                    'link_acesso': link if link else '',
+                                    'observacoes': senha_obs_textarea.value.strip() if senha_obs_textarea.value else ''
+                                }
+                                
+                                success, password_id, message = save_process_password(
+                                    state['process_id'],
+                                    password_data,
+                                    senha_id_ref['val']
+                                )
+                                
+                                if success:
+                                    ui.notify(message, type='positive')
+                                    senha_dialog.close()
+                                    render_passwords.refresh()
+                                else:
+                                    ui.notify(message, type='negative')
+                            
+                            with ui.row().classes('w-full justify-end gap-2 mt-3'):
+                                ui.button('Cancelar', on_click=senha_dialog.close).props('flat')
+                                senha_save_btn = ui.button('Salvar', on_click=save_password).props('color=primary')
+                            
+                            def open_senha_dialog(password_id=None):
+                                senha_id_ref['val'] = password_id
+                                senha_show_password['val'] = False
+                                senha_password_input.props(add='password')
+                                senha_toggle_btn.props(remove='icon=visibility')
+                                senha_toggle_btn.props(add='icon=visibility_off')
+                                senha_toggle_btn.tooltip('Mostrar senha')
+                                
+                                if password_id:
+                                    # Edição - carregar dados
+                                    senhas = get_process_passwords(state.get('process_id', ''))
+                                    senha_data = next((s for s in senhas if s.get('id') == password_id), None)
+                                    if senha_data:
+                                        senha_title_label.text = 'Editar senha'
+                                        senha_save_btn.text = 'Salvar'
+                                        senha_titulo_input.value = senha_data.get('titulo', '')
+                                        senha_usuario_input.value = senha_data.get('usuario', '')
+                                        senha_password_input.value = senha_data.get('senha', '')
+                                        senha_link_input.value = senha_data.get('link_acesso', '')
+                                        senha_obs_textarea.value = senha_data.get('observacoes', '')
+                                    else:
+                                        ui.notify('Senha não encontrada', type='warning')
+                                        return
+                                else:
+                                    # Nova senha
+                                    senha_title_label.text = 'Nova senha'
+                                    senha_save_btn.text = 'Salvar'
+                                    senha_titulo_input.value = ''
+                                    senha_usuario_input.value = ''
+                                    senha_password_input.value = ''
+                                    senha_link_input.value = ''
+                                    senha_obs_textarea.value = ''
+                                
+                                senha_dialog.open()
+                        
+                        # Header com botão de adicionar
+                        with ui.row().classes('w-full justify-between items-center mb-4'):
+                            ui.label('🔑 Senhas de acesso').classes('text-lg font-bold text-gray-800')
+                            ui.button('+ Nova senha', icon='add', on_click=lambda: open_senha_dialog(None) if state.get('process_id') else ui.notify('Salve o processo primeiro para adicionar senhas', type='warning')).props('flat dense color=primary')
+                        
+                        @ui.refreshable
+                        def render_passwords():
+                            if not state.get('process_id'):
+                                with ui.card().classes('w-full p-6 text-center'):
+                                    ui.label('💡 Salve o processo primeiro para gerenciar senhas').classes('text-gray-500')
+                                return
+                            
+                            senhas = get_process_passwords(state['process_id'])
+                            
+                            if not senhas:
+                                with ui.card().classes('w-full p-6 text-center'):
+                                    ui.label('Nenhuma senha cadastrada').classes('text-gray-400 italic')
+                                return
+                            
+                            for senha in senhas:
+                                senha_id = senha.get('id')
+                                senha_show = {'val': False}
+                                
+                                with ui.card().classes('w-full p-4 mb-3').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
+                                    # Título
+                                    ui.label(senha.get('titulo', 'Sem título')).classes('text-base font-bold text-gray-800 mb-3')
                                     
-                                    with ui.column().classes('flex-2'):
-                                        access_client_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso do cliente...'
-                                        ).classes('w-full').props('outlined dense rows=3')
+                                    # Usuário
+                                    if senha.get('usuario'):
+                                        with ui.row().classes('w-full items-center gap-2 mb-2'):
+                                            ui.icon('person').classes('text-gray-500')
+                                            ui.label(senha.get('usuario')).classes('text-sm text-gray-700 flex-grow')
+                                            def copy_usuario(u=senha.get('usuario')):
+                                                # Usar JSON.stringify para escapar corretamente
+                                                import json
+                                                u_json = json.dumps(u)
+                                                ui.run_javascript(f'navigator.clipboard.writeText({u_json})')
+                                                ui.notify('Usuário copiado!', type='positive')
+                                            ui.button(icon='content_copy', on_click=copy_usuario).props('flat dense size=sm').tooltip('Copiar usuário')
+                                    
+                                    # Senha
+                                    with ui.row().classes('w-full items-center gap-2 mb-2'):
+                                        ui.icon('lock').classes('text-gray-500')
+                                        senha_display_label = ui.label('••••••••').classes('text-sm text-gray-700 font-mono flex-grow')
+                                        
+                                        def toggle_senha_show():
+                                            senha_show['val'] = not senha_show['val']
+                                            if senha_show['val']:
+                                                senha_display_label.text = senha.get('senha', '')
+                                                toggle_senha_btn.props(remove='icon=visibility_off')
+                                                toggle_senha_btn.props(add='icon=visibility')
+                                                toggle_senha_btn.tooltip('Ocultar senha')
+                                            else:
+                                                senha_display_label.text = '••••••••'
+                                                toggle_senha_btn.props(remove='icon=visibility')
+                                                toggle_senha_btn.props(add='icon=visibility_off')
+                                                toggle_senha_btn.tooltip('Mostrar senha')
+                                        
+                                        toggle_senha_btn = ui.button(icon='visibility_off', on_click=toggle_senha_show).props('flat dense size=sm').tooltip('Mostrar senha')
+                                        
+                                        def copy_senha(s=senha.get('senha')):
+                                            # Usar JSON.stringify para escapar corretamente
+                                            import json
+                                            s_json = json.dumps(s)
+                                            ui.run_javascript(f'navigator.clipboard.writeText({s_json})')
+                                            ui.notify('Senha copiada!', type='positive')
+                                        ui.button(icon='content_copy', on_click=copy_senha).props('flat dense size=sm').tooltip('Copiar senha')
+                                    
+                                    # Link de acesso
+                                    if senha.get('link_acesso'):
+                                        with ui.row().classes('w-full items-center gap-2 mb-2'):
+                                            ui.icon('link').classes('text-gray-500')
+                                            link_url = senha.get('link_acesso')
+                                            def open_link(l=link_url):
+                                                ui.run_javascript(f'window.open("{l}", "_blank")')
+                                            ui.link(link_url, target='_blank').classes('text-sm text-blue-600 hover:underline flex-grow')
+                                            ui.button(icon='open_in_new', on_click=lambda l=link_url: open_link(l)).props('flat dense size=sm').tooltip('Abrir link')
+                                    
+                                    # Observações
+                                    if senha.get('observacoes'):
+                                        ui.label(senha.get('observacoes')).classes('text-xs text-gray-500 mt-2 italic')
+                                    
+                                    # Botões de ação
+                                    with ui.row().classes('w-full justify-end gap-2 mt-3'):
+                                        ui.button('Editar', icon='edit', on_click=lambda pid=senha_id: open_senha_dialog(pid)).props('flat dense size=sm color=primary')
+                                        
+                                        def delete_senha(pid=senha_id):
+                                            delete_senha_id_ref['val'] = pid
+                                            delete_senha_dialog.open()
+                                        
+                                        ui.button('Excluir', icon='delete', on_click=lambda pid=senha_id: delete_senha(pid)).props('flat dense size=sm color=red')
+                        
+                        render_passwords()
 
                     # --- TAB 8: SLACK ---
                     with ui.tab_panel(tab_slack):
@@ -771,7 +988,9 @@ def render_process_dialog(on_success=None):
                         access_lawyer_requested=access_lawyer_requested.value,
                         access_technicians_requested=access_technicians_requested.value,
                         access_client_requested=access_client_requested.value,
-                        parent_ids=state['parent_ids']
+                        parent_ids=state['parent_ids'],
+                        area_total_discutida=area_total_discutida_input.value,
+                        envolve_dano_app=envolve_dano_app_switch.value
                     )
                     
                     # Log de debug: verifica dados após build
@@ -802,6 +1021,8 @@ def render_process_dialog(on_success=None):
         type_select.value = 'Existente'; data_abertura_input.value = ''
         system_select.value = None; nucleo_select.value = 'Ambiental'
         area_select.value = None; status_select.value = 'Em andamento'; result_select.value = None
+        envolve_dano_app_switch.value = False
+        area_total_discutida_input.value = None
         # Relatório
         relatory_facts_input.value = ''; relatory_timeline_input.value = ''; relatory_documents_input.value = ''
         # Estratégia
@@ -886,6 +1107,8 @@ def render_process_dialog(on_success=None):
             nucleo_select.value = p.get('nucleo', 'Ambiental') or 'Ambiental'
             area_select.value = p.get('area') or None
             status_select.value = p.get('status', 'Em andamento') or 'Em andamento'
+            envolve_dano_app_switch.value = p.get('envolve_dano_app', False) or False
+            area_total_discutida_input.value = p.get('area_total_discutida') if p.get('area_total_discutida') is not None else None
             result_select.value = p.get('result') or None
             
             # Relatório

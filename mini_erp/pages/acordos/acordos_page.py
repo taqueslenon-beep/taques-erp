@@ -110,28 +110,25 @@ def formatar_partes_envolvidas(acordo: Dict[str, Any]) -> str:
 
 def obter_cor_status(status: str) -> str:
     """
-    Retorna cor do badge baseado no status.
+    Retorna cor do badge baseado no status (mesmo padrão do modal de processos).
     
     Args:
         status: Status do acordo
     
     Returns:
-        Nome da cor para o badge
+        String de estilo CSS para o badge
     """
-    status_lower = (status or '').lower()
+    if not status:
+        return 'background-color: #d1d5db; color: #000000;'
     
-    if 'ativo' in status_lower or 'andamento' in status_lower or 'em andamento' in status_lower:
-        return 'green'
-    elif 'concluído' in status_lower or 'concluido' in status_lower or 'finalizado' in status_lower:
-        return 'grey'
-    elif 'rescindido' in status_lower or 'cancelado' in status_lower:
-        return 'red'
-    elif 'assinado' in status_lower:
-        return 'teal'
-    elif 'negociação' in status_lower or 'negociacao' in status_lower:
-        return 'orange'
+    status_lower = status.lower()
+    
+    if 'em andamento' in status_lower or 'andamento' in status_lower:
+        return 'background-color: #fde047; color: #000000;'  # Amarelo
+    elif 'concluído' in status_lower or 'concluido' in status_lower:
+        return 'background-color: #4ade80; color: #000000;'  # Verde
     else:
-        return 'blue'
+        return 'background-color: #d1d5db; color: #000000;'  # Cinza padrão
 
 
 @ui.page('/acordos')
@@ -241,9 +238,10 @@ def acordos():
                     columns = [
                         {'name': 'data', 'label': 'Data', 'field': 'data', 'align': 'center', 'style': 'width: 120px;'},
                         {'name': 'titulo', 'label': 'Título/Número', 'field': 'titulo', 'align': 'left'},
+                        {'name': 'caso', 'label': 'Caso', 'field': 'caso', 'align': 'left', 'style': 'width: 200px;'},
                         {'name': 'partes', 'label': 'Partes Envolvidas', 'field': 'partes', 'align': 'left'},
                         {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'style': 'width: 150px;'},
-                        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 120px;'},
+                        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 150px;'},
                     ]
                     
                     # Preparar linhas
@@ -256,6 +254,26 @@ def acordos():
                         # Título/Número
                         titulo = acordo.get('titulo') or acordo.get('title') or acordo.get('numero') or acordo.get('number') or '-'
                         
+                        # Caso vinculado
+                        caso_texto = '-'
+                        casos = acordo.get('casos', [])
+                        if casos:
+                            # Pega o primeiro caso
+                            primeiro_caso = casos[0] if isinstance(casos, list) else casos
+                            if isinstance(primeiro_caso, dict):
+                                caso_titulo = primeiro_caso.get('title', 'Sem título')
+                                caso_numero = primeiro_caso.get('number', '')
+                                if caso_numero:
+                                    caso_texto = f"{caso_titulo} ({caso_numero})"
+                                else:
+                                    caso_texto = caso_titulo
+                            else:
+                                caso_texto = str(primeiro_caso)
+                        
+                        # Limita o tamanho do texto do caso para não quebrar o layout
+                        if len(caso_texto) > 50:
+                            caso_texto = caso_texto[:47] + '...'
+                        
                         # Partes envolvidas
                         partes = formatar_partes_envolvidas(acordo)
                         
@@ -266,6 +284,7 @@ def acordos():
                             'id': acordo.get('_id'),
                             'data': data_formatada,
                             'titulo': titulo,
+                            'caso': caso_texto,
                             'partes': partes,
                             'status': status,
                         })
@@ -277,36 +296,33 @@ def acordos():
                         row_key='id'
                     ).classes('w-full').props('flat dense')
                     
-                    # Slot para status com cores
+                    # Slot para status com cores (mesmo padrão do modal de processos)
                     table.add_slot('body-cell-status', '''
-                        <q-td :props="props">
+                        <q-td :props="props" style="vertical-align: middle;">
                             <q-badge 
-                                :color="props.value && (
-                                    props.value.toLowerCase().includes('ativo') || 
-                                    props.value.toLowerCase().includes('andamento')
-                                ) ? 'green' : 
-                                (props.value && (
-                                    props.value.toLowerCase().includes('concluído') || 
-                                    props.value.toLowerCase().includes('concluido') || 
-                                    props.value.toLowerCase().includes('finalizado')
-                                )) ? 'grey' :
-                                (props.value && (
-                                    props.value.toLowerCase().includes('rescindido') || 
-                                    props.value.toLowerCase().includes('cancelado')
-                                )) ? 'red' :
-                                (props.value && props.value.toLowerCase().includes('assinado')) ? 'teal' :
-                                (props.value && (
-                                    props.value.toLowerCase().includes('negociação') || 
-                                    props.value.toLowerCase().includes('negociacao')
-                                )) ? 'orange' : 'blue'"
-                                :label="props.value"
-                            />
+                                :style="props.value === 'Em andamento' || (props.value && props.value.toLowerCase().includes('andamento')) ? 'background-color: #fde047; color: #000000;' : 
+                                        props.value === 'Concluído' || (props.value && (props.value.toLowerCase().includes('concluído') || props.value.toLowerCase().includes('concluido'))) ? 'background-color: #4ade80; color: #000000;' : 
+                                        'background-color: #d1d5db; color: #000000;'"
+                                class="px-3 py-1"
+                                style="border: 1px solid rgba(0,0,0,0.1);"
+                            >
+                                {{ props.value }}
+                            </q-badge>
                         </q-td>
                     ''')
                     
-                    # Slot para ações (Editar, Deletar)
+                    # Slot para ações (Visualizar, Editar, Deletar)
                     table.add_slot('body-cell-actions', '''
                         <q-td :props="props">
+                            <q-btn 
+                                flat 
+                                dense 
+                                icon="visibility" 
+                                color="primary" 
+                                @click="$parent.$emit('view', props.row)" 
+                                size="sm"
+                                title="Visualizar"
+                            />
                             <q-btn 
                                 flat 
                                 dense 
@@ -329,6 +345,14 @@ def acordos():
                     ''')
                     
                     # Handlers para ações
+                    def on_view(acordo_row):
+                        """Handler para visualizar acordo."""
+                        acordo_id = acordo_row.get('id')
+                        if acordo_id:
+                            ui.navigate.to(f'/acordos/{acordo_id}')
+                        else:
+                            ui.notify('Erro: ID do acordo não encontrado', type='negative')
+                    
                     def on_edit(acordo_row):
                         """Handler para editar acordo."""
                         acordo_id = acordo_row.get('id')
@@ -341,6 +365,7 @@ def acordos():
                         """Handler para deletar acordo."""
                         ui.notify('Deleção em desenvolvimento', type='info')
                     
+                    table.on('view', lambda e: on_view(e.args))
                     table.on('edit', lambda e: on_edit(e.args))
                     table.on('delete', lambda e: on_delete(e.args))
                     

@@ -463,6 +463,8 @@ def build_process_data(
     access_technicians_requested: bool = False,
     access_client_requested: bool = False,
     parent_ids: List[str] = None,
+    area_total_discutida: Optional[float] = None,
+    envolve_dano_app: bool = False,
 ) -> Dict[str, Any]:
     """
     Constrói dicionário de dados de processo para salvar.
@@ -503,6 +505,8 @@ def build_process_data(
         'access_technicians_requested': access_technicians_requested,
         'access_client_requested': access_client_requested,
         'parent_ids': (parent_ids or []).copy(),
+        'area_total_discutida': float(area_total_discutida) if area_total_discutida is not None else None,
+        'envolve_dano_app': envolve_dano_app,
     }
 
 

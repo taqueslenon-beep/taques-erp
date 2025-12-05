@@ -24,6 +24,9 @@ from ...core import (
     invalidate_cache,
 )
 from ...firebase_config import get_db
+from ...auth import get_current_user
+from .password_security import encrypt_password, decrypt_password
+from google.cloud.firestore import SERVER_TIMESTAMP
 
 
 # =============================================================================
@@ -665,6 +668,56 @@ def verificar_integridade_processos() -> Dict[str, Any]:
 THIRD_PARTY_MONITORING_COLLECTION = 'third_party_monitoring'
 
 
+def sanitize_for_firestore(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Sanitiza dados antes de enviar ao Firestore.
+    Remove valores None e converte para tipos válidos.
+    
+    Args:
+        data: Dicionário com dados a sanitizar
+    
+    Returns:
+        Dicionário sanitizado sem valores None
+    """
+    sanitized = {}
+    
+    for key, value in data.items():
+        # Ignora campos com valor None
+        if value is None:
+            continue
+        
+        # Listas: garante que são listas válidas e remove None internos
+        if isinstance(value, list):
+            sanitized_list = [v for v in value if v is not None]
+            sanitized[key] = sanitized_list if sanitized_list else []
+        
+        # Strings: remove espaços extras e converte None para string vazia
+        elif isinstance(value, str):
+            sanitized[key] = value.strip() if value.strip() else ''
+        
+        # Dicionários: sanitiza recursivamente
+        elif isinstance(value, dict):
+            sanitized[key] = sanitize_for_firestore(value)
+        
+        # Booleanos: mantém como está
+        elif isinstance(value, bool):
+            sanitized[key] = value
+        
+        # Números: mantém como está
+        elif isinstance(value, (int, float)):
+            sanitized[key] = value
+        
+        # Outros tipos: converte para string se possível
+        else:
+            try:
+                sanitized[key] = str(value) if value else ''
+            except Exception:
+                # Se não conseguir converter, ignora o campo
+                continue
+    
+    return sanitized
+
+
 def criar_acompanhamento(acompanhamento_data: Dict[str, Any]) -> str:
     """
     Cria um novo acompanhamento de terceiros no Firestore.
@@ -717,39 +770,66 @@ def criar_acompanhamento(acompanhamento_data: Dict[str, Any]) -> str:
         doc_data.pop('_id', None)
         
         # Garante que título está presente (múltiplos campos para compatibilidade)
-        if 'title' not in doc_data:
+        if 'title' not in doc_data or not doc_data.get('title'):
             doc_data['title'] = title_value
-        if 'process_title' not in doc_data:
+        if 'process_title' not in doc_data or not doc_data.get('process_title'):
             doc_data['process_title'] = title_value
         
         # Garantir que link está presente (múltiplos campos para compatibilidade)
-        link_value = doc_data.get('link_do_processo') or doc_data.get('link', '')
-        if link_value:
-            doc_data['link_do_processo'] = link_value
-            doc_data['link'] = link_value  # Também salvar como 'link'
+        link_value = doc_data.get('link_do_processo') or doc_data.get('link', '') or ''
+        doc_data['link_do_processo'] = link_value
+        doc_data['link'] = link_value  # Também salvar como 'link'
         
         # Garantir que número está presente
-        number_value = doc_data.get('process_number') or doc_data.get('number', '')
-        if number_value:
-            doc_data['number'] = number_value
-            doc_data['process_number'] = number_value  # Compatibilidade
+        number_value = doc_data.get('process_number') or doc_data.get('number', '') or ''
+        doc_data['number'] = number_value
+        doc_data['process_number'] = number_value  # Compatibilidade
         
-        print(f"[CRIAR_ACOMPANHAMENTO] Link a salvar: '{doc_data.get('link')}' ou '{doc_data.get('link_do_processo')}'")
-        print(f"[CRIAR_ACOMPANHAMENTO] Número a salvar: '{doc_data.get('number')}' ou '{doc_data.get('process_number')}'")
+        # Garantir que listas não sejam None
+        if 'parte_ativa' not in doc_data or doc_data.get('parte_ativa') is None:
+            doc_data['parte_ativa'] = []
+        if 'parte_passiva' not in doc_data or doc_data.get('parte_passiva') is None:
+            doc_data['parte_passiva'] = []
+        if 'outros_envolvidos' not in doc_data or doc_data.get('outros_envolvidos') is None:
+            doc_data['outros_envolvidos'] = []
+        if 'processos_pais' not in doc_data or doc_data.get('processos_pais') is None:
+            doc_data['processos_pais'] = []
+        if 'cases' not in doc_data or doc_data.get('cases') is None:
+            doc_data['cases'] = []
+        if 'scenarios' not in doc_data or doc_data.get('scenarios') is None:
+            doc_data['scenarios'] = []
+        if 'protocols' not in doc_data or doc_data.get('protocols') is None:
+            doc_data['protocols'] = []
         
         # Adiciona timestamps
         doc_data['created_at'] = datetime.now().isoformat()
         doc_data['updated_at'] = datetime.now().isoformat()
         
         # Garante que status existe
-        if 'status' not in doc_data:
+        if 'status' not in doc_data or not doc_data.get('status'):
             doc_data['status'] = 'ativo'
         
+        # Sanitiza dados antes de salvar (remove None e converte tipos)
+        doc_data = sanitize_for_firestore(doc_data)
+        
+        print(f"[CRIAR_ACOMPANHAMENTO] Link a salvar: '{doc_data.get('link')}' ou '{doc_data.get('link_do_processo')}'")
+        print(f"[CRIAR_ACOMPANHAMENTO] Número a salvar: '{doc_data.get('number')}' ou '{doc_data.get('process_number')}'")
         print(f"[CRIAR_ACOMPANHAMENTO] Dados finais a salvar:")
         print(f"  - title: {doc_data.get('title')}")
         print(f"  - process_title: {doc_data.get('process_title')}")
         print(f"  - status: {doc_data.get('status')}")
         print(f"  - Total de campos: {len(doc_data)}")
+        
+        # Validação final: verifica se há campos problemáticos
+        problematic_fields = []
+        for key, value in doc_data.items():
+            if value is None:
+                problematic_fields.append(key)
+        
+        if problematic_fields:
+            print(f"[CRIAR_ACOMPANHAMENTO] ⚠️  AVISO: Campos com None encontrados após sanitização: {problematic_fields}")
+            # Remove campos None restantes
+            doc_data = {k: v for k, v in doc_data.items() if v is not None}
         
         # Salva no Firestore
         doc_ref = db.collection(THIRD_PARTY_MONITORING_COLLECTION).document(doc_id)
@@ -977,24 +1057,52 @@ def atualizar_acompanhamento(doc_id: str, updates: Dict[str, Any]) -> bool:
         
         # Garantir que campos críticos estejam presentes
         # Link do processo (múltiplos campos para compatibilidade)
-        link_value = updates.get('link_do_processo') or updates.get('link', '')
-        if link_value:
-            updates['link_do_processo'] = link_value
-            updates['link'] = link_value  # Também salvar como 'link' para compatibilidade
+        link_value = updates.get('link_do_processo') or updates.get('link', '') or ''
+        updates['link_do_processo'] = link_value
+        updates['link'] = link_value  # Também salvar como 'link' para compatibilidade
         
         # Número do processo
-        number_value = updates.get('process_number') or updates.get('number', '')
-        if number_value:
-            updates['number'] = number_value
-            updates['process_number'] = number_value  # Compatibilidade
+        number_value = updates.get('process_number') or updates.get('number', '') or ''
+        updates['number'] = number_value
+        updates['process_number'] = number_value  # Compatibilidade
+        
+        # Garantir que listas não sejam None
+        if 'parte_ativa' in updates and updates.get('parte_ativa') is None:
+            updates['parte_ativa'] = []
+        if 'parte_passiva' in updates and updates.get('parte_passiva') is None:
+            updates['parte_passiva'] = []
+        if 'outros_envolvidos' in updates and updates.get('outros_envolvidos') is None:
+            updates['outros_envolvidos'] = []
+        if 'processos_pais' in updates and updates.get('processos_pais') is None:
+            updates['processos_pais'] = []
+        if 'cases' in updates and updates.get('cases') is None:
+            updates['cases'] = []
+        if 'scenarios' in updates and updates.get('scenarios') is None:
+            updates['scenarios'] = []
+        if 'protocols' in updates and updates.get('protocols') is None:
+            updates['protocols'] = []
         
         # Remove campos que não devem ser atualizados diretamente
         updates.pop('_id', None)
         updates.pop('id', None)
         updates.pop('created_at', None)
         
+        # Sanitiza dados antes de atualizar (remove None e converte tipos)
+        updates = sanitize_for_firestore(updates)
+        
         print(f"[ATUALIZAR_ACOMPANHAMENTO] Link a salvar: '{updates.get('link')}' ou '{updates.get('link_do_processo')}'")
         print(f"[ATUALIZAR_ACOMPANHAMENTO] Número a salvar: '{updates.get('number')}' ou '{updates.get('process_number')}'")
+        
+        # Validação final: verifica se há campos problemáticos
+        problematic_fields = []
+        for key, value in updates.items():
+            if value is None:
+                problematic_fields.append(key)
+        
+        if problematic_fields:
+            print(f"[ATUALIZAR_ACOMPANHAMENTO] ⚠️  AVISO: Campos com None encontrados após sanitização: {problematic_fields}")
+            # Remove campos None restantes
+            updates = {k: v for k, v in updates.items() if v is not None}
         
         # Verifica se documento existe antes de atualizar
         doc_ref = db.collection(THIRD_PARTY_MONITORING_COLLECTION).document(doc_id)
@@ -1054,5 +1162,165 @@ def deletar_acompanhamento(doc_id: str) -> bool:
         import traceback
         traceback.print_exc()
         return False
+
+
+# =============================================================================
+# FUNÇÕES DE BANCO DE DADOS PARA SENHAS DE PROCESSOS
+# =============================================================================
+
+def get_process_passwords(process_id: str, collection_name: str = 'processes') -> List[Dict[str, Any]]:
+    """
+    Obtém todas as senhas cadastradas para um processo ou acompanhamento.
+    
+    Args:
+        process_id: ID do processo/acompanhamento no Firestore
+        collection_name: Nome da coleção ('processes' ou 'third_party_monitoring')
+    
+    Returns:
+        Lista de dicionários com dados das senhas (senha descriptografada)
+    """
+    if not process_id:
+        return []
+    
+    try:
+        db = get_db()
+        senhas_ref = db.collection(collection_name).document(process_id).collection('senhas_processo')
+        docs = senhas_ref.order_by('data_criacao', direction='DESCENDING').stream()
+        
+        senhas = []
+        for doc in docs:
+            senha_data = doc.to_dict()
+            senha_data['id'] = doc.id
+            
+            # Descriptografa a senha para exibição
+            senha_criptografada = senha_data.get('senha', '')
+            if senha_criptografada:
+                senha_data['senha'] = decrypt_password(senha_criptografada)
+            else:
+                senha_data['senha'] = ''
+            
+            senhas.append(senha_data)
+        
+        return senhas
+    
+    except Exception as e:
+        print(f"Erro ao buscar senhas do {collection_name} {process_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+def save_process_password(process_id: str, password_data: Dict[str, Any], password_id: Optional[str] = None, collection_name: str = 'processes') -> Tuple[bool, Optional[str], str]:
+    """
+    Salva ou atualiza uma senha de processo ou acompanhamento.
+    
+    Args:
+        process_id: ID do processo/acompanhamento no Firestore
+        password_data: Dicionário com dados da senha:
+            - titulo: str (obrigatório)
+            - usuario: str (opcional)
+            - senha: str (obrigatório, será criptografada)
+            - link_acesso: str (opcional)
+            - observacoes: str (opcional)
+        password_id: ID da senha para atualização (None para criar nova)
+        collection_name: Nome da coleção ('processes' ou 'third_party_monitoring')
+    
+    Returns:
+        Tupla (sucesso: bool, senha_id: Optional[str], mensagem: str)
+    """
+    if not process_id:
+        return False, None, "ID do processo/acompanhamento não fornecido"
+    
+    # Validação de campos obrigatórios
+    if not password_data.get('titulo'):
+        return False, None, "Título da senha é obrigatório"
+    
+    if not password_data.get('senha'):
+        return False, None, "Senha é obrigatória"
+    
+    try:
+        db = get_db()
+        
+        # Obter usuário atual
+        current_user = get_current_user()
+        user_id = current_user.get('uid') if current_user else 'sistema'
+        
+        # Preparar dados para salvar
+        senha_para_salvar = {
+            'titulo': password_data.get('titulo', '').strip(),
+            'usuario': password_data.get('usuario', '').strip(),
+            'senha': encrypt_password(password_data.get('senha', '')),  # Criptografa antes de salvar
+            'link_acesso': password_data.get('link_acesso', '').strip(),
+            'observacoes': password_data.get('observacoes', '').strip(),
+            'data_atualizacao': SERVER_TIMESTAMP,
+        }
+        
+        # Obter referência da subcoleção
+        senhas_ref = db.collection(collection_name).document(process_id).collection('senhas_processo')
+        
+        if password_id:
+            # Atualização
+            senha_doc = senhas_ref.document(password_id)
+            
+            # Verificar se existe
+            if not senha_doc.get().exists:
+                return False, None, "Senha não encontrada"
+            
+            # Atualizar apenas campos modificados (preserva data_criacao e criado_por)
+            senha_doc.update(senha_para_salvar)
+            senha_id_final = password_id
+            mensagem = "Senha atualizada com sucesso!"
+        else:
+            # Criação
+            senha_para_salvar['data_criacao'] = SERVER_TIMESTAMP
+            senha_para_salvar['criado_por'] = user_id
+            
+            doc_ref = senhas_ref.document()
+            doc_ref.set(senha_para_salvar)
+            senha_id_final = doc_ref.id
+            mensagem = "Senha cadastrada com sucesso!"
+        
+        return True, senha_id_final, mensagem
+    
+    except Exception as e:
+        print(f"Erro ao salvar senha do {collection_name} {process_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, None, f"Erro ao salvar senha: {str(e)}"
+
+
+def delete_process_password(process_id: str, password_id: str, collection_name: str = 'processes') -> Tuple[bool, str]:
+    """
+    Exclui uma senha de processo ou acompanhamento.
+    
+    Args:
+        process_id: ID do processo/acompanhamento no Firestore
+        password_id: ID da senha a ser excluída
+        collection_name: Nome da coleção ('processes' ou 'third_party_monitoring')
+    
+    Returns:
+        Tupla (sucesso: bool, mensagem: str)
+    """
+    if not process_id or not password_id:
+        return False, "ID do processo/acompanhamento ou da senha não fornecido"
+    
+    try:
+        db = get_db()
+        senha_doc = db.collection(collection_name).document(process_id).collection('senhas_processo').document(password_id)
+        
+        # Verificar se existe
+        if not senha_doc.get().exists:
+            return False, "Senha não encontrada"
+        
+        # Excluir
+        senha_doc.delete()
+        
+        return True, "Senha excluída com sucesso!"
+    
+    except Exception as e:
+        print(f"Erro ao excluir senha {password_id} do {collection_name} {process_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, f"Erro ao excluir senha: {str(e)}"
 
 

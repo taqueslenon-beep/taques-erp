@@ -67,7 +67,9 @@ from .ui_components import (
 from .business_logic import deduplicate_cases_by_title
 
 # Importar componentes padrão de processos
-from ..processos.ui_components import BODY_SLOT_AREA, BODY_SLOT_STATUS
+from ..processos.ui_components import BODY_SLOT_AREA, BODY_SLOT_STATUS, TABELA_PROCESSOS_CSS
+# Importar modal de edição de processos
+from ..processos.modais.modal_processo import render_process_dialog
 
 # --- NEW IMPORT ---
 # Import this module to ensure the @ui.page('/casos/admin/duplicatas') route is registered
@@ -530,18 +532,18 @@ def case_detail(case_slug: str):
             ui.button('🗑️ Excluir Caso', on_click=delete_case_dialog.open).classes('bg-red-600 text-white').props('dense')
 
         with ui.tabs().classes('w-full bg-white').props('align=left no-caps') as tabs:
-            basic_tab = ui.tab('Dados Básicos')
+            basic_tab = ui.tab('Dados básicos')
             proc_tab = ui.tab('Processos')
             calc_tab = ui.tab('Cálculos')
-            report_tab = ui.tab('Relatório Geral do Caso')
+            report_tab = ui.tab('Relatório geral do caso')
             vistorias_tab = ui.tab('Vistorias')
-            strategy_tab = ui.tab('Estratégia Geral')
-            next_actions_tab = ui.tab('Próximas Ações')
+            strategy_tab = ui.tab('Estratégia geral')
+            next_actions_tab = ui.tab('Próximas ações')
             slack_tab = ui.tab('Slack')
-            links_tab = ui.tab('Links Úteis')
+            links_tab = ui.tab('Links úteis')
         
         with ui.tab_panels(tabs, value=basic_tab).classes('w-full p-6 bg-white rounded shadow-sm'):
-            # Tab 1: Dados Básicos
+            # Tab 1: Dados básicos
             with ui.tab_panel(basic_tab).classes('w-full'):
                 # ========== DADOS BÁSICOS CLEAN ==========
                 
@@ -804,25 +806,8 @@ def case_detail(case_slug: str):
 
             # Tab 2: Processos
             with ui.tab_panel(proc_tab).classes('w-full'):
-                # Estilo CSS para tabela compacta no modal (adicionado uma vez)
-                ui.add_head_html('''
-                    <style>
-                        .processes-table-modal .q-table thead th {
-                            font-size: 10px !important;
-                            padding: 6px 8px !important;
-                        }
-                        .processes-table-modal .q-table tbody td {
-                            font-size: 10px !important;
-                            padding: 4px 6px !important;
-                        }
-                        .processes-table-modal .q-table {
-                            border-collapse: collapse;
-                        }
-                        .processes-table-modal .q-table tbody tr {
-                            border-bottom: 1px solid #e8e8e8;
-                        }
-                    </style>
-                ''')
+                # CSS padrão para tabelas de processos (cores alternadas)
+                ui.add_head_html(TABELA_PROCESSOS_CSS)
                 
                 # ===== CONSTANTES E HELPERS PARA ÁREA DO DIREITO (APENAS NA ABA PROCESSOS) =====
                 # Opções padronizadas de área do direito
@@ -901,6 +886,15 @@ def case_detail(case_slug: str):
                 # Container para a tabela de processos
                 processes_container = ui.column().classes('w-full')
                 
+                # Criar instância do modal de edição de processos
+                def on_process_saved():
+                    """Callback quando processo é salvo - atualiza a lista"""
+                    render_linked_processes.refresh()
+                
+                process_dialog, open_process_modal = render_process_dialog(
+                    on_success=on_process_saved
+                )
+                
                 # Definir render_linked_processes ANTES de ser referenciado
                 @ui.refreshable
                 def render_linked_processes():
@@ -954,43 +948,32 @@ def case_detail(case_slug: str):
                                 # Ordena por título
                                 table_rows.sort(key=lambda r: (r.get('title') or '').lower())
                                 
-                                # Definir colunas da tabela (ordem padrão: Área, Título, Casos, Número, Clientes, Parte Contrária, Status)
+                                # Definir colunas da tabela (sincronizado com módulo de Processos - sem coluna Casos e sem Ações)
                                 columns = [
-                                    {'name': 'area', 'label': 'Área', 'field': 'area', 'align': 'left', 'sortable': True, 'style': 'width: 100px; max-width: 100px; font-size: 10px;'},
-                                    {'name': 'title', 'label': 'Título', 'field': 'title', 'align': 'left', 'sortable': True, 'style': 'width: 200px; max-width: 200px; font-size: 10px;'},
-                                    {'name': 'cases', 'label': 'Casos', 'field': 'cases', 'align': 'left', 'style': 'width: 120px; min-width: 120px; font-size: 10px;'},
-                                    {'name': 'number', 'label': 'Número', 'field': 'number', 'align': 'left', 'sortable': True, 'style': 'width: 140px; font-size: 10px;'},
-                                    {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left', 'style': 'width: 90px; max-width: 90px; font-size: 10px;'},
-                                    {'name': 'opposing', 'label': 'Parte Contrária', 'field': 'opposing', 'align': 'left', 'style': 'width: 90px; max-width: 90px; font-size: 10px;'},
-                                    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 130px; font-size: 10px;'},
-                                    {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 100px; font-size: 10px;'},
+                                    {'name': 'area', 'label': 'Área', 'field': 'area', 'align': 'left', 'sortable': True, 'style': 'width: 120px; max-width: 120px;'},
+                                    {'name': 'title', 'label': 'Título', 'field': 'title', 'align': 'left', 'sortable': True, 'style': 'width: 280px; max-width: 280px;'},
+                                    {'name': 'number', 'label': 'Número', 'field': 'number', 'align': 'left', 'sortable': True, 'style': 'width: 180px;'},
+                                    {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
+                                    {'name': 'opposing', 'label': 'Parte Contrária', 'field': 'opposing', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
+                                    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 150px;'},
                                 ]
                                 
-                                # Criar tabela
+                                # Criar tabela (sincronizado com módulo de Processos)
                                 processes_table = ui.table(
                                     columns=columns,
                                     rows=table_rows,
                                     row_key='_id',
                                     pagination={'rowsPerPage': 10}
-                                ).classes('w-full processes-table-modal')
+                                ).classes('w-full').props('flat bordered dense')
                                 
-                                # Handler para clique no título (abre modal de edição)
-                                async def handle_title_click(e):
-                                    clicked_row = e.args
-                                    if clicked_row and '_id' in clicked_row:
-                                        process_id = clicked_row['_id']
-                                        await open_edit_process_from_case(process_id)
-                                
-                                processes_table.on('titleClick', handle_title_click)
-                                
-                                # Slot para área usando componente padrão
+                                # Slot para área usando componente padrão (sincronizado com módulo de Processos)
                                 processes_table.add_slot('body-cell-area', BODY_SLOT_AREA)
                                 
-                                # Slot para título - clicável para abrir modal de edição (verde como padrão)
+                                # Slot para título (sincronizado com módulo de Processos - verde como padrão)
                                 processes_table.add_slot('body-cell-title', '''
-                                    <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; padding: 4px 6px; font-size: 10px;">
-                                        <span class="cursor-pointer font-medium" 
-                                              style="line-height: 1.3; color: #223631; font-size: 10px;"
+                                    <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 280px; padding: 8px 12px; vertical-align: middle;">
+                                        <span class="text-sm cursor-pointer font-medium" 
+                                              style="line-height: 1.4; color: #223631;"
                                               @click="$parent.$emit('titleClick', props.row)">
                                             {{ props.value }}
                                         </span>
@@ -1000,92 +983,68 @@ def case_detail(case_slug: str):
                                 # Slot para status usando componente padrão
                                 processes_table.add_slot('body-cell-status', BODY_SLOT_STATUS)
                                 
-                                # Slot para clientes - exibe múltiplos verticalmente
+                                # Slot para clientes (múltiplos verticalmente - sincronizado com módulo de Processos)
                                 processes_table.add_slot('body-cell-clients', '''
-                                    <q-td :props="props" style="white-space: normal; vertical-align: top; max-width: 90px; padding: 4px 6px; font-size: 10px;">
+                                    <q-td :props="props" style="white-space: normal; vertical-align: middle; max-width: 100px; padding: 8px 8px;">
                                         <div v-if="props.row.clients_list && props.row.clients_list.length > 0" style="display: flex; flex-direction: column; gap: 2px;">
-                                            <div v-for="(client, index) in props.row.clients_list" :key="index" class="text-gray-700" style="word-wrap: break-word; overflow-wrap: break-word; font-size: 10px; line-height: 1.3;">
+                                            <div v-for="(client, index) in props.row.clients_list" :key="index" class="text-xs text-gray-700" style="line-height: 1.3;">
                                                 {{ client }}
                                             </div>
                                         </div>
-                                        <span v-else class="text-gray-400" style="font-size: 10px;">—</span>
+                                        <span v-else class="text-gray-400">—</span>
                                     </q-td>
                                 ''')
                                 
-                                # Slot para parte contrária - exibe múltiplos verticalmente
+                                # Slot para parte contrária (múltiplos verticalmente - sincronizado com módulo de Processos)
                                 processes_table.add_slot('body-cell-opposing', '''
-                                    <q-td :props="props" style="white-space: normal; vertical-align: top; max-width: 90px; padding: 4px 6px; font-size: 10px;">
+                                    <q-td :props="props" style="white-space: normal; vertical-align: middle; max-width: 100px; padding: 8px 8px;">
                                         <div v-if="props.row.opposing_list && props.row.opposing_list.length > 0" style="display: flex; flex-direction: column; gap: 2px;">
-                                            <div v-for="(opposing, index) in props.row.opposing_list" :key="index" class="text-gray-700" style="word-wrap: break-word; overflow-wrap: break-word; font-size: 10px; line-height: 1.3;">
+                                            <div v-for="(opposing, index) in props.row.opposing_list" :key="index" class="text-xs text-gray-700" style="line-height: 1.3;">
                                                 {{ opposing }}
                                             </div>
                                         </div>
-                                        <span v-else class="text-gray-400" style="font-size: 10px;">—</span>
+                                        <span v-else class="text-gray-400">—</span>
                                     </q-td>
                                 ''')
                                 
-                                # Slot para casos - exibe em linha única
-                                processes_table.add_slot('body-cell-cases', '''
-                                    <q-td :props="props" style="vertical-align: middle; padding: 4px 6px; font-size: 10px;">
-                                        <div v-if="props.row.cases_list && props.row.cases_list.length > 0" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; line-height: 1.4;">
-                                            <span v-for="(caso, index) in props.row.cases_list" :key="index" class="text-gray-700" style="font-size: 10px;">
-                                                {{ caso }}<span v-if="index < props.row.cases_list.length - 1">, </span>
-                                            </span>
-                                        </div>
-                                        <span v-else class="text-gray-400" style="font-size: 10px;">—</span>
-                                    </q-td>
-                                ''')
-                                
-                                # Slot para número - hyperlink clicável
+                                # Slot para número com link e botão copiar (idêntico ao módulo de Processos)
                                 processes_table.add_slot('body-cell-number', '''
-                                    <q-td :props="props" style="padding: 4px 6px; font-size: 10px; vertical-align: middle;">
-                                        <a v-if="props.row.link && props.value" 
-                                           :href="props.row.link" 
-                                           target="_blank" 
-                                           class="text-blue-600 hover:text-blue-800 underline hover:no-underline cursor-pointer"
-                                           style="font-size: 10px; line-height: 1.4;">
-                                            {{ props.value }}
-                                        </a>
-                                        <span v-else-if="props.value" class="text-gray-700" style="font-size: 10px; line-height: 1.4;">{{ props.value }}</span>
-                                        <span v-else class="text-gray-400" style="font-size: 10px;">—</span>
-                                    </q-td>
-                                ''')
-                                
-                                # Slot para ações (vincular/desvincular)
-                                processes_table.add_slot('body-cell-actions', '''
-                                    <q-td :props="props" style="text-align: center; padding: 4px 6px; vertical-align: middle;">
-                                        <div style="display: flex; gap: 4px; justify-content: center;">
+                                    <q-td :props="props" style="padding: 8px 12px; vertical-align: middle;">
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <a v-if="props.row.link && props.value" 
+                                               :href="props.row.link" 
+                                               target="_blank" 
+                                               class="text-blue-600 hover:underline"
+                                               style="font-size: 12px;">
+                                                {{ props.value }}
+                                            </a>
+                                            <span v-else-if="props.value" style="font-size: 12px; color: #374151;">
+                                                {{ props.value }}
+                                            </span>
+                                            <span v-else class="text-gray-400">—</span>
                                             <q-btn 
-                                                @click="$parent.$emit('edit', props.row._id)" 
-                                                icon="edit" 
+                                                v-if="props.value"
+                                                flat dense round 
+                                                icon="content_copy" 
                                                 size="xs" 
-                                                flat 
-                                                round 
-                                                dense
-                                                class="text-blue-600"
-                                            ></q-btn>
-                                            <q-btn 
-                                                @click="$parent.$emit('unlink', props.row._id)" 
-                                                icon="link_off" 
-                                                size="xs" 
-                                                flat 
-                                                round 
-                                                dense
-                                                class="text-orange-600"
-                                            ></q-btn>
+                                                color="grey"
+                                                @click.stop="navigator.clipboard.writeText(props.value); $q.notify({message: 'Número copiado!', color: 'positive', timeout: 1500})"
+                                            />
                                         </div>
                                     </q-td>
                                 ''')
                                 
-                                # Handlers de eventos
-                                async def handle_edit(process_id: str):
-                                    await open_edit_process_from_case(process_id)
+                                # Handler para clique no título (abre modal de edição - igual ao módulo de Processos)
+                                def handle_title_click(e):
+                                    """Handler para clique no título - abre modal de edição do processo"""
+                                    clicked_row = e.args
+                                    if clicked_row and '_id' in clicked_row:
+                                        process_id = clicked_row['_id']
+                                        async def _open():
+                                            await open_edit_process_from_case(process_id)
+                                        ui.run_coroutine(_open())
                                 
-                                async def handle_unlink(process_id: str):
-                                    await unlink_process(process_id)
-                                
-                                processes_table.on('edit', lambda e: handle_edit(e.args))
-                                processes_table.on('unlink', lambda e: handle_unlink(e.args))
+                                processes_table.on('titleClick', handle_title_click)
                     
                     except Exception as e:
                         print(f"Erro ao carregar processos vinculados: {e}")
@@ -1568,22 +1527,24 @@ def case_detail(case_slug: str):
                 
                 # Funções para manipular processos
                 async def open_edit_process_from_case(process_id: str):
-                    """Abre edição de processo em modal local"""
+                    """Abre edição de processo usando o modal do módulo de processos"""
                     try:
-                        db = get_db()
-                        doc = db.collection('processes').document(process_id).get()
-                        if not doc.exists:
-                            ui.notify('Processo não encontrado.', type='negative')
+                        # Busca todos os processos para encontrar o índice
+                        all_processes = get_processes_list()
+                        
+                        # Encontra o índice do processo pelo ID
+                        process_idx = None
+                        for idx, proc in enumerate(all_processes):
+                            if proc.get('_id') == process_id:
+                                process_idx = idx
+                                break
+                        
+                        if process_idx is None:
+                            ui.notify('Processo não encontrado na lista.', type='negative')
                             return
                         
-                        process_to_edit = doc.to_dict()
-                        process_to_edit['_id'] = doc.id
-                        
-                        fill_process_form(process_to_edit)
-                        process_form_state['is_editing'] = True
-                        process_form_state['edit_id'] = process_id
-                        delete_process_button.visible = True
-                        edit_process_dialog.open()
+                        # Abre o modal de edição usando o índice
+                        open_process_modal(process_idx=process_idx)
                     except Exception as e:
                         print(f'Erro ao abrir edição de processo: {e}')
                         import traceback
@@ -2013,7 +1974,7 @@ def case_detail(case_slug: str):
                 
                 render_calculations_list()
 
-            # Tab 4: Relatório Geral do Caso
+            # Tab 4: Relatório geral do caso
             with ui.tab_panel(report_tab).classes('w-full gap-4'):
                 # Variável reativa para o conteúdo do relatório (permite edição)
                 report_value = {'content': case.get('general_report', '')}
@@ -2031,7 +1992,7 @@ def case_detail(case_slug: str):
                 # Cabeçalho com título e controles
                 with ui.row().classes('w-full items-center justify-between mb-4'):
                     with ui.column().classes('flex-grow'):
-                        ui.label('Relatório Geral do Caso').classes('text-lg font-bold')
+                        ui.label('Relatório geral do caso').classes('text-lg font-bold')
                     with ui.row().classes('items-center gap-3'):
                         report_save_indicator()
                         # Registra o indicador para atualização automática
@@ -2176,10 +2137,10 @@ def case_detail(case_slug: str):
                     on_change=on_vistorias_change
                 ).classes('w-full').style('min-height: 300px')
 
-            # Tab 6: Estratégia Geral
+            # Tab 6: Estratégia geral
             with ui.tab_panel(strategy_tab).classes('w-full gap-4'):
                 with ui.row().classes('w-full items-center justify-between mb-2'):
-                    ui.label('Estratégia Geral').classes('text-lg font-bold')
+                    ui.label('Estratégia geral').classes('text-lg font-bold')
                     ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
                 
                 with ui.expansion('Objetivos do caso', icon='flag').classes('w-full border rounded bg-gray-50'):
@@ -2421,10 +2382,10 @@ def case_detail(case_slug: str):
                         on_change=on_strategy_observations_change
                     ).classes('w-full').style('min-height: 150px')
 
-            # Tab 7: Próximas Ações
+            # Tab 7: Próximas ações
             with ui.tab_panel(next_actions_tab).classes('w-full'):
                 with ui.row().classes('w-full items-center justify-between mb-4'):
-                    ui.label('Próximas Ações').classes('text-lg font-bold')
+                    ui.label('Próximas ações').classes('text-lg font-bold')
                     ui.label('💾 Salvamento automático ativado').classes('text-xs text-green-600 italic')
                 
                 def on_next_actions_change(e):
@@ -2444,9 +2405,9 @@ def case_detail(case_slug: str):
                 with ui.card().classes('w-full p-8 flex flex-col items-center justify-center bg-gray-50'):
                     ui.label('No futuro, o Slack do escritório será adicionado neste local.').classes('text-gray-500 italic text-center')
 
-            # Tab 9: Links Úteis
+            # Tab 9: Links úteis
             with ui.tab_panel(links_tab).classes('w-full'):
-                ui.label('Links Úteis').classes('text-lg font-bold mb-4')
+                ui.label('Links úteis').classes('text-lg font-bold mb-4')
                 
                 if not isinstance(case.get('links'), list):
                     case['links'] = []

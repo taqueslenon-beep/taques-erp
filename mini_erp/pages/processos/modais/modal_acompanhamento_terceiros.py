@@ -1,5 +1,6 @@
 from nicegui import ui
 from datetime import datetime
+import asyncio
 from ....core import (
     PRIMARY_COLOR, get_cases_list, get_clients_list, get_opposing_parties_list, 
     get_processes_list, format_date_br, get_display_name, get_protocols_by_process
@@ -21,8 +22,9 @@ from ..business_logic import (
 )
 from ..database import (
     criar_acompanhamento, atualizar_acompanhamento, deletar_acompanhamento,
-    obter_acompanhamento_por_id
+    obter_acompanhamento_por_id, THIRD_PARTY_MONITORING_COLLECTION
 )
+from .components import render_passwords_tab
 
 def make_required_label(text: str) -> str:
     """
@@ -35,6 +37,19 @@ def make_required_label(text: str) -> str:
         Label com asterisco simples (sem HTML)
     """
     return f'{text} *'
+
+class DummyField:
+    """Helper class para campos dummy que mantém compatibilidade com código existente."""
+    def __init__(self, default_value):
+        self._value = default_value
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
 
 
 def validate_third_party_monitoring(
@@ -60,6 +75,24 @@ def validate_third_party_monitoring(
     return True, ''
 
 
+def sanitize_value(value, default=''):
+    """
+    Converte None para valor padrão.
+    
+    Args:
+        value: Valor a sanitizar
+        default: Valor padrão se value for None
+    
+    Returns:
+        Valor sanitizado
+    """
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip() if value.strip() else default
+    return value
+
+
 def build_third_party_monitoring_data(
     title: str,
     link_do_processo: str,
@@ -76,52 +109,97 @@ def build_third_party_monitoring_data(
     """
     Constrói dicionário completo de dados de acompanhamento de terceiros para salvar.
     Inclui todos os campos das outras abas também.
+    Sanitiza todos os campos antes de retornar.
     """
+    # Sanitiza listas
+    clients = clients or []
+    opposing_parties = opposing_parties or []
+    other_parties = other_parties or []
+    cases = cases or []
+    parent_processes = parent_processes or []
+    
     # Obtém o primeiro cliente como client_id principal
-    client_id = clients[0] if clients else ''
-    client_name = clients[0] if clients else ''
+    client_id = sanitize_value(clients[0] if clients else '', '')
+    client_name = sanitize_value(clients[0] if clients else '', '')
     
     data = {
         # TÍTULO - CRÍTICO: Deve estar presente para aparecer na tabela
-        'title': title or '',  # Campo principal para exibição
-        'process_title': title or '',  # Compatibilidade
-        'titulo': title or '',  # Compatibilidade adicional
+        'title': sanitize_value(title, ''),
+        'process_title': sanitize_value(title, ''),
+        'titulo': sanitize_value(title, ''),
         
         # Campos básicos específicos - TODOS devem ser salvos
-        'link_do_processo': link_do_processo or '',
-        'link': link_do_processo or '',  # Compatibilidade - campo 'link' também
-        'tipo_de_processo': tipo_processo or 'Existente',
-        'tipo_processo': tipo_processo or 'Existente',  # Compatibilidade
-        'data_de_abertura': data_abertura or '',
-        'start_date': data_abertura or '',  # Compatibilidade
+        'link_do_processo': sanitize_value(link_do_processo, ''),
+        'link': sanitize_value(link_do_processo, ''),
+        'tipo_de_processo': sanitize_value(tipo_processo, 'Existente'),
+        'tipo_processo': sanitize_value(tipo_processo, 'Existente'),
+        'data_de_abertura': sanitize_value(data_abertura, ''),
+        'start_date': sanitize_value(data_abertura, ''),
         
         # Partes envolvidas (novo schema)
-        'parte_ativa': (clients or []).copy(),  # Obrigatório
-        'parte_passiva': (opposing_parties or []).copy(),  # Opcional
-        'outros_envolvidos': (other_parties or []).copy(),  # Opcional
+        'parte_ativa': list(clients) if clients else [],
+        'parte_passiva': list(opposing_parties) if opposing_parties else [],
+        'outros_envolvidos': list(other_parties) if other_parties else [],
         
         # Mantém campos antigos para compatibilidade (serão removidos na migração)
-        'clientes': clients or [],
+        'clientes': list(clients) if clients else [],
         'client_id': client_id,
         'client_name': client_name,
-        'parte_contraria': (opposing_parties or []).copy(),
+        'parte_contraria': list(opposing_parties) if opposing_parties else [],
         
         # Vínculos
-        'processos_pais': (parent_processes or []).copy(),
-        'cases': (cases or []).copy(),
+        'processos_pais': list(parent_processes) if parent_processes else [],
+        'cases': list(cases) if cases else [],
         
         # Status padrão
         'status': 'ativo',
     }
     
-    # Adiciona todos os outros campos do processo (kwargs)
-    data.update(kwargs)
+    # Sanitiza kwargs antes de adicionar
+    sanitized_kwargs = {}
+    for key, value in kwargs.items():
+        if value is None:
+            # Para campos de select, converte None para string vazia
+            if key in ['system', 'area', 'nucleo', 'status', 'result']:
+                sanitized_kwargs[key] = ''
+            # Para listas, converte None para lista vazia
+            elif key in ['scenarios', 'protocols']:
+                sanitized_kwargs[key] = []
+            # Para outros campos, pula (será removido na sanitização final)
+            continue
+        elif isinstance(value, list):
+            sanitized_kwargs[key] = [v for v in value if v is not None] if value else []
+        elif isinstance(value, str):
+            sanitized_kwargs[key] = value.strip() if value.strip() else ''
+        else:
+            sanitized_kwargs[key] = value
+    
+    # Adiciona todos os outros campos do processo (kwargs sanitizados)
+    data.update(sanitized_kwargs)
     
     # Garantir que campos críticos estejam presentes mesmo se vierem via kwargs
     # Número do processo
-    if 'number' in kwargs:
-        data['number'] = kwargs.get('number', '')
-        data['process_number'] = kwargs.get('number', '')  # Compatibilidade
+    if 'number' in sanitized_kwargs:
+        data['number'] = sanitize_value(sanitized_kwargs.get('number'), '')
+        data['process_number'] = sanitize_value(sanitized_kwargs.get('number'), '')
+    
+    # Garantir que campos de select tenham valores válidos
+    if 'system' in data and data['system'] is None:
+        data['system'] = ''
+    if 'area' in data and data['area'] is None:
+        data['area'] = ''
+    if 'nucleo' in data and data['nucleo'] is None:
+        data['nucleo'] = 'Ambiental'  # Valor padrão
+    if 'status' in data and data['status'] is None:
+        data['status'] = 'ativo'
+    if 'result' in data and data['result'] is None:
+        data['result'] = ''
+    
+    # Garantir que listas não sejam None
+    if 'scenarios' not in data or data.get('scenarios') is None:
+        data['scenarios'] = []
+    if 'protocols' not in data or data.get('protocols') is None:
+        data['protocols'] = []
     
     # Log de debug para verificar campos salvos
     print(f"[BUILD_MONITORING_DATA] Campos incluídos: {list(data.keys())}")
@@ -179,8 +257,19 @@ def render_third_party_monitoring_dialog(on_success=None):
                         tab_strategy = ui.tab('Estratégia', icon='lightbulb')
                         tab_scenarios = ui.tab('Cenários', icon='analytics')
                         tab_protocols = ui.tab('Protocolos', icon='history')
-                        tab_access = ui.tab('Chave/acesso', icon='key')
+                        tab_access = ui.tab('Senhas de acesso', icon='key')
                         tab_slack = ui.tab('Slack', icon='tag')
+            
+            # Variáveis dummy para campos de acesso (mantidas para compatibilidade com código de salvamento)
+            access_lawyer_requested = DummyField(False)
+            access_lawyer_granted = DummyField(False)
+            access_technicians_requested = DummyField(False)
+            access_technicians_granted = DummyField(False)
+            access_client_requested = DummyField(False)
+            access_client_granted = DummyField(False)
+            access_lawyer_comment = DummyField('')
+            access_technicians_comment = DummyField('')
+            access_client_comment = DummyField('')
             
             # Content
             with ui.column().classes('flex-grow h-full overflow-auto bg-gray-50'):
@@ -752,55 +841,13 @@ def render_third_party_monitoring_dialog(on_success=None):
                                             ui.icon('link').classes('text-blue-400 text-lg')
                         render_protocols()
 
-                    # --- TAB 7: CHAVE/ACESSO ---
+                    # --- TAB 7: SENHAS DE ACESSO ---
                     with ui.tab_panel(tab_access):
-                        with ui.column().classes('w-full gap-6'):
-                            ui.label('🔑 Controle de Acesso ao Processo').classes('text-lg font-bold text-gray-800 mb-4')
-                            
-                            # SEÇÃO ADVOGADO
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('👨‍💼 Acesso do Advogado').classes('text-base font-semibold text-gray-700 mb-3')
-                                
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_lawyer_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_lawyer_granted = ui.checkbox('Acesso concedido').classes('text-sm')
-                                    
-                                    with ui.column().classes('flex-2'):
-                                        access_lawyer_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso do advogado...'
-                                        ).classes('w-full').props('outlined dense rows=3')
-                            
-                            # SEÇÃO TÉCNICOS
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('🔧 Acesso dos Técnicos').classes('text-base font-semibold text-gray-700 mb-3')
-                                
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_technicians_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_technicians_granted = ui.checkbox('Acesso concedido').classes('text-sm')
-                                    
-                                    with ui.column().classes('flex-2'):
-                                        access_technicians_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso dos técnicos...'
-                                        ).classes('w-full').props('outlined dense rows=3')
-                            
-                            # SEÇÃO CLIENTE
-                            with ui.card().classes('w-full p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
-                                ui.label('👤 Acesso do Cliente').classes('text-base font-semibold text-gray-700 mb-3')
-                                
-                                with ui.row().classes('w-full gap-4 items-start'):
-                                    with ui.column().classes('flex-1 gap-2'):
-                                        access_client_requested = ui.checkbox('Acesso solicitado').classes('text-sm')
-                                        access_client_granted = ui.checkbox('Acesso concedido').classes('text-sm')
-                                    
-                                    with ui.column().classes('flex-2'):
-                                        access_client_comment = ui.textarea(
-                                            'Comentários/Observações',
-                                            placeholder='Adicione observações sobre o acesso do cliente...'
-                                        ).classes('w-full').props('outlined dense rows=3')
+                        def get_monitoring_id():
+                            return state.get('monitoring_id')
+                        
+                        # Renderizar componente de senhas
+                        render_passwords_tab(get_monitoring_id, THIRD_PARTY_MONITORING_COLLECTION)
 
                     # --- TAB 8: SLACK ---
                     with ui.tab_panel(tab_slack):
@@ -809,11 +856,13 @@ def render_third_party_monitoring_dialog(on_success=None):
             # Footer Actions
             with ui.row().classes('absolute bottom-0 right-0 p-4 gap-2 z-10').style('background: rgba(249, 250, 251, 0.95); border-radius: 8px 0 0 0;'):
                 
-                def do_delete():
+                async def do_delete():
                     if state['is_editing'] and state.get('monitoring_id'):
                         sucesso = deletar_acompanhamento(state['monitoring_id'])
                         if sucesso:
                             ui.notify('Acompanhamento excluído!', type='positive')
+                            # Aguarda um pouco antes de fechar para garantir que a notificação seja exibida
+                            await asyncio.sleep(0.1)
                             dialog.close()
                             if on_success: 
                                 from ...core import invalidate_cache
@@ -826,7 +875,7 @@ def render_third_party_monitoring_dialog(on_success=None):
 
                 delete_btn = ui.button('EXCLUIR', icon='delete', on_click=do_delete).props('color=red').classes('hidden font-bold shadow-lg')
 
-                def do_save():
+                async def do_save():
                     # Validação específica para acompanhamentos
                     is_valid, msg = validate_third_party_monitoring(
                         title=title_input.value,
@@ -837,41 +886,65 @@ def render_third_party_monitoring_dialog(on_success=None):
                         ui.notify(msg, type='warning')
                         return
                     
+                    # Validação e sanitização de campos do formulário antes de construir dados
+                    # Garantir que state['selected_clients'] e outras listas não sejam None
+                    if state.get('selected_clients') is None:
+                        state['selected_clients'] = []
+                    if state.get('selected_opposing') is None:
+                        state['selected_opposing'] = []
+                    if state.get('selected_others') is None:
+                        state['selected_others'] = []
+                    if state.get('selected_cases') is None:
+                        state['selected_cases'] = []
+                    if state.get('parent_ids') is None:
+                        state['parent_ids'] = []
+                    if state.get('scenarios') is None:
+                        state['scenarios'] = []
+                    if state.get('protocols') is None:
+                        state['protocols'] = []
+                    
+                    # Sanitiza valores de select (converte None para string vazia ou valor padrão)
+                    system_value = system_select.value if system_select.value is not None else ''
+                    nucleo_value = nucleo_select.value if nucleo_select.value is not None else 'Ambiental'
+                    area_value = area_select.value if area_select.value is not None else ''
+                    status_value = status_select.value if status_select.value is not None else 'Em andamento'
+                    result_value = result_select.value if result_select.value is not None else ''
+                    
                     # Constrói dados do acompanhamento
                     monitoring_data = build_third_party_monitoring_data(
-                        title=title_input.value,
-                        link_do_processo=link_input.value,
-                        tipo_processo=type_select.value,
-                        data_abertura=data_abertura_input.value,
+                        title=title_input.value or '',
+                        link_do_processo=link_input.value or '',
+                        tipo_processo=type_select.value or 'Existente',
+                        data_abertura=data_abertura_input.value or '',
                         clients=state['selected_clients'],
                         opposing_parties=state['selected_opposing'],
                         other_parties=state['selected_others'],
                         cases=state['selected_cases'],
                         parent_processes=state['parent_ids'],
                         # Campos das outras abas (idênticos ao processo)
-                        number=number_input.value,
-                        system=system_select.value,
-                        nucleo=nucleo_select.value,
-                        area=area_select.value,
-                        status=status_select.value,
-                        result=result_select.value,
-                        relatory_facts=relatory_facts_input.value,
-                        relatory_timeline=relatory_timeline_input.value,
-                        relatory_documents=relatory_documents_input.value,
-                        strategy_objectives=objectives_input.value,
-                        legal_thesis=thesis_input.value,
-                        strategy_observations=observations_input.value,
+                        number=number_input.value or '',
+                        system=system_value,
+                        nucleo=nucleo_value,
+                        area=area_value,
+                        status=status_value,
+                        result=result_value,
+                        relatory_facts=relatory_facts_input.value or '',
+                        relatory_timeline=relatory_timeline_input.value or '',
+                        relatory_documents=relatory_documents_input.value or '',
+                        strategy_objectives=objectives_input.value or '',
+                        legal_thesis=thesis_input.value or '',
+                        strategy_observations=observations_input.value or '',
                         scenarios=state['scenarios'],
                         protocols=state['protocols'],
-                        access_lawyer=access_lawyer_granted.value,
-                        access_technicians=access_technicians_granted.value,
-                        access_client=access_client_granted.value,
-                        access_lawyer_comment=access_lawyer_comment.value,
-                        access_technicians_comment=access_technicians_comment.value,
-                        access_client_comment=access_client_comment.value,
-                        access_lawyer_requested=access_lawyer_requested.value,
-                        access_technicians_requested=access_technicians_requested.value,
-                        access_client_requested=access_client_requested.value,
+                        access_lawyer=access_lawyer_granted.value if access_lawyer_granted.value is not None else False,
+                        access_technicians=access_technicians_granted.value if access_technicians_granted.value is not None else False,
+                        access_client=access_client_granted.value if access_client_granted.value is not None else False,
+                        access_lawyer_comment=access_lawyer_comment.value or '',
+                        access_technicians_comment=access_technicians_comment.value or '',
+                        access_client_comment=access_client_comment.value or '',
+                        access_lawyer_requested=access_lawyer_requested.value if access_lawyer_requested.value is not None else False,
+                        access_technicians_requested=access_technicians_requested.value if access_technicians_requested.value is not None else False,
+                        access_client_requested=access_client_requested.value if access_client_requested.value is not None else False,
                     )
                     
                     # Log de debug antes de salvar
@@ -897,6 +970,8 @@ def render_third_party_monitoring_dialog(on_success=None):
                             if sucesso:
                                 print(f"[SALVAR ACOMPANHAMENTO] ✓ Acompanhamento {monitoring_id} atualizado com sucesso!")
                                 ui.notify('✅ Acompanhamento atualizado com sucesso!', type='positive', timeout=3000)
+                                # Aguarda um pouco antes de fechar para garantir que a notificação seja exibida
+                                await asyncio.sleep(0.1)
                                 dialog.close()
                                 if on_success:
                                     from ...core import invalidate_cache
@@ -913,6 +988,8 @@ def render_third_party_monitoring_dialog(on_success=None):
                             if doc_id:
                                 print(f"[SALVAR ACOMPANHAMENTO] ✓ Novo acompanhamento criado com ID: {doc_id}")
                                 ui.notify(f'✅ Acompanhamento "{title_input.value}" cadastrado com sucesso!', type='positive', timeout=3000)
+                                # Aguarda um pouco antes de fechar para garantir que a notificação seja exibida
+                                await asyncio.sleep(0.1)
                                 dialog.close()
                                 if on_success:
                                     from ...core import invalidate_cache
@@ -922,10 +999,19 @@ def render_third_party_monitoring_dialog(on_success=None):
                                 print(f"[SALVAR ACOMPANHAMENTO] ❌ Erro ao criar (retornou None)")
                                 ui.notify('❌ Erro ao criar acompanhamento. Verifique os logs do servidor.', type='negative', timeout=5000)
                     except Exception as e:
-                        print(f"[SALVAR ACOMPANHAMENTO] ❌ EXCEÇÃO ao salvar: {e}")
+                        error_msg = str(e)
+                        print(f"[SALVAR ACOMPANHAMENTO] ❌ EXCEÇÃO: {error_msg}")
+                        print(f"[SALVAR ACOMPANHAMENTO] Dados: {monitoring_data}")
                         import traceback
                         traceback.print_exc()
-                        ui.notify(f'❌ Erro ao salvar: {str(e)}', type='negative', timeout=5000)
+                        
+                        # Mensagem amigável baseada no erro
+                        if 'None' in error_msg or 'NoneType' in error_msg:
+                            ui.notify('❌ Erro: Algum campo obrigatório está vazio.', type='negative', timeout=5000)
+                        elif 'Firestore' in error_msg or 'firestore' in error_msg.lower():
+                            ui.notify('❌ Erro ao conectar com o banco de dados. Tente novamente.', type='negative', timeout=5000)
+                        else:
+                            ui.notify(f'❌ Erro ao salvar: {error_msg[:100]}', type='negative', timeout=5000)
 
                 ui.button('SALVAR', icon='save', on_click=do_save).props('color=primary').classes('font-bold shadow-lg')
 
