@@ -35,6 +35,10 @@ def painel():
             ui.navigate.to('/login')
             return
         
+        # Define workspace atual na sessão (workspace padrão)
+        from ...gerenciadores.gerenciador_workspace import definir_workspace
+        definir_workspace('area_cliente_schmidmeier')
+        
         # ==========================================================================
         # OTIMIZAÇÃO: Carrega todos os dados UMA ÚNICA VEZ no início
         # ==========================================================================

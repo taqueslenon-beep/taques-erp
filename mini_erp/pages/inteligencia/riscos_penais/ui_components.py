@@ -176,3 +176,4 @@ def timeline_vertical(etapas: List[Dict[str, Any]]) -> None:
                             ui.label(etapa['observacao']).classes('text-xs italic text-gray-500')
 
 
+

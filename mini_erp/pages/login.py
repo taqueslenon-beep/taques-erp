@@ -64,6 +64,12 @@ def login_page():
                 if result['success']:
                     # Salva usuário na sessão
                     app.storage.user['user'] = result['user']
+                    
+                    # Carrega workspace persistido do localStorage ou usa padrão
+                    from ..gerenciadores.gerenciador_workspace import carregar_workspace_persistido, definir_workspace
+                    workspace_id = carregar_workspace_persistido()
+                    definir_workspace(workspace_id)
+                    
                     ui.notify('Login realizado com sucesso!', type='positive')
                     ui.navigate.to('/')
                 else:

@@ -1943,9 +1943,45 @@ def preload_data():
     thread.start()
 
 
+def get_route_for_workspace(base_route: str) -> str:
+    """
+    Retorna a rota correta baseada no workspace atual.
+
+    Args:
+        base_route: Rota base (ex: '/', '/casos', '/processos')
+
+    Returns:
+        Rota ajustada para o workspace atual
+    """
+    from .gerenciadores.gerenciador_workspace import obter_workspace_atual, obter_info_workspace
+
+    workspace_id = obter_workspace_atual()
+    workspace_info = obter_info_workspace(workspace_id)
+
+    if not workspace_info:
+        return base_route
+
+    # Se for workspace padrão (area_cliente_schmidmeier), usa rotas normais
+    if workspace_id == 'area_cliente_schmidmeier':
+        return base_route
+
+    # Se for novo workspace (visao_geral_escritorio), adiciona prefixo /visao-geral/
+    if workspace_id == 'visao_geral_escritorio':
+        # Trata rota raiz especial
+        if base_route == '/':
+            return '/visao-geral/painel'
+        # Remove barra inicial se existir e adiciona prefixo
+        route = base_route.lstrip('/')
+        return f'/visao-geral/{route}' if route else '/visao-geral/painel'
+
+    return base_route
+
+
 def menu_item(label: str, icon: str, target: str):
     """Cria item do menu de navegação."""
-    with ui.link(target=target).classes('w-full flex flex-row flex-nowrap items-center gap-3 hover:bg-white/10 rounded transition-colors no-underline cursor-pointer').style('padding: 8px 8px 8px 12px; margin-left: 0;'):
+    # Ajusta rota baseado no workspace atual
+    adjusted_target = get_route_for_workspace(target)
+    with ui.link(target=adjusted_target).classes('w-full flex flex-row flex-nowrap items-center gap-3 hover:bg-white/10 rounded transition-colors no-underline cursor-pointer').style('padding: 8px 8px 8px 12px; margin-left: 0;'):
         ui.icon(icon, size='sm').classes('text-white/80 flex-shrink-0')
         ui.label(label).classes('text-sm font-medium text-white/90 whitespace-nowrap')
 
@@ -2041,6 +2077,17 @@ def layout(page_title: str, breadcrumbs: list = None):
                 window.addEventListener('load', function() {
                     reconnectAttempts = 0;
                 });
+                
+                // Carrega workspace do localStorage ao carregar página (se não estiver na sessão)
+                try {
+                    const savedWorkspace = localStorage.getItem('taques_erp_workspace');
+                    if (savedWorkspace) {
+                        // Sincroniza com sessão NiceGUI se necessário
+                        // A sessão será atualizada pelo Python quando necessário
+                    }
+                } catch (e) {
+                    console.log('Erro ao carregar workspace do localStorage:', e);
+                }
             });
         </script>
     ''')
@@ -2056,10 +2103,9 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             # DIREITA - Elementos alinhados
             with ui.row().style('align-items: center; gap: 16px; color: white;'):
-                # Cliente - Módulo Workspace
-                with ui.element().style('background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; gap: 8px;'):
-                    ui.icon('folder_open').style('font-size: 16px;')
-                    ui.label('Área do cliente: Schmidmeier 🇩🇪').style('font-size: 13px; font-weight: 500; white-space: nowrap;')
+                # Workspace - Dropdown de seleção
+                from .componentes.dropdown_workspace import render_workspace_dropdown
+                render_workspace_dropdown()
                 
                 # Separador
                 ui.element('div').style('width: 1px; height: 20px; background-color: rgba(255,255,255,0.2);')
@@ -2150,23 +2196,25 @@ def layout(page_title: str, breadcrumbs: list = None):
                     # Verifica atualizações a cada 2 segundos quando na página
                     ui.timer(2.0, check_avatar_update)
 
-    # Sidebar - Fixo permanentemente
-    with ui.left_drawer(value=True).props('width=190 bordered persistent').classes('border-r border-gray-200').style(f'background-color: {PRIMARY_COLOR}'):
-        with ui.column().classes('w-full px-2 pt-4 gap-1'):
-            menu_item('Painel', 'dashboard', '/')
-            menu_item('Inteligência', 'psychology', '/inteligencia')
-            # menu_item('Governança', 'shield', '/governanca')  # Em desenvolvimento
-            
-            menu_item('Casos', 'folder', '/casos')
-            menu_item('Processos', 'gavel', '/processos')
-            menu_item('Acordos', 'handshake', '/acordos')
-            
-            # menu_item('Prazos', 'schedule', '/prazos')  # Em desenvolvimento
-            # menu_item('Compromissos', 'event', '/compromissos')  # Em desenvolvimento
-            
-            menu_item('Pessoas', 'groups', '/pessoas')
-            
-            menu_item('Configurações', 'settings', '/configuracoes')
+    # Sidebar - Renderiza baseado no workspace ativo
+    from .componentes.sidebar_base import render_sidebar, obter_itens_menu_por_workspace
+    from .gerenciadores.gerenciador_workspace import obter_workspace_atual
+
+    # Obtém workspace atual e itens de menu correspondentes
+    workspace_atual = obter_workspace_atual()
+    itens_menu = obter_itens_menu_por_workspace(workspace_atual)
+
+    # Obtém rota atual para destacar item ativo
+    from nicegui import app
+    rota_atual = None
+    try:
+        # Tenta obter a rota atual da requisição
+        rota_atual = app.storage.user.get('_current_route', None)
+    except Exception:
+        pass
+
+    # Renderiza sidebar com itens do workspace
+    render_sidebar(itens_menu, rota_atual=rota_atual)
 
     with ui.column().classes('w-full min-h-screen p-6 bg-gray-50'):
         if breadcrumbs:

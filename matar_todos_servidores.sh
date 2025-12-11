@@ -38,3 +38,4 @@ echo "   cd /Users/lenontaques/Documents/taques-erp"
 echo "   python3 -m mini_erp.main"
 
 
+

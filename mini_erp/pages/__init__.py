@@ -16,6 +16,9 @@ from .acordos import acordos
 # Módulo de inteligência (em desenvolvimento)
 from .inteligencia import inteligencia
 
+# Módulo de visão geral do escritório (novo workspace)
+from . import visao_geral
+
 # Módulos desativados temporariamente (em desenvolvimento)
 # from . import prazos, compromissos
 # from . import governanca

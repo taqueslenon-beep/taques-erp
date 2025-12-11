@@ -4,6 +4,8 @@ Sistema de autenticação com Firebase Auth
 import requests
 from nicegui import app, ui
 from functools import wraps
+from firebase_admin import auth as admin_auth
+from typing import Optional, List
 
 # Configuração do Firebase Auth REST API
 FIREBASE_API_KEY = "AIzaSyB5AmzmzdqBJ3WHSV8hiqKxdOf6wCM-Ol4"
@@ -152,6 +154,81 @@ def require_auth(func):
             return
         return func(*args, **kwargs)
     return wrapper
+
+
+# =============================================================================
+# SISTEMA DE WORKSPACES (DEPRECATED - usar gerenciador_workspace)
+# =============================================================================
+# Mantido para compatibilidade. Use gerenciadores.gerenciador_workspace para novas implementações.
+
+def get_user_profile() -> Optional[str]:
+    """
+    Obtém o perfil do usuário atual via Firebase Auth custom_claims.
+    
+    Returns:
+        Perfil do usuário: 'cliente', 'interno', 'df_projetos' ou None
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return None
+        
+        uid = user.get('uid')
+        if not uid:
+            return None
+        
+        # Busca custom_claims do Firebase Auth
+        firebase_user = admin_auth.get_user(uid)
+        custom_claims = firebase_user.custom_claims or {}
+        
+        # Tenta obter perfil de diferentes campos possíveis
+        perfil = custom_claims.get('perfil') or custom_claims.get('role') or custom_claims.get('profile')
+        
+        # Normaliza valores
+        if perfil:
+            perfil = perfil.lower()
+            # Mapeia variações possíveis
+            if perfil in ['cliente', 'client']:
+                return 'cliente'
+            elif perfil in ['interno', 'internal', 'admin']:
+                return 'interno'
+            elif perfil in ['df_projetos', 'df-projetos', 'projetos']:
+                return 'df_projetos'
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao obter perfil do usuário: {e}")
+        return None
+
+
+def get_user_workspaces(profile: Optional[str] = None) -> List[str]:
+    """
+    DEPRECATED: Use gerenciadores.gerenciador_workspace.obter_workspaces_usuario()
+    
+    Retorna lista de workspaces que o usuário tem acesso baseado no perfil.
+    """
+    from .gerenciadores.gerenciador_workspace import obter_workspaces_usuario
+    return obter_workspaces_usuario()
+
+
+def get_current_workspace() -> str:
+    """
+    DEPRECATED: Use gerenciadores.gerenciador_workspace.obter_workspace_atual()
+    
+    Retorna o workspace atual da sessão do usuário.
+    """
+    from .gerenciadores.gerenciador_workspace import obter_workspace_atual
+    return obter_workspace_atual()
+
+
+def set_current_workspace(workspace_id: str):
+    """
+    DEPRECATED: Use gerenciadores.gerenciador_workspace.definir_workspace()
+    
+    Define o workspace atual na sessão do usuário.
+    """
+    from .gerenciadores.gerenciador_workspace import definir_workspace
+    definir_workspace(workspace_id)
 
 
 
