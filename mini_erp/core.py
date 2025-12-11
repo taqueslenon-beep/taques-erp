@@ -1966,6 +1966,11 @@ def layout(page_title: str, breadcrumbs: list = None):
     ui.colors(primary=PRIMARY_COLOR)
     
     ui.add_head_html('''
+        <!-- Meta tags anti-cache para corrigir hot reload -->
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        
         <style>
             a.no-underline { text-decoration: none !important; color: inherit !important; }
             a.no-underline:hover { text-decoration: none !important; }

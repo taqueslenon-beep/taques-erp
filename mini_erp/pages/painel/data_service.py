@@ -6,6 +6,7 @@ from collections import Counter
 from typing import Dict, List, Any, Tuple
 
 from .helpers import get_case_type, safe_float
+from ...core import get_display_name
 
 
 class PainelDataService:
@@ -249,17 +250,129 @@ class PainelDataService:
     # =========================================================================
     # CONTAGENS POR PARTE CONTRÁRIA
     # =========================================================================
+    def _normalize_opposing_name(self, opposing_name: str) -> str:
+        """
+        Normaliza nome de parte contrária para nome de exibição.
+        
+        Busca na lista de opposing_parties e retorna o nome de exibição.
+        Isso evita duplicatas quando o mesmo órgão aparece com nomes diferentes.
+        
+        Estratégia de busca:
+        1. Busca exata (case-insensitive)
+        2. Busca por similaridade (contém palavras-chave)
+        3. Busca por sigla/acrônimo no nome completo
+        
+        Args:
+            opposing_name: Nome salvo no processo (pode ser nome completo ou de exibição)
+        
+        Returns:
+            Nome de exibição normalizado
+        """
+        if not opposing_name or not opposing_name.strip():
+            return "Sem identificação"
+        
+        opposing_name_clean = opposing_name.strip()
+        opposing_name_lower = opposing_name_clean.lower()
+        
+        # ETAPA 1: Busca exata (case-insensitive)
+        for opposing in self._opposing:
+            full_name = (opposing.get('full_name') or '').strip()
+            name = (opposing.get('name') or '').strip()
+            nome_exibicao = (opposing.get('nome_exibicao') or '').strip()
+            display_name = (opposing.get('display_name') or '').strip()
+            nickname = (opposing.get('nickname') or '').strip()
+            
+            if (opposing_name_lower == full_name.lower() or 
+                opposing_name_lower == name.lower() or 
+                opposing_name_lower == nome_exibicao.lower() or 
+                opposing_name_lower == display_name.lower() or
+                opposing_name_lower == nickname.lower()):
+                display = get_display_name(opposing)
+                return display if display else opposing_name_clean
+        
+        # ETAPA 2: Mapeamentos específicos conhecidos (ANTES da busca por similaridade)
+        # Mapeamentos conhecidos para casos específicos problemáticos
+        mapeamentos_especificos = {
+            'polícia militar ambiental de canoinhas': 'PMA/SC',
+            'polícia militar ambiental': 'PMA/SC',
+            'instituto brasileiro do meio ambiente e dos recursos naturais renováveis': 'IBAMA',
+            'instituto brasileiro do meio ambiente': 'IBAMA',
+            'ibama': 'IBAMA',
+        }
+        
+        # Verifica mapeamentos específicos primeiro
+        for chave, valor in mapeamentos_especificos.items():
+            if chave in opposing_name_lower:
+                return valor
+        
+        # Mapeamento especial para "Polícia" genérico (deve vir depois dos mapeamentos específicos)
+        if opposing_name_lower == 'polícia' or opposing_name_lower.strip() == 'polícia':
+            return 'PMA/SC'  # PMA/SC é a mais comum nos processos
+        
+        # ETAPA 3: Busca por similaridade (nome salvo contém palavras-chave do nome completo)
+        # Útil para casos como "Polícia Militar Ambiental de Canoinhas" → "PMA/SC"
+        # Mas ignora "Força Verde" para nomes genéricos como "Polícia"
+        for opposing in self._opposing:
+            full_name = (opposing.get('full_name') or '').strip()
+            name = (opposing.get('name') or '').strip()
+            nome_exibicao = (opposing.get('nome_exibicao') or '').strip()
+            display_name = (opposing.get('display_name') or '').strip()
+            
+            # Ignora "Força Verde" para nomes genéricos
+            if (opposing_name_lower == 'polícia' and 
+                (nome_exibicao == 'Força Verde' or display_name == 'Força Verde')):
+                continue
+            
+            # Se o nome salvo contém palavras-chave do nome completo cadastrado
+            if full_name and opposing_name_lower in full_name.lower():
+                display = get_display_name(opposing)
+                if display:
+                    return display
+            
+            # Ou se o nome completo cadastrado contém palavras-chave do nome salvo
+            if full_name and full_name.lower() in opposing_name_lower:
+                display = get_display_name(opposing)
+                if display:
+                    return display
+        
+        # ETAPA 4: Busca por sigla/acrônimo no nome completo
+        # Ex: "Instituto Brasileiro do Meio Ambiente..." → buscar por "IBAMA" no nome completo
+        for opposing in self._opposing:
+            full_name = (opposing.get('full_name') or '').strip()
+            nome_exibicao = (opposing.get('nome_exibicao') or '').strip()
+            display_name = (opposing.get('display_name') or '').strip()
+            
+            # Se o nome completo cadastrado contém o nome salvo (ou vice-versa)
+            # e tem um nome de exibição, usa o nome de exibição
+            if full_name:
+                # Extrai sigla/acrônimo do nome completo (texto entre parênteses)
+                import re
+                sigla_match = re.search(r'\(([^)]+)\)', full_name)
+                if sigla_match:
+                    sigla = sigla_match.group(1).strip()
+                    if sigla.lower() in opposing_name_lower or opposing_name_lower in full_name.lower():
+                        display = get_display_name(opposing)
+                        if display:
+                            return display
+        
+        # Se não encontrou correspondência, retorna o nome original
+        return opposing_name_clean
+    
     def get_processes_by_opposing_party(self) -> List[Tuple[str, int]]:
         """Conta processos por parte contrária, ordenado do maior para menor."""
         counter = Counter()
         for proc in self._processes:
             for opposing in proc.get('opposing_parties', []):
-                counter[opposing] += 1
+                # Normaliza para nome de exibição para evitar duplicatas
+                normalized_name = self._normalize_opposing_name(opposing)
+                counter[normalized_name] += 1
         return sorted(counter.items(), key=lambda x: x[1], reverse=True)
     
     def get_processes_by_opposing_party_filtered(self, status_filter: str) -> List[Tuple[str, int]]:
         """
         Conta processos por parte contrária com filtro de status, ordenado do maior para menor.
+        
+        IMPORTANTE: Usa nomes de exibição normalizados para evitar duplicatas.
         
         Args:
             status_filter: 'todos' | 'em_andamento' | 'concluidos'
@@ -268,7 +381,7 @@ class PainelDataService:
                 - 'concluidos': filtra por status in {'Concluído', 'Concluído com pendências'}
         
         Returns:
-            Lista de tuplas (parte contrária, quantidade) ordenada do maior para menor
+            Lista de tuplas (nome de exibição, quantidade) ordenada do maior para menor
         """
         counter = Counter()
         
@@ -291,7 +404,9 @@ class PainelDataService:
             # Se não há filtro ou o status está permitido, conta o processo
             if allowed_statuses is None or proc_status in allowed_statuses:
                 for opposing in proc.get('opposing_parties', []):
-                    counter[opposing] += 1
+                    # Normaliza para nome de exibição para evitar duplicatas
+                    normalized_name = self._normalize_opposing_name(opposing)
+                    counter[normalized_name] += 1
         
         return sorted(counter.items(), key=lambda x: x[1], reverse=True)
     

@@ -455,8 +455,18 @@ def case_detail(case_slug: str):
             # Salva o caso no Firestore
             try:
                 from ...core import save_case
+                from ....utils.save_logger import SaveLogger
+                
+                # Log antes de salvar
+                SaveLogger.log_save_attempt('casos', case.get('slug', 'desconhecido'), {'campos': list(case.keys())})
+                
                 save_case(case)
+                
+                # Log de sucesso
+                SaveLogger.log_save_success('casos', case.get('slug', 'desconhecido'))
             except Exception as e:
+                from ....utils.save_logger import SaveLogger
+                SaveLogger.log_save_error('casos', case.get('slug', 'desconhecido'), e)
                 print(f'Erro no auto-save: {e}')
             
             save_data()  # Mantém para compatibilidade
@@ -1669,81 +1679,119 @@ def case_detail(case_slug: str):
                         
                         with spreadsheet_table_container:
                             if calc_type == 'Área Total':
-                                # Áreas Afetadas
+                                # Áreas Afetadas - Layout em Tabela
                                 rows = calc.get('area_rows', [])
                                 
                                 ui.label('Áreas Afetadas').classes('text-lg font-semibold mb-4')
                                 
-                                # Lista de áreas afetadas
-                                areas_list_container = ui.column().classes('w-full gap-3 mb-4')
+                                # Lista de áreas afetadas em formato de tabela
+                                # Container criado explicitamente para garantir que seja adicionado ao DOM
+                                areas_list_container = ui.column().classes('w-full gap-0 mb-4')
                                 
                                 def render_areas_list():
+                                    """Renderiza a lista de áreas afetadas em formato de tabela"""
                                     areas_list_container.clear()
+                                    
+                                    if edit_state['edit_index'] is None:
+                                        return
+                                    
                                     calc = case['calculations'][edit_state['edit_index']]
                                     rows = calc.get('area_rows', [])
+                                    
+                                    # Garantir que os campos novos existam nos dados antigos
+                                    for row in rows:
+                                        if 'status' not in row:
+                                            row['status'] = 'Em discussão'
+                                        if 'observations' not in row:
+                                            row['observations'] = ''
                                     
                                     with areas_list_container:
                                         if not rows:
                                             ui.label('Nenhuma área afetada cadastrada. Clique em "Adicionar Área Afetada" para começar.').classes('text-gray-400 italic text-center py-4')
-                                        
-                                        for row_idx, row in enumerate(rows):
-                                            with ui.card().classes('w-full p-4 border shadow-sm'):
-                                                with ui.row().classes('w-full items-start gap-3'):
-                                                    # Descrição
-                                                    with ui.column().classes('flex-1'):
-                                                        desc_input = ui.input(
-                                                            'Descrição da área afetada',
-                                                            value=row.get('description', ''),
-                                                            placeholder='Ex: Área de preservação permanente'
-                                                        ).classes('w-full').props('outlined')
-                                                        
-                                                        def update_desc(idx=row_idx):
-                                                            calc = case['calculations'][edit_state['edit_index']]
-                                                            if 'area_rows' not in calc:
-                                                                calc['area_rows'] = []
-                                                            if idx < len(calc['area_rows']):
-                                                                calc['area_rows'][idx]['description'] = desc_input.value or ''
-                                                                trigger_autosave()
-                                                        
-                                                        desc_input.on('update:model-value', lambda: update_desc())
-                                                    
+                                        else:
+                                            # Cabeçalho da tabela
+                                            with ui.row().classes('w-full bg-gray-100 p-2 font-semibold text-sm border-b'):
+                                                ui.label('Hectares (ha)').classes('w-32 text-center')
+                                                ui.label('Descrição').classes('flex-1')
+                                                ui.label('Status').classes('w-40 text-center')
+                                                ui.label('Observações').classes('w-64 text-center')
+                                                ui.label('Ações').classes('w-20 text-center')
+                                            
+                                            # Linhas da tabela
+                                            for row_idx, row in enumerate(rows):
+                                                with ui.row().classes('w-full p-1 border-b items-start hover:bg-gray-50'):
                                                     # Hectares
-                                                    with ui.column().classes('w-40'):
-                                                        hectares_input = ui.number(
-                                                            'Hectares',
-                                                            value=row.get('hectares', 0.0),
-                                                            format='%.2f'
-                                                        ).classes('w-full').props('outlined')
-                                                        
-                                                        def update_hectares(idx=row_idx):
-                                                            calc = case['calculations'][edit_state['edit_index']]
-                                                            if 'area_rows' not in calc:
-                                                                calc['area_rows'] = []
-                                                            if idx < len(calc['area_rows']):
-                                                                calc['area_rows'][idx]['hectares'] = hectares_input.value or 0.0
-                                                                trigger_autosave()
-                                                                render_areas_list()
-                                                        
-                                                        hectares_input.on('update:model-value', lambda: update_hectares())
+                                                    hectares_input = ui.number(
+                                                        '',
+                                                        value=row.get('hectares', 0.0),
+                                                        format='%.2f'
+                                                    ).classes('w-32').props('dense outlined')
                                                     
-                                                    # Status
-                                                    with ui.column().classes('w-48'):
-                                                        status_options = ['Perdido', 'Em discussão', 'Pendente', 'Recuperado']
+                                                    # Descrição
+                                                    desc_input = ui.input(
+                                                        '',
+                                                        value=row.get('description', ''),
+                                                        placeholder='Ex: Área de preservação permanente'
+                                                    ).classes('flex-1').props('dense outlined')
+                                                    
+                                                    # Status com badge colorido
+                                                    status_options = ['Vencido', 'Perdido', 'Em discussão']
+                                                    current_status = row.get('status', 'Em discussão')
+                                                    
+                                                    # Função para obter classes CSS do badge baseado no status
+                                                    def get_status_badge_classes(status):
+                                                        if status == 'Vencido':
+                                                            return 'bg-green-100 text-green-800'
+                                                        elif status == 'Perdido':
+                                                            return 'bg-red-100 text-red-800'
+                                                        else:  # Em discussão
+                                                            return 'bg-yellow-100 text-yellow-800'
+                                                    
+                                                    with ui.column().classes('w-40 gap-1'):
                                                         status_select = ui.select(
                                                             options=status_options,
-                                                            label='Status',
-                                                            value=row.get('status', 'Pendente')
-                                                        ).classes('w-full').props('outlined')
+                                                            value=current_status
+                                                        ).classes('w-full').props('dense outlined')
                                                         
-                                                        def update_status(idx=row_idx):
-                                                            calc = case['calculations'][edit_state['edit_index']]
-                                                            if 'area_rows' not in calc:
-                                                                calc['area_rows'] = []
-                                                            if idx < len(calc['area_rows']):
-                                                                calc['area_rows'][idx]['status'] = status_select.value or 'Pendente'
-                                                                trigger_autosave()
-                                                        
-                                                        status_select.on('update:model-value', lambda: update_status())
+                                                        # Badge visual do status
+                                                        status_badge = ui.label(current_status).classes(
+                                                            'text-xs px-2 py-1 rounded-full text-center font-medium'
+                                                        )
+                                                        # Aplicar classes de cor iniciais
+                                                        status_badge.classes(add=get_status_badge_classes(current_status))
+                                                    
+                                                    # Observações (textarea)
+                                                    observations_input = ui.textarea(
+                                                        '',
+                                                        value=row.get('observations', ''),
+                                                        placeholder='Observações sobre a área'
+                                                    ).classes('w-64').props('dense outlined rows=3 maxlength=500')
+                                                    
+                                                    # Função para atualizar linha completa
+                                                    def update_row(idx=row_idx, hectares=hectares_input, desc=desc_input, status=status_select, observations=observations_input):
+                                                        calc = case['calculations'][edit_state['edit_index']]
+                                                        if 'area_rows' not in calc:
+                                                            calc['area_rows'] = []
+                                                        if idx < len(calc['area_rows']):
+                                                            new_status = status.value or 'Em discussão'
+                                                            calc['area_rows'][idx] = {
+                                                                'hectares': hectares.value or 0.0,
+                                                                'description': desc.value or '',
+                                                                'status': new_status,
+                                                                'observations': observations.value or ''
+                                                            }
+                                                            # Atualizar badge visual do status
+                                                            status_badge.text = new_status
+                                                            # Remover classes de cor antigas e adicionar novas
+                                                            status_badge.classes(remove='bg-green-100 text-green-800 bg-red-100 text-red-800 bg-yellow-100 text-yellow-800')
+                                                            status_badge.classes(add=get_status_badge_classes(new_status))
+                                                            trigger_autosave()
+                                                    
+                                                    # Bind dos eventos de atualização
+                                                    hectares_input.on('update:model-value', lambda: update_row())
+                                                    desc_input.on('update:model-value', lambda: update_row())
+                                                    status_select.on('update:model-value', lambda: update_row())
+                                                    observations_input.on('update:model-value', lambda: update_row())
                                                     
                                                     # Botão remover
                                                     def remove_area(idx=row_idx):
@@ -1756,19 +1804,34 @@ def case_detail(case_slug: str):
                                                     ui.button(
                                                         icon='delete',
                                                         on_click=remove_area
-                                                    ).props('flat round dense color=red').tooltip('Remover área')
+                                                    ).props('flat round dense color=red size=sm').classes('w-20').tooltip('Remover área')
+                                            
+                                            # Total e resumo
+                                            total_hectares = sum(r.get('hectares', 0.0) for r in rows)
+                                            status_count = {}
+                                            for r in rows:
+                                                status = r.get('status', 'Em discussão')
+                                                status_count[status] = status_count.get(status, 0) + 1
+                                            
+                                            status_summary = ', '.join([f'{count} {status}' for status, count in status_count.items()])
+                                            
+                                            with ui.row().classes('w-full p-2 bg-green-50 font-semibold border-t-2'):
+                                                ui.label(f'Total: {total_hectares:,.2f} ha').classes('flex-1 text-green-700')
+                                                ui.label(status_summary).classes('text-sm text-gray-600')
                                 
                                 render_areas_list()
                                 
                                 # Botão para adicionar área
                                 def add_area_row():
+                                    """Adiciona uma nova linha na planilha de áreas"""
                                     calc = case['calculations'][edit_state['edit_index']]
                                     if 'area_rows' not in calc:
                                         calc['area_rows'] = []
                                     calc['area_rows'].append({
-                                        'description': '',
                                         'hectares': 0.0,
-                                        'status': 'Pendente'
+                                        'description': '',
+                                        'status': 'Em discussão',
+                                        'observations': ''
                                     })
                                     trigger_autosave()
                                     render_areas_list()
@@ -1779,14 +1842,6 @@ def case_detail(case_slug: str):
                                         icon='add',
                                         on_click=add_area_row
                                     ).classes('bg-green-600 text-white px-6 py-2')
-                                
-                                # Total
-                                if rows:
-                                    total_hectares = sum(r.get('hectares', 0.0) for r in rows)
-                                    with ui.card().classes('w-full p-4 mt-4 bg-green-50 border-2 border-green-300'):
-                                        with ui.row().classes('w-full items-center justify-between'):
-                                            ui.label('Total de Áreas Afetadas:').classes('font-semibold text-gray-700 text-lg')
-                                            ui.label(f'{total_hectares:,.2f} hectares').classes('font-bold text-green-700 text-xl')
                                 
                             else:  # Financeiro
                                 # Planilha Financeira
@@ -1888,7 +1943,7 @@ def case_detail(case_slug: str):
                     }
                     
                     if calc_type == 'Área Total':
-                        calc_data['area_rows'] = []
+                        calc_data['area_rows'] = []  # Estrutura: hectares, description, status, observations
                     else:  # Financeiro
                         calc_data['finance_rows'] = []
                     
@@ -1904,10 +1959,16 @@ def case_detail(case_slug: str):
                     edit_state['is_editing'] = True
                     edit_state['edit_index'] = index
                     
-                    # Garantir que as estruturas existem
+                    # Garantir que as estruturas existem e migrar dados antigos
                     if calc.get('type') == 'Área Total':
                         if 'area_rows' not in calc:
                             calc['area_rows'] = []
+                        # Migração: garantir que campos novos existam em dados antigos
+                        for row in calc['area_rows']:
+                            if 'status' not in row:
+                                row['status'] = 'Em discussão'  # Default para dados antigos
+                            if 'observations' not in row:
+                                row['observations'] = ''  # Default para dados antigos
                     else:
                         if 'finance_rows' not in calc:
                             calc['finance_rows'] = []
@@ -1950,7 +2011,13 @@ def case_detail(case_slug: str):
                                                 rows = calc.get('area_rows', [])
                                                 if rows:
                                                     total = sum(r.get('hectares', 0.0) for r in rows)
-                                                    ui.label(f'{len(rows)} área(s) • {total:,.2f} ha').classes('text-xs text-gray-500')
+                                                    # Contar por status
+                                                    status_count = {}
+                                                    for r in rows:
+                                                        status = r.get('status', 'Em discussão')
+                                                        status_count[status] = status_count.get(status, 0) + 1
+                                                    status_summary = ', '.join([f'{count} {status}' for status, count in status_count.items()])
+                                                    ui.label(f'{len(rows)} área(s) • {total:,.2f} ha • {status_summary}').classes('text-xs text-gray-500')
                                                 else:
                                                     ui.label('Planilha vazia').classes('text-xs text-gray-400 italic')
                                             else:
@@ -2001,6 +2068,8 @@ def case_detail(case_slug: str):
                         # Botão de salvamento manual
                         async def manual_save_report():
                             """Salva manualmente o relatório no Firestore"""
+                            from ....utils.save_logger import SaveLogger
+                            
                             try:
                                 autosave_state['is_saving'] = True
                                 report_save_indicator.refresh()
@@ -2008,6 +2077,9 @@ def case_detail(case_slug: str):
                                 from ...core import save_case
                                 # Lê o valor atual (a variável reativa é atualizada pelos callbacks)
                                 current_value = report_value['content']
+                                
+                                # Log antes de salvar
+                                SaveLogger.log_save_attempt('casos', case.get('slug', 'desconhecido'), {'general_report': current_value[:100] + '...' if len(current_value) > 100 else current_value})
                                 
                                 # Atualiza tanto o caso quanto a variável reativa
                                 case['general_report'] = current_value
@@ -2018,11 +2090,16 @@ def case_detail(case_slug: str):
                                 
                                 await asyncio.sleep(0.3)  # Pequeno delay para mostrar o indicador
                                 
+                                # Log de sucesso
+                                SaveLogger.log_save_success('casos', case.get('slug', 'desconhecido'))
+                                
                                 autosave_state['is_saving'] = False
                                 report_save_indicator.refresh()
                                 
                                 ui.notify('Relatório salvo com sucesso!', type='positive', timeout=2000)
                             except Exception as e:
+                                # Log de erro
+                                SaveLogger.log_save_error('casos', case.get('slug', 'desconhecido'), e)
                                 print(f'Erro ao salvar relatório: {e}')
                                 import traceback
                                 traceback.print_exc()
@@ -2083,6 +2160,8 @@ def case_detail(case_slug: str):
                         # Botão de salvamento manual
                         async def manual_save_vistorias():
                             """Salva manualmente as vistorias no Firestore"""
+                            from ....utils.save_logger import SaveLogger
+                            
                             try:
                                 autosave_state['is_saving'] = True
                                 vistorias_save_indicator.refresh()
@@ -2090,6 +2169,9 @@ def case_detail(case_slug: str):
                                 from ...core import save_case
                                 # Lê o valor atual (a variável reativa é atualizada pelos callbacks)
                                 current_value = vistorias_value['content']
+                                
+                                # Log antes de salvar
+                                SaveLogger.log_save_attempt('casos', case.get('slug', 'desconhecido'), {'vistorias': current_value[:100] + '...' if len(current_value) > 100 else current_value})
                                 
                                 # Atualiza tanto o caso quanto a variável reativa
                                 case['vistorias'] = current_value
@@ -2100,11 +2182,16 @@ def case_detail(case_slug: str):
                                 
                                 await asyncio.sleep(0.3)  # Pequeno delay para mostrar o indicador
                                 
+                                # Log de sucesso
+                                SaveLogger.log_save_success('casos', case.get('slug', 'desconhecido'))
+                                
                                 autosave_state['is_saving'] = False
                                 vistorias_save_indicator.refresh()
                                 
                                 ui.notify('Vistorias salvas com sucesso!', type='positive', timeout=2000)
                             except Exception as e:
+                                # Log de erro
+                                SaveLogger.log_save_error('casos', case.get('slug', 'desconhecido'), e)
                                 print(f'Erro ao salvar vistorias: {e}')
                                 import traceback
                                 traceback.print_exc()
@@ -2167,6 +2254,124 @@ def case_detail(case_slug: str):
                         on_change=on_legal_considerations_change
                     ).classes('w-full').style('min-height: 150px')
 
+                # Análise Jurídica do Caso "Leonel II / Grein II"
+                with ui.expansion('Análise Jurídica do Caso "Leonel II / Grein II"', icon='analytics').classes('w-full border rounded bg-gray-50'):
+                    with ui.column().classes('w-full gap-6 p-4'):
+                        # Título do Infográfico
+                        ui.label('Análise Jurídica do Caso "Leonel II / Grein II" - Crimes Ambientais').classes('text-xl font-bold text-gray-800 mb-2')
+                        ui.label('Uma análise detalhada da denúncia por múltiplos crimes ambientais na Comarca de Mafra, envolvendo os réus Luciane Schmidmeier, Carlos Schmidmeier e a empresa Refloresta Empreendimentos Ltda.').classes('text-sm text-gray-600 mb-6')
+                        
+                        # Slide 1: Visão Geral do Caso
+                        with ui.card().classes('w-full p-6 border-l-4').style('border-left-color: #dc2626;'):
+                            ui.label('📋 Slide 1: Visão Geral do Caso').classes('text-lg font-bold text-gray-800 mb-4')
+                            ui.label('O Caso "Leonel II / Grein II"').classes('text-md font-semibold text-gray-700 mb-3')
+                            
+                            with ui.column().classes('gap-2 text-sm text-gray-700'):
+                                ui.label('• Réus: Luciane Schmidmeier, Carlos Schmidmeier, Refloresta Empreendimentos Ltda.')
+                                ui.label('• Acusação Principal: Série de crimes ambientais praticados em concurso, totalizando 9 fatos delituosos.')
+                                ui.label('• Local: Comarca de Mafra, Santa Catarina.')
+                                ui.label('• Ponto-chave: A denúncia envolve a destruição de vegetação em Área de Preservação Permanente (APP) e no Bioma Mata Atlântica, com o agravante de atingir espécies ameaçadas de extinção.')
+                        
+                        # Slide 2: As Acusações
+                        with ui.card().classes('w-full p-6 border-l-4').style('border-left-color: #f59e0b;'):
+                            ui.label('⚖️ Slide 2: As Acusações - Crimes Imputados').classes('text-lg font-bold text-gray-800 mb-4')
+                            ui.label('Detalhamento dos Crimes (Lei n.º 9.605/98)').classes('text-md font-semibold text-gray-700 mb-4')
+                            
+                            with ui.row().classes('w-full gap-4 flex-wrap'):
+                                # Coluna 1: Art. 38
+                                with ui.card().classes('flex-1 min-w-64 p-4 bg-red-50'):
+                                    ui.label('Art. 38 - Dano a APP').classes('font-bold text-red-700 mb-2')
+                                    ui.label('Destruir ou danificar floresta considerada de preservação permanente, mesmo que em formação, ou utilizá-la com infringência das normas de proteção.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Fatos no Caso: I, IV, VI e IX').classes('text-xs text-gray-600 mb-1')
+                                    ui.label('Pena Base: 1 a 3 anos de detenção').classes('text-xs font-semibold text-red-700')
+                                
+                                # Coluna 2: Art. 38-A
+                                with ui.card().classes('flex-1 min-w-64 p-4 bg-orange-50'):
+                                    ui.label('Art. 38-A - Dano ao Bioma Mata Atlântica').classes('font-bold text-orange-700 mb-2')
+                                    ui.label('Destruir ou danificar vegetação primária ou secundária, em estágio avançado ou médio de regeneração, do Bioma Mata Atlântica.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Fatos no Caso: II, V, VII e VIII').classes('text-xs text-gray-600 mb-1')
+                                    ui.label('Pena Base: 1 a 3 anos de detenção').classes('text-xs font-semibold text-orange-700')
+                                
+                                # Coluna 3: Art. 48
+                                with ui.card().classes('flex-1 min-w-64 p-4 bg-yellow-50'):
+                                    ui.label('Art. 48 - Impedir a Regeneração').classes('font-bold text-yellow-700 mb-2')
+                                    ui.label('Impedir ou dificultar a regeneração natural de florestas e demais formas de vegetação.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Fato no Caso: III').classes('text-xs text-gray-600 mb-1')
+                                    ui.label('Pena Base: 6 meses a 1 ano de detenção').classes('text-xs font-semibold text-yellow-700')
+                        
+                        # Slide 3: O Agravante Principal
+                        with ui.card().classes('w-full p-6 border-l-4').style('border-left-color: #dc2626;'):
+                            ui.label('🔍 Slide 3: O Agravante Principal').classes('text-lg font-bold text-gray-800 mb-4')
+                            ui.label('Fator de Aumento da Pena').classes('text-md font-semibold text-gray-700 mb-3')
+                            
+                            with ui.column().classes('gap-3 text-sm text-gray-700'):
+                                ui.label('Art. 53, Inciso II, Alínea "c" da Lei 9.605/98').classes('font-semibold text-red-700')
+                                ui.label('A pena é aumentada de 1/6 a 1/3 se o crime afeta espécies raras ou consideradas ameaçadas de extinção.')
+                                
+                                with ui.row().classes('gap-4 mt-2'):
+                                    with ui.card().classes('flex-1 p-3 bg-red-100'):
+                                        ui.label('Espécies Atingidas:').classes('font-semibold mb-1')
+                                        ui.label('• Pinheiro Brasileiro (Araucária)').classes('text-sm')
+                                        ui.label('• Imbuia').classes('text-sm')
+                                        ui.label('• Cedro').classes('text-sm')
+                                    
+                                    with ui.card().classes('flex-1 p-3 bg-red-100'):
+                                        ui.label('Impacto:').classes('font-semibold mb-1')
+                                        ui.label('Este fator incide sobre TODOS os 9 fatos descritos na denúncia, elevando o potencial de todas as penas.').classes('text-sm')
+                        
+                        # Slide 4: Cenários de Pena
+                        with ui.card().classes('w-full p-6 border-l-4').style('border-left-color: #8b5cf6;'):
+                            ui.label('📊 Slide 4: Cenários de Pena - O Concurso de Crimes').classes('text-lg font-bold text-gray-800 mb-4')
+                            ui.label('Como a Pena Final é Calculada? A Complexidade do Concurso de Crimes').classes('text-md font-semibold text-gray-700 mb-4')
+                            
+                            with ui.column().classes('gap-4'):
+                                # Concurso Material
+                                with ui.card().classes('w-full p-4 bg-red-50 border-l-4').style('border-left-color: #dc2626;'):
+                                    ui.label('Concurso Material (Art. 69, CP) - O Pior Cenário').classes('font-bold text-red-700 mb-2')
+                                    ui.label('Conceito: As penas de todos os 9 crimes são SOMADAS.').classes('text-sm text-gray-700 mb-2')
+                                    with ui.row().classes('gap-4'):
+                                        ui.label('Pena Mínima Estimada: ~9 anos e 11 meses').classes('text-sm font-semibold text-red-700')
+                                        ui.label('Pena Máxima Estimada: ~33 anos e 4 meses').classes('text-sm font-semibold text-red-700')
+                                
+                                # Concurso Formal
+                                with ui.card().classes('w-full p-4 bg-yellow-50 border-l-4').style('border-left-color: #f59e0b;'):
+                                    ui.label('Concurso Formal (Art. 70, CP) - Cenário Intermediário').classes('font-bold text-yellow-700 mb-2')
+                                    ui.label('Conceito: Aplica-se a pena do crime mais grave, aumentada de 1/6 a 1/2. Considera-se que uma única ação gerou vários resultados.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Pena Máxima Estimada: ~6 anos').classes('text-sm font-semibold text-yellow-700')
+                                
+                                # Crime Continuado
+                                with ui.card().classes('w-full p-4 bg-green-50 border-l-4').style('border-left-color: #16a34a;'):
+                                    ui.label('Crime Continuado (Art. 71, CP) - Cenário Mais Complexo e Benéfico').classes('font-bold text-green-700 mb-2')
+                                    ui.label('Conceito: Crimes da mesma espécie são agrupados. A pena de um deles é aplicada e aumentada de 1/6 a 2/3.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Aplicação: Agruparia os 4 crimes do art. 38 e os 4 do art. 38-A. A pena final seria a soma das penas dos grupos (já majoradas) com a pena do crime do art. 48.').classes('text-sm text-gray-700 mb-2')
+                                    ui.label('Resultado: Uma pena significativamente menor que a do concurso material.').classes('text-sm font-semibold text-green-700')
+                        
+                        # Slide 5: Conclusão
+                        with ui.card().classes('w-full p-6 border-l-4').style('border-left-color: #3b82f6;'):
+                            ui.label('🎯 Slide 5: Conclusão e Pontos de Atenção').classes('text-lg font-bold text-gray-800 mb-4')
+                            ui.label('Resumo Estratégico e Próximos Passos').classes('text-md font-semibold text-gray-700 mb-4')
+                            
+                            with ui.column().classes('gap-3 text-sm text-gray-700'):
+                                with ui.row().classes('items-start gap-2'):
+                                    ui.label('•').classes('font-bold')
+                                    ui.label('Gravidade Elevada: A multiplicidade de fatos, o concurso de crimes e o dano a espécies ameaçadas tornam o caso extremamente grave.').classes('flex-1')
+                                
+                                with ui.row().classes('items-start gap-2'):
+                                    ui.label('•').classes('font-bold')
+                                    ui.label('Sem Benefícios: Não há possibilidade de transação penal, suspensão condicional do processo ou ANPP.').classes('flex-1')
+                                
+                                with ui.row().classes('items-start gap-2'):
+                                    ui.label('•').classes('font-bold')
+                                    ui.label('Ponto Central da Defesa: A principal tese defensiva será, provavelmente, afastar o concurso material e buscar o reconhecimento do crime continuado ou do concurso formal para reduzir a pena.').classes('flex-1')
+                                
+                                with ui.row().classes('items-start gap-2'):
+                                    ui.label('•').classes('font-bold')
+                                    ui.label('Questão Processual Chave: A competência para julgar o caso (Justiça Estadual vs. Federal) é um ponto crucial, dado o dano a espécies ameaçadas de extinção.').classes('flex-1')
+                                
+                                with ui.row().classes('items-start gap-2'):
+                                    ui.label('•').classes('font-bold')
+                                    ui.label('Decisão Final: A pena exata dependerá da análise das provas pelo juiz e, fundamentalmente, de sua interpretação sobre qual regra de concurso de crimes aplicar.').classes('flex-1')
+
                 with ui.expansion('Considerações Técnicas', icon='science').classes('w-full border rounded bg-gray-50'):
                     def on_technical_considerations_change(e):
                         new_value = e.value if hasattr(e, 'value') else str(e)
@@ -2215,6 +2420,8 @@ def case_detail(case_slug: str):
                         ).classes('w-full mb-4').props('outlined')
                         
                         def save_thesis():
+                            from ....utils.save_logger import SaveLogger
+                            
                             if not thesis_name.value:
                                 ui.notify('O nome da tese é obrigatório!', type='warning')
                                 return
@@ -2227,16 +2434,22 @@ def case_detail(case_slug: str):
                                 'status': thesis_status.value or 'Aguardando o momento certo para apresentar a tese'
                             }
                             
-                            if edit_state['is_editing']:
-                                case['theses'][edit_state['edit_index']] = thesis_data
-                                ui.notify('Tese atualizada!')
-                            else:
-                                case['theses'].append(thesis_data)
-                                ui.notify('Tese adicionada!')
-                            
-                            trigger_autosave()
-                            render_theses_list.refresh()
-                            thesis_dialog.close()
+                            try:
+                                if edit_state['is_editing']:
+                                    case['theses'][edit_state['edit_index']] = thesis_data
+                                    SaveLogger.log_save_success('casos', f"{case.get('slug', 'desconhecido')}/theses")
+                                    ui.notify('Tese atualizada!', type='positive')
+                                else:
+                                    case['theses'].append(thesis_data)
+                                    SaveLogger.log_save_success('casos', f"{case.get('slug', 'desconhecido')}/theses")
+                                    ui.notify('Tese adicionada!', type='positive')
+                                
+                                trigger_autosave()
+                                render_theses_list.refresh()
+                                thesis_dialog.close()
+                            except Exception as e:
+                                SaveLogger.log_save_error('casos', f"{case.get('slug', 'desconhecido')}/theses", e)
+                                ui.notify(f'Erro ao salvar tese: {str(e)}', type='negative')
                         
                         def reset_form():
                             thesis_name.value = ''

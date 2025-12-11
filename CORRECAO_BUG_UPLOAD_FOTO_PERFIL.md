@@ -56,3 +56,6 @@ Adicionado `await` antes de `file_upload.read()` na linha 365 do arquivo `mini_e
 - A função `handle_upload` já era assíncrona (`async def`), então apenas foi necessário adicionar o `await`
 - O comentário no código foi atualizado para mencionar que o método `read()` é assíncrono
 
+
+
+

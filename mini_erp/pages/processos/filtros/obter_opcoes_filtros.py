@@ -46,3 +46,6 @@ def obter_todas_opcoes_filtros(rows: List[Dict[str, Any]]) -> Dict[str, List[str
 
 
 
+
+
+

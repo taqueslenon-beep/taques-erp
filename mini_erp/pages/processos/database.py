@@ -181,8 +181,8 @@ def save_process(process_data: Dict[str, Any], edit_index: Optional[int] = None)
     Returns:
         Mensagem de sucesso
     """
-    # Obtém o doc_id (_id) do processo
-    # Prioridade: _id do process_data > _id do processo existente > None (novo processo)
+    # Log de operação
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     doc_id = process_data.get('_id')
     
     if not doc_id and edit_index is not None:
@@ -191,6 +191,34 @@ def save_process(process_data: Dict[str, Any], edit_index: Optional[int] = None)
             existing_process = processes[edit_index]
             doc_id = existing_process.get('_id')
     
+    operacao = 'ATUALIZAR' if doc_id else 'CRIAR'
+    processo_id = doc_id or 'NOVO'
+    
+    print(f"[{timestamp}] [PROCESSOS] [{operacao}] ID: {processo_id}")
+    print(f"[{timestamp}] [PROCESSOS] [{operacao}] Título: {process_data.get('title', 'Sem título')}")
+    print(f"[{timestamp}] [PROCESSOS] [{operacao}] Campos recebidos: {list(process_data.keys())}")
+    print(f"[{timestamp}] [PROCESSOS] [{operacao}] Total de campos: {len(process_data)}")
+    
+    # Log detalhado de campos importantes
+    campos_importantes = [
+        'title', 'number', 'status', 'process_type', 'system', 'nucleo', 'area',
+        'clients', 'opposing_parties', 'cases', 'parent_ids',
+        'relatory_facts', 'relatory_timeline', 'relatory_documents',
+        'strategy_objectives', 'legal_thesis', 'strategy_observations',
+        'scenarios', 'protocols', 'envolve_dano_app', 'area_total_discutida'
+    ]
+    
+    for campo in campos_importantes:
+        valor = process_data.get(campo)
+        if valor is not None:
+            if isinstance(valor, (list, dict)):
+                tamanho = len(valor) if valor else 0
+                print(f"[{timestamp}] [PROCESSOS] [{operacao}] {campo}: [{tamanho} item(s)]")
+            elif isinstance(valor, str) and len(valor) > 50:
+                print(f"[{timestamp}] [PROCESSOS] [{operacao}] {campo}: {len(valor)} caracteres")
+            else:
+                print(f"[{timestamp}] [PROCESSOS] [{operacao}] {campo}: {valor}")
+    
     if doc_id:
         message = 'Processo atualizado!'
     else:
@@ -198,7 +226,14 @@ def save_process(process_data: Dict[str, Any], edit_index: Optional[int] = None)
     
     # Salva no Firestore usando a função do core
     # A função save_process_to_firestore gerencia a persistência corretamente
-    save_process_to_firestore(process_data, doc_id=doc_id, sync=True)
+    try:
+        save_process_to_firestore(process_data, doc_id=doc_id, sync=True)
+        print(f"[{timestamp}] [PROCESSOS] [{operacao}] ✓ Processo salvo com sucesso no Firestore")
+    except Exception as e:
+        print(f"[{timestamp}] [PROCESSOS] [{operacao}] ❌ ERRO ao salvar: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     return message
 

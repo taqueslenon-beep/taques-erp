@@ -56,7 +56,7 @@ except ImportError:
 
 # Agora é seguro importar nicegui e outros módulos que podem acionar Firebase
 logger.debug("Importando NiceGUI...")
-from nicegui import ui
+from nicegui import ui, app
 logger.debug("NiceGUI importado com sucesso.")
 
 # Garante que funcione tanto com `python3 -m mini_erp.main` quanto com `python3 mini_erp/main.py`
@@ -116,12 +116,32 @@ def handle_segmentation_fault(signum, frame):
     os._exit(1)
 
 
+def find_available_port(start_port=8081):
+    """
+    Encontra uma porta disponível a partir de start_port.
+    Tenta portas sequencialmente até encontrar uma disponível.
+    """
+    port = start_port
+    max_port = 65535  # Porta máxima do sistema
+    attempts = 0
+    
+    while port <= max_port:
+        if is_port_available(port):
+            return port
+        port += 1
+        attempts += 1
+        if attempts % 100 == 0:
+            logger.debug(f"Verificando porta {port}... ({attempts} tentativas)")
+    
+    return None
+
+
 def start_server_safe():
     """
     Inicia o servidor NiceGUI de forma segura, tratando erros de porta em uso.
     
     Lê a porta da variável de ambiente APP_PORT (padrão: 8081).
-    Se a porta estiver em uso, tenta portas alternativas automaticamente (8082, 8083, etc).
+    Se a porta estiver em uso, tenta portas alternativas automaticamente até encontrar uma disponível.
     """
     logger.info("Iniciando o procedimento para iniciar o servidor seguro (start_server_safe)...")
     # Registra handler para segmentation fault (SIGSEGV)
@@ -134,28 +154,24 @@ def start_server_safe():
         pass
     
     # Lê porta da variável de ambiente ou usa padrão
-    base_port_str = os.environ.get('APP_PORT', '8080')
+    base_port_str = os.environ.get('APP_PORT', '8081')
     logger.debug(f"Variável de ambiente APP_PORT='{base_port_str}'.")
     base_port = int(base_port_str)
-    port = base_port
-    max_attempts = 10  # Tenta até 10 portas alternativas
     
-    # Tenta encontrar uma porta disponível
-    logger.info(f"Iniciando verificação de porta a partir de {port}...")
-    attempts = 0
-    while not is_port_available(port) and attempts < max_attempts:
-        attempts += 1
-        port = base_port + attempts
-        logger.warning(f"Porta {base_port + attempts - 1} ocupada. Tentando próxima porta: {port}...")
+    # Encontra uma porta disponível
+    logger.info(f"Procurando porta disponível a partir de {base_port}...")
+    port = find_available_port(base_port)
     
-    if not is_port_available(port):
-        logger.critical(f"\n❌ Erro Fatal: Não foi possível encontrar uma porta disponível após {max_attempts} tentativas.")
+    if port is None:
+        logger.critical(f"\n❌ Erro Fatal: Não foi possível encontrar uma porta disponível.")
         logger.critical(f"   Tente encerrar outros processos ou escolha uma porta manualmente (variável de ambiente APP_PORT).")
         logger.critical(f"   Exemplo: APP_PORT=9000 python3 -m mini_erp.main\n")
         os._exit(1)
     
     if port != base_port:
         logger.warning(f"⚠️  Porta original {base_port} estava ocupada. O servidor subirá na porta {port}.")
+    else:
+        logger.info(f"✅ Porta {port} está disponível.")
     
     logger.info(f"🚀 Porta {port} confirmada como disponível. Configurando o servidor NiceGUI...")
     
@@ -163,22 +179,35 @@ def start_server_safe():
     is_dev_server = os.environ.get('DEV_SERVER', '').lower() == 'true'
     logger.debug(f"Modo dev_server: {is_dev_server}")
     
-    # Hot Reload: ativa quando rodando diretamente (não via dev_server)
-    # O dev_server.py já cuida do reload, então desabilita para evitar conflito
-    enable_reload = not is_dev_server
+    # Hot Reload: sempre ativado para recarregamento automático do NiceGUI
+    logger.info("🔥 Hot Reload ATIVADO. Mudanças em arquivos .py recarregarão o servidor automaticamente.")
     
-    if enable_reload:
-        logger.info("🔥 Hot Reload ATIVADO (execução direta). Mudanças em arquivos .py recarregarão o servidor.")
-    else:
-        logger.info("⚙️ Hot Reload DESATIVADO (execução via dev_server.py). O dev_server gerencia o recarregamento.")
+    # Adiciona middleware para headers anti-cache (corrige problema de cache no navegador)
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+    from starlette.responses import Response
+    
+    class NoCacheMiddleware(BaseHTTPMiddleware):
+        """Middleware que adiciona headers anti-cache em todas as respostas"""
+        async def dispatch(self, request: Request, call_next):
+            response = await call_next(request)
+            # Adiciona headers anti-cache
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            return response
+    
+    # Registra middleware no app do NiceGUI
+    app.add_middleware(NoCacheMiddleware)
+    logger.info("✅ Middleware anti-cache configurado")
     
     # Configurações do servidor
     server_config = {
-        'title': 'TAQUES ERP',
+        'title': 'TAQUES-ERP - Sistema de Advocacia',
         'favicon': '💼',
         'port': port,
         'host': '0.0.0.0',
-        'reload': enable_reload,
+        'reload': True,  # Hot reload sempre ativo
         'show': not is_dev_server,
         'show_welcome_message': False,
         'storage_secret': 'taques-erp-secret-key-2024',
@@ -211,12 +240,9 @@ def start_server_safe():
 
 
 # IMPORTANTE:
-# Hot Reload está configurado automaticamente:
-# - Se rodar diretamente (python3 -m mini_erp.main): reload=True (hot reload ativo)
-# - Se rodar via dev_server.py: reload=False (dev_server cuida do reload)
-# 
-# O NiceGUI detecta mudanças em arquivos .py e recarrega automaticamente.
-# A página do navegador pode precisar de refresh manual (F5) após mudanças.
+# Hot Reload está sempre ATIVO (reload=True).
+# O NiceGUI detecta mudanças em arquivos .py e recarrega automaticamente o servidor.
+# A página do navegador pode precisar de refresh manual (F5) após mudanças de código.
 if __name__ in {"__main__", "__mp_main__"}:
     logger.info(f"Ponto de entrada (__name__='{__name__}') alcançado. Chamando start_server_safe().")
     start_server_safe()

@@ -346,3 +346,6 @@ Para adicionar um novo tipo com cores próprias:
 
 
 
+
+
+

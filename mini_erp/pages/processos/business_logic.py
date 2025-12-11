@@ -25,7 +25,9 @@ def validate_process(
     selected_clients: Optional[List[str]] = None,
     parent_ids: Optional[List[str]] = None,
     current_process_id: Optional[str] = None,
-    process_type: Optional[str] = None
+    process_type: Optional[str] = None,
+    status: Optional[str] = None,
+    **kwargs
 ) -> Tuple[bool, str]:
     """
     Valida dados de um processo antes de salvar.
@@ -37,20 +39,37 @@ def validate_process(
         parent_ids: Lista de IDs dos processos pais (opcional)
         current_process_id: ID do processo sendo editado (para evitar auto-vínculo)
         process_type: Tipo do processo ('Futuro' ou 'Existente') - opcional
+        status: Status do processo (opcional, mas recomendado)
+        **kwargs: Outros campos para validação adicional
     
     Returns:
         Tupla (is_valid, error_message)
     """
-    if not title:
+    # Validação de título (obrigatório)
+    if not title or not str(title).strip():
         return False, 'Título do processo é obrigatório!'
+    
+    # Validação de status (obrigatório)
+    if not status or not str(status).strip():
+        return False, 'Status do processo é obrigatório!'
+    
+    # Validação de tipo de processo (obrigatório)
+    if not process_type or not str(process_type).strip():
+        return False, 'Tipo de processo é obrigatório!'
     
     # Processos futuros podem não ter casos vinculados ainda
     if not selected_cases and process_type != 'Futuro':
         return False, 'Adicione pelo menos um caso vinculado!'
     
-    # Validação de cliente removida para flexibilidade
-    # if not selected_clients:
-    #     return False, 'Adicione pelo menos um cliente!'
+    # Validação de valor numérico (se fornecido)
+    area_total = kwargs.get('area_total_discutida')
+    if area_total is not None:
+        try:
+            float(area_total)
+            if float(area_total) < 0:
+                return False, 'Área total discutida deve ser um valor positivo!'
+        except (ValueError, TypeError):
+            return False, 'Área total discutida deve ser um valor numérico!'
     
     # Validação de processos pai
     if parent_ids:

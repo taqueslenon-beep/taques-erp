@@ -144,3 +144,6 @@ def is_password_encrypted(encrypted_password: str) -> bool:
     
     return False
 
+
+
+

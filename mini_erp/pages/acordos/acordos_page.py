@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from nicegui import ui
 from ...core import layout
 from ...auth import is_authenticated
+from mini_erp.constants import AREA_COLORS_BACKGROUND, AREA_COLORS_TEXT, AREA_COLORS_BORDER
 from .modais import render_acordo_dialog
 from .database import buscar_todos_os_acordos, invalidar_cache_acordos, salvar_acordo, buscar_acordo_por_id
 
@@ -238,10 +239,11 @@ def acordos():
                     columns = [
                         {'name': 'data', 'label': 'Data', 'field': 'data', 'align': 'center', 'style': 'width: 120px;'},
                         {'name': 'titulo', 'label': 'Título/Número', 'field': 'titulo', 'align': 'left'},
+                        {'name': 'esfera', 'label': 'Esfera', 'field': 'esfera', 'align': 'center', 'style': 'width: 140px;'},
+                        {'name': 'tipo_acordo_criminal', 'label': 'Tipo', 'field': 'tipo_acordo_criminal', 'align': 'left', 'style': 'width: 250px;'},
                         {'name': 'caso', 'label': 'Caso', 'field': 'caso', 'align': 'left', 'style': 'width: 200px;'},
                         {'name': 'partes', 'label': 'Partes Envolvidas', 'field': 'partes', 'align': 'left'},
                         {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'style': 'width: 150px;'},
-                        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 150px;'},
                     ]
                     
                     # Preparar linhas
@@ -253,6 +255,14 @@ def acordos():
                         
                         # Título/Número
                         titulo = acordo.get('titulo') or acordo.get('title') or acordo.get('numero') or acordo.get('number') or '-'
+                        
+                        # Esfera do Acordo
+                        esfera = acordo.get('esfera') or '-'
+                        
+                        # Tipo de Acordo Criminal (apenas para acordos criminais)
+                        tipo_acordo_criminal = '-'
+                        if esfera == 'Criminal':
+                            tipo_acordo_criminal = acordo.get('tipo_acordo_criminal') or '-'
                         
                         # Caso vinculado
                         caso_texto = '-'
@@ -284,6 +294,8 @@ def acordos():
                             'id': acordo.get('_id'),
                             'data': data_formatada,
                             'titulo': titulo,
+                            'esfera': esfera,
+                            'tipo_acordo_criminal': tipo_acordo_criminal,
                             'caso': caso_texto,
                             'partes': partes,
                             'status': status,
@@ -295,6 +307,52 @@ def acordos():
                         rows=rows,
                         row_key='id'
                     ).classes('w-full').props('flat dense')
+                    
+                    # Slot para título/número clicável (estilo de link)
+                    table.add_slot('body-cell-titulo', '''
+                        <q-td :props="props" style="vertical-align: middle;">
+                            <span 
+                                @click="$parent.$emit('edit', props.row)"
+                                style="color: #1976d2; cursor: pointer;"
+                                onmouseover="this.style.textDecoration='underline'; this.style.color='#1565c0';"
+                                onmouseout="this.style.textDecoration='none'; this.style.color='#1976d2';"
+                            >
+                                {{ props.value }}
+                            </span>
+                        </q-td>
+                    ''')
+                    
+                    # Slot para esfera com badge colorido (mesmo padrão do módulo de processos)
+                    table.add_slot('body-cell-esfera', '''
+                        <q-td :props="props" style="vertical-align: middle;">
+                            <q-badge 
+                                v-if="props.value && props.value !== '-'"
+                                :style="props.value === 'Administrativo' ? 'background-color: #d1d5db; color: #1f2937; border: 1px solid #9ca3af;' : 
+                                        props.value === 'Criminal' ? 'background-color: #fecaca; color: #7f1d1d; border: 1px solid #f87171;' : 
+                                        props.value === 'Cível' ? 'background-color: #bfdbfe; color: #1e3a8a; border: 1px solid #60a5fa;' : 
+                                        props.value === 'Tributário' ? 'background-color: #ddd6fe; color: #4c1d95; border: 1px solid #a78bfa;' : 
+                                        'background-color: #e5e7eb; color: #374151; border: 1px solid #9ca3af;'"
+                                class="text-xs px-2 py-1"
+                            >
+                                {{ props.value }}
+                            </q-badge>
+                            <span v-else class="text-gray-400">-</span>
+                        </q-td>
+                    ''')
+                    
+                    # Slot para tipo de acordo criminal (badge vermelho claro, mesma cor do Criminal)
+                    table.add_slot('body-cell-tipo_acordo_criminal', '''
+                        <q-td :props="props" style="vertical-align: middle;">
+                            <q-badge 
+                                v-if="props.value && props.value !== '-'"
+                                style="background-color: #fecaca; color: #7f1d1d; border: 1px solid #f87171;"
+                                class="text-xs px-2 py-1"
+                            >
+                                {{ props.value }}
+                            </q-badge>
+                            <span v-else class="text-gray-400">-</span>
+                        </q-td>
+                    ''')
                     
                     # Slot para status com cores (mesmo padrão do modal de processos)
                     table.add_slot('body-cell-status', '''
@@ -311,63 +369,16 @@ def acordos():
                         </q-td>
                     ''')
                     
-                    # Slot para ações (Visualizar, Editar, Deletar)
-                    table.add_slot('body-cell-actions', '''
-                        <q-td :props="props">
-                            <q-btn 
-                                flat 
-                                dense 
-                                icon="visibility" 
-                                color="primary" 
-                                @click="$parent.$emit('view', props.row)" 
-                                size="sm"
-                                title="Visualizar"
-                            />
-                            <q-btn 
-                                flat 
-                                dense 
-                                icon="edit" 
-                                color="primary" 
-                                @click="$parent.$emit('edit', props.row)" 
-                                size="sm"
-                                title="Editar"
-                            />
-                            <q-btn 
-                                flat 
-                                dense 
-                                icon="delete" 
-                                color="red" 
-                                @click="$parent.$emit('delete', props.row)" 
-                                size="sm"
-                                title="Deletar"
-                            />
-                        </q-td>
-                    ''')
-                    
-                    # Handlers para ações
-                    def on_view(acordo_row):
-                        """Handler para visualizar acordo."""
-                        acordo_id = acordo_row.get('id')
-                        if acordo_id:
-                            ui.navigate.to(f'/acordos/{acordo_id}')
-                        else:
-                            ui.notify('Erro: ID do acordo não encontrado', type='negative')
-                    
+                    # Handler para editar ao clicar no título
                     def on_edit(acordo_row):
-                        """Handler para editar acordo."""
+                        """Handler para editar acordo ao clicar no título."""
                         acordo_id = acordo_row.get('id')
                         if acordo_id:
                             abrir_modal_edicao(acordo_id)
                         else:
                             ui.notify('Erro: ID do acordo não encontrado', type='negative')
                     
-                    def on_delete(acordo_row):
-                        """Handler para deletar acordo."""
-                        ui.notify('Deleção em desenvolvimento', type='info')
-                    
-                    table.on('view', lambda e: on_view(e.args))
                     table.on('edit', lambda e: on_edit(e.args))
-                    table.on('delete', lambda e: on_delete(e.args))
                     
                 except Exception as e:
                     # Tratamento de erro

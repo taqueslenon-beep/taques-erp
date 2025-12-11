@@ -12,6 +12,7 @@ from .models import (
     HEATMAP_COLORS, RESULT_COLORS,
 )
 from .helpers import get_short_name, format_currency
+from ...core import get_display_name
 from .chart_builders import (
     build_bar_chart_config, build_pie_chart_config, build_line_chart_config,
     build_heatmap_config, build_simple_pie_config,
@@ -761,7 +762,9 @@ def render_tab_parte(ds: PainelDataService) -> None:
             sorted_opposing = ds.get_processes_by_opposing_party_filtered(filter_status['value'])
             
             if sorted_opposing:
-                opposing_names = [get_short_name(item[0], ds.opposing_parties) for item in sorted_opposing]
+                # Os nomes já vêm normalizados como nomes de exibição do data_service
+                # Não precisa mais usar get_short_name, já são os nomes corretos
+                opposing_names = [item[0] for item in sorted_opposing]
                 opposing_values = [item[1] for item in sorted_opposing]
                 
                 chart_height = max(200, len(opposing_names) * 40)

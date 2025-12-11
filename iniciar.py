@@ -16,7 +16,7 @@ import socket
 
 # Configuração
 PASTA_PROJETO = os.path.dirname(os.path.abspath(__file__))
-PORTA_PADRAO = 8080
+PORTA_PADRAO = 8081
 HOST = '127.0.0.1'
 
 
@@ -35,23 +35,44 @@ def verificar_porta(porta):
 def encontrar_porta_disponivel():
     """Encontra a primeira porta disponível a partir da porta padrão"""
     porta = PORTA_PADRAO
-    while porta < PORTA_PADRAO + 10:
+    max_porta = 65535  # Porta máxima do sistema
+    while porta <= max_porta:
         if verificar_porta(porta):
             return porta
         porta += 1
     return None
 
 
+def servidor_pronto(porta, max_tentativas=30):
+    """Verifica se o servidor está respondendo"""
+    import urllib.request
+    url = f'http://{HOST}:{porta}'
+    for i in range(max_tentativas):
+        try:
+            req = urllib.request.urlopen(url, timeout=1)
+            if req.getcode() == 200:
+                return True
+        except:
+            pass
+        time.sleep(0.5)
+    return False
+
+
 def abrir_navegador(porta):
     """Aguarda o servidor iniciar e abre o navegador"""
-    time.sleep(3)
-    url = f'http://{HOST}:{porta}'
-    try:
-        webbrowser.open(url)
-        print(f'\n✅ Navegador aberto em: {url}\n')
-    except Exception as e:
-        print(f'\n⚠️  Erro ao abrir navegador: {e}')
-        print(f'   Abra manualmente: {url}\n')
+    print(f'⏳ Aguardando servidor ficar pronto...')
+    if servidor_pronto(porta):
+        url = f'http://{HOST}:{porta}'
+        try:
+            webbrowser.open(url)
+            print(f'\n✅ Servidor pronto! Navegador aberto em: {url}\n')
+        except Exception as e:
+            print(f'\n⚠️  Erro ao abrir navegador: {e}')
+            print(f'   Abra manualmente: {url}\n')
+    else:
+        url = f'http://{HOST}:{porta}'
+        print(f'\n⚠️  Servidor pode não estar pronto ainda.')
+        print(f'   Tente acessar manualmente: {url}\n')
 
 
 def main():
@@ -63,7 +84,7 @@ def main():
     # Encontra porta disponível
     porta = encontrar_porta_disponivel()
     if not porta:
-        print(f'\n❌ Erro: Nenhuma porta disponível entre {PORTA_PADRAO} e {PORTA_PADRAO + 9}')
+        print(f'\n❌ Erro: Nenhuma porta disponível a partir de {PORTA_PADRAO}')
         print(f'   Encerre outros processos ou tente novamente.')
         sys.exit(1)
     

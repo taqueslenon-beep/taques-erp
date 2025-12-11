@@ -944,6 +944,9 @@ def render_process_dialog(on_success=None):
                 delete_btn = ui.button('EXCLUIR', icon='delete', on_click=do_delete).props('color=red').classes('hidden font-bold shadow-lg')
 
                 def do_save():
+                    # Importar logger
+                    from ....utils.save_logger import SaveLogger
+                    
                     # Validação antes de salvar
                     is_valid, msg = validate_process(
                         title_input.value, 
@@ -956,18 +959,12 @@ def render_process_dialog(on_success=None):
                         ui.notify(msg, type='warning')
                         return
                     
-                    # Log de debug: verifica dados antes de salvar
-                    print(f"[SALVAR PROCESSO] Iniciando salvamento...")
-                    print(f"[SALVAR PROCESSO] Título: {title_input.value}")
-                    print(f"[SALVAR PROCESSO] Clientes selecionados: {state['selected_clients']}")
-                    print(f"[SALVAR PROCESSO] Número de clientes: {len(state['selected_clients']) if state['selected_clients'] else 0}")
-                    
                     # Validação adicional: garante que clientes não seja None
                     selected_clients = state['selected_clients'] or []
                     if not isinstance(selected_clients, list):
                         selected_clients = []
-                        print(f"[SALVAR PROCESSO] ⚠️  Clientes não era uma lista, convertendo para lista vazia")
                     
+                    # Coletar TODOS os campos do formulário
                     p_data = build_process_data(
                         title=title_input.value, number=number_input.value, system=system_select.value,
                         link=link_input.value, nucleo=nucleo_select.value, area=area_select.value,
@@ -975,16 +972,16 @@ def render_process_dialog(on_success=None):
                         data_abertura=data_abertura_input.value,
                         clients=selected_clients, opposing_parties=state['selected_opposing'],
                         other_parties=state['selected_others'], cases=state['selected_cases'],
-                        relatory_facts=relatory_facts_input.value, relatory_timeline=relatory_timeline_input.value,
-                        relatory_documents=relatory_documents_input.value,
-                        strategy_objectives=objectives_input.value, legal_thesis=thesis_input.value,
-                        strategy_observations=observations_input.value, scenarios=state['scenarios'],
+                        relatory_facts=relatory_facts_input.value or '', relatory_timeline=relatory_timeline_input.value or '',
+                        relatory_documents=relatory_documents_input.value or '',
+                        strategy_objectives=objectives_input.value or '', legal_thesis=thesis_input.value or '',
+                        strategy_observations=observations_input.value or '', scenarios=state['scenarios'],
                         protocols=state['protocols'],
                         access_lawyer=access_lawyer_granted.value, access_technicians=access_technicians_granted.value, 
                         access_client=access_client_granted.value,
-                        access_lawyer_comment=access_lawyer_comment.value, 
-                        access_technicians_comment=access_technicians_comment.value, 
-                        access_client_comment=access_client_comment.value,
+                        access_lawyer_comment=access_lawyer_comment.value or '', 
+                        access_technicians_comment=access_technicians_comment.value or '', 
+                        access_client_comment=access_client_comment.value or '',
                         access_lawyer_requested=access_lawyer_requested.value,
                         access_technicians_requested=access_technicians_requested.value,
                         access_client_requested=access_client_requested.value,
@@ -993,13 +990,11 @@ def render_process_dialog(on_success=None):
                         envolve_dano_app=envolve_dano_app_switch.value
                     )
                     
-                    # Log de debug: verifica dados após build
-                    print(f"[SALVAR PROCESSO] Dados construídos - Clientes no p_data: {p_data.get('clients', [])}")
-                    print(f"[SALVAR PROCESSO] Tipo de clients: {type(p_data.get('clients'))}")
-                    
                     # Preserva o _id se estiver editando
+                    documento_id = None
                     if state['is_editing'] and state['process_id']:
                         p_data['_id'] = state['process_id']
+                        documento_id = state['process_id']
                     
                     # Compatibilidade: se houver apenas um parent_id, mantém também o campo antigo
                     if len(p_data.get('parent_ids', [])) == 1:
@@ -1007,12 +1002,23 @@ def render_process_dialog(on_success=None):
                     else:
                         p_data['parent_id'] = None
                     
-                    idx = state['edit_index'] if state['is_editing'] else None
-                    msg = save_process(p_data, idx)
-                    print(f"[SALVAR PROCESSO] ✓ Processo salvo com sucesso: {msg}")
-                    ui.notify(msg)
-                    dialog.close()
-                    if on_success: on_success()
+                    # Log antes de salvar
+                    SaveLogger.log_save_attempt('processos', documento_id or 'novo', p_data)
+                    
+                    try:
+                        idx = state['edit_index'] if state['is_editing'] else None
+                        msg = save_process(p_data, idx)
+                        
+                        # Log de sucesso
+                        SaveLogger.log_save_success('processos', documento_id or 'novo')
+                        
+                        ui.notify(msg, type='positive')
+                        dialog.close()
+                        if on_success: on_success()
+                    except Exception as e:
+                        # Log de erro
+                        SaveLogger.log_save_error('processos', documento_id or 'novo', e)
+                        ui.notify(f'Erro ao salvar processo: {str(e)}', type='negative')
 
                 ui.button('SALVAR', icon='save', on_click=do_save).props('color=primary').classes('font-bold shadow-lg')
 
@@ -1089,6 +1095,14 @@ def render_process_dialog(on_success=None):
             p = processes[process_idx]
             # Preserva o _id do processo para salvar corretamente no Firestore
             state['process_id'] = p.get('_id')
+            
+            # Log de carregamento
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            processo_id = state['process_id'] or 'SEM_ID'
+            print(f"[{timestamp}] [PROCESSOS] [CARREGAR] ID: {processo_id}")
+            print(f"[{timestamp}] [PROCESSOS] [CARREGAR] Título: {p.get('title', 'Sem título')}")
+            print(f"[{timestamp}] [PROCESSOS] [CARREGAR] Campos disponíveis: {list(p.keys())}")
+            print(f"[{timestamp}] [PROCESSOS] [CARREGAR] Total de campos: {len(p)}")
             
             # Carregar parent_ids (novo formato) ou migrar de parent_id (antigo)
             parent_ids = p.get('parent_ids', [])

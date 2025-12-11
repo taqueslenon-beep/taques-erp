@@ -11,7 +11,7 @@ USO:
 PASSO A PASSO:
 1. Salve este arquivo na raiz do seu projeto (próximo a main.py)
 2. No terminal, execute: python3 dev_server.py
-3. Abra http://localhost:8080 no navegador
+3. Abra http://localhost:8081 no navegador
 4. Faça mudanças no código e salve (Cmd+S ou Ctrl+S)
 5. A página recarrega AUTOMATICAMENTE!
 
@@ -28,7 +28,7 @@ from watchfiles import run_process, Change, DefaultFilter
 # Configuração
 MAIN_FILE = "mini_erp/main.py"  # Altere se seu arquivo principal tiver outro nome
 WATCH_DIRS = ["."]     # Monitora o diretório atual
-PORT = 8080
+PORT = int(os.environ.get('APP_PORT', '8081'))  # Lê da variável de ambiente ou usa padrão
 
 # Debounce para evitar reinicializações em cascata
 _last_restart = 0

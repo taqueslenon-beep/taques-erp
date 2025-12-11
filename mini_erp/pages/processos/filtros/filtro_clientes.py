@@ -101,3 +101,6 @@ def obter_opcoes_parte_contraria(rows: List[Dict[str, Any]]) -> List[str]:
 
 
 
+
+
+

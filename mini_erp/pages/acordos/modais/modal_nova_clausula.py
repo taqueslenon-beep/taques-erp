@@ -208,9 +208,22 @@ def render_clausula_dialog(on_save: Optional[Callable] = None, clausula_inicial:
                     'regular': is_regular['value'],  # Estado do botão Regular
                 }
                 
+                print(f"DEBUG: modal_nova_clausula - clausula_data preparado: {clausula_data}")
+                print(f"DEBUG: modal_nova_clausula - on_save existe: {on_save is not None}")
+                
                 # Chamar callback se fornecido
                 if on_save:
-                    on_save(clausula_data)
+                    print(f"DEBUG: modal_nova_clausula - Chamando on_save callback")
+                    try:
+                        on_save(clausula_data)
+                        print(f"DEBUG: modal_nova_clausula - on_save callback executado com sucesso")
+                    except Exception as e:
+                        import traceback
+                        print(f"DEBUG: modal_nova_clausula - ERRO ao chamar on_save: {traceback.format_exc()}")
+                        ui.notify(f'Erro ao salvar cláusula: {str(e)}', type='negative')
+                        return
+                else:
+                    print(f"DEBUG: modal_nova_clausula - ERRO: on_save é None!")
                 
                 # Fechar dialog
                 dialog.close()
