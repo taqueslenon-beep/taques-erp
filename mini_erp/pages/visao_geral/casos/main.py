@@ -12,7 +12,7 @@ from ....core import layout, PRIMARY_COLOR
 from ....auth import is_authenticated
 from ....gerenciadores.gerenciador_workspace import definir_workspace
 from .database import listar_casos, excluir_caso, buscar_caso, atualizar_caso
-from .caso_dialog import abrir_dialog_caso, confirmar_exclusao
+from .caso_dialog import abrir_dialog_caso, confirmar_exclusao, _carregar_pessoas_para_select
 from .models import (
     NUCLEO_OPTIONS,
     STATUS_OPTIONS,
@@ -20,7 +20,6 @@ from .models import (
     ESTADOS,
     obter_cor_nucleo,
 )
-from ..pessoas.database import listar_pessoas
 
 
 # =============================================================================
@@ -391,8 +390,8 @@ def _renderizar_detalhes_caso(caso: dict):
     titulo = caso.get('titulo', 'Caso sem título')
     caso_id = caso.get('_id', '')
 
-    # Carregar clientes para o formulário de edição
-    todas_pessoas = listar_pessoas()
+    # Carregar clientes da coleção 'clients' (108+ pessoas)
+    todas_pessoas = _carregar_pessoas_para_select()
 
     with layout(
         f'Caso: {titulo}',

@@ -12,7 +12,38 @@ from .models import (
     NUCLEO_OPTIONS, STATUS_OPTIONS, CATEGORIA_OPTIONS, ESTADOS,
     criar_caso_vazio, validar_caso
 )
-from ..pessoas.database import listar_pessoas
+# Usar coleção 'vg_pessoas' que tem 108 pessoas cadastradas
+from ....firebase_config import get_db
+
+
+def _carregar_pessoas_para_select():
+    """Carrega pessoas da coleção 'vg_pessoas' para o select."""
+    resultado = []
+    try:
+        db = get_db()
+        if not db:
+            print('[CASO_DIALOG] ❌ Conexão Firebase não disponível')
+            return resultado
+
+        for doc in db.collection('vg_pessoas').stream():
+            dados = doc.to_dict()
+            # Tentar diferentes campos de nome
+            nome = dados.get('nome_exibicao') or dados.get('full_name') or dados.get('name') or ''
+            if nome and doc.id:
+                resultado.append({
+                    '_id': doc.id,
+                    'nome_exibicao': nome,
+                    'full_name': nome
+                })
+
+        # Ordenar por nome
+        resultado.sort(key=lambda p: p.get('nome_exibicao', '').lower())
+        print(f'[CASO_DIALOG] ✅ {len(resultado)} pessoas carregadas da coleção vg_pessoas')
+    except Exception as e:
+        print(f'[CASO_DIALOG] ❌ Erro ao carregar pessoas: {e}')
+        import traceback
+        traceback.print_exc()
+    return resultado
 
 
 def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] = None):
@@ -26,8 +57,8 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
     is_edicao = caso is not None
     dados = caso.copy() if caso else criar_caso_vazio()
 
-    # Carregar clientes da coleção vg_pessoas
-    todas_pessoas = listar_pessoas()
+    # Carregar clientes da coleção 'clients' (108+ pessoas)
+    todas_pessoas = _carregar_pessoas_para_select()
 
     # Estado local para clientes selecionados
     clientes_selecionados = list(dados.get('clientes', []))
@@ -87,17 +118,19 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
 
                 # Dropdown para adicionar cliente + botão
                 with ui.row().classes('w-full gap-2 items-end'):
-                    # Preparar opções de clientes
-                    opcoes_clientes = [
-                        {'label': p.get('nome_exibicao', p.get('full_name', 'Sem nome')), 'value': p['_id']}
+                    # Preparar opções de clientes: dict {id: nome} para ui.select
+                    opcoes_clientes = {
+                        p['_id']: p.get('nome_exibicao', p.get('full_name', 'Sem nome'))
                         for p in todas_pessoas
-                    ]
+                        if p.get('_id')
+                    }
+                    print(f'[CASO_DIALOG] Opções do select: {len(opcoes_clientes)} clientes')
 
                     cliente_select = ui.select(
                         options=opcoes_clientes,
-                        label='Adicionar cliente',
+                        label='Buscar pessoa...',
                         with_input=True
-                    ).classes('flex-grow').props('dense outlined use-input input-debounce="300"')
+                    ).classes('flex-grow').props('dense outlined use-input input-debounce="300" clearable')
 
                     def adicionar_cliente():
                         if cliente_select.value:
@@ -152,32 +185,28 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                             # Mostrar chips individuais (limitado a 10 para performance)
                             exibir = clientes_selecionados[:10]
                             for cliente_id in exibir:
-                                pessoa = next(
-                                    (p for p in todas_pessoas if p['_id'] == cliente_id),
-                                    None
-                                )
-                                if pessoa:
-                                    nome = pessoa.get('nome_exibicao', pessoa.get('full_name', '?'))
-                                    # Nome curto (primeiro nome ou sigla)
-                                    nome_curto = nome.split()[0] if ' ' in nome else nome
-                                    if len(nome_curto) > 15:
-                                        nome_curto = nome_curto[:15] + '...'
+                                # Buscar nome do dicionário opcoes_clientes
+                                nome = opcoes_clientes.get(cliente_id, cliente_id)
+                                # Nome curto (primeiro nome ou sigla)
+                                nome_curto = nome.split()[0] if ' ' in nome else nome
+                                if len(nome_curto) > 15:
+                                    nome_curto = nome_curto[:15] + '...'
 
-                                    def remover(cid=cliente_id):
-                                        if cid in clientes_selecionados:
-                                            clientes_selecionados.remove(cid)
-                                            todos_selecionados['value'] = False
-                                            todos_checkbox.value = False
-                                            renderizar_chips.refresh()
+                                def remover(cid=cliente_id):
+                                    if cid in clientes_selecionados:
+                                        clientes_selecionados.remove(cid)
+                                        todos_selecionados['value'] = False
+                                        todos_checkbox.value = False
+                                        renderizar_chips.refresh()
 
-                                    with ui.element('div').classes(
-                                        'px-3 py-1 rounded-full flex items-center gap-1'
-                                    ).style('background-color: #e5e7eb;'):
-                                        ui.label(nome_curto).classes('text-sm').tooltip(nome)
-                                        ui.button(
-                                            icon='close',
-                                            on_click=remover
-                                        ).props('flat dense round size=xs')
+                                with ui.element('div').classes(
+                                    'px-3 py-1 rounded-full flex items-center gap-1'
+                                ).style('background-color: #e5e7eb;'):
+                                    ui.label(nome_curto).classes('text-sm').tooltip(nome)
+                                    ui.button(
+                                        icon='close',
+                                        on_click=remover
+                                    ).props('flat dense round size=xs')
 
                             # Indicador de mais clientes
                             if len(clientes_selecionados) > 10:
@@ -203,6 +232,9 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
 
             def salvar():
                 # Coleta dados do formulário (simplificado)
+                # Usar dicionário opcoes_clientes para obter nomes
+                nomes_clientes = [opcoes_clientes.get(cid, '') for cid in clientes_selecionados]
+
                 novos_dados = {
                     'titulo': titulo_input.value.strip() if titulo_input.value else '',
                     'nucleo': nucleo_select.value or 'Generalista',
@@ -210,14 +242,7 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                     'categoria': categoria_select.value or 'Contencioso',
                     'estado': estado_select.value or '',
                     'clientes': clientes_selecionados.copy(),
-                    'clientes_nomes': [
-                        next(
-                            (p.get('nome_exibicao', p.get('full_name', ''))
-                             for p in todas_pessoas if p['_id'] == cid),
-                            ''
-                        )
-                        for cid in clientes_selecionados
-                    ],
+                    'clientes_nomes': nomes_clientes,
                     'descricao': descricao_input.value.strip() if descricao_input.value else '',
                 }
 
