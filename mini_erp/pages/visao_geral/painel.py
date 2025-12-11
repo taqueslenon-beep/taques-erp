@@ -2,10 +2,10 @@
 Página principal do workspace "Visão geral do escritório".
 Exibe o painel com visão consolidada de todos os casos e processos do escritório.
 """
-from nicegui import ui
+from nicegui import ui, app
 from ...core import layout
 from ...auth import is_authenticated
-from ...middlewares.verificar_workspace import verificar_e_definir_workspace_automatico
+from ...gerenciadores.gerenciador_workspace import definir_workspace
 
 
 @ui.page('/visao-geral/painel')
@@ -15,11 +15,12 @@ def painel():
         ui.navigate.to('/login')
         return
 
-    # Verifica e define workspace automaticamente (com verificação de permissão)
-    if not verificar_e_definir_workspace_automatico():
-        return  # Redirecionamento já foi feito pelo middleware
+    # Define o workspace diretamente (sem middleware complexo)
+    definir_workspace('visao_geral_escritorio')
 
     with layout('Painel', breadcrumbs=[('Visão geral do escritório', '/visao-geral/painel'), ('Painel', None)]):
-        ui.label('Módulo em desenvolvimento').classes('text-xl text-gray-500 text-center mt-8')
-        ui.label('Esta funcionalidade estará disponível em breve.').classes('text-sm text-gray-400 text-center mt-2')
+        with ui.column().classes('w-full items-center justify-center py-16'):
+            ui.icon('construction', size='64px').classes('text-gray-400')
+            ui.label('Módulo em desenvolvimento').classes('text-xl font-bold text-gray-500 mt-4')
+            ui.label('Este módulo estará disponível em breve.').classes('text-gray-400')
 

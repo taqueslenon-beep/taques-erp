@@ -42,8 +42,9 @@ def require_workspace_access(workspace_id: str = None, redirect_on_deny: bool = 
                 # Detecta workspace baseado na rota atual
                 from nicegui import context
                 route = context.get_client().request.path
-                
-                if '/visao-geral-escritorio' in route:
+
+                # Rotas /visao-geral/* pertencem ao workspace visao_geral_escritorio
+                if '/visao-geral' in route:
                     target_workspace = 'visao_geral_escritorio'
                 else:
                     target_workspace = 'area_cliente_schmidmeier'
@@ -90,13 +91,14 @@ def verificar_e_definir_workspace_automatico():
     """
     if not is_authenticated():
         return False
-    
+
     from nicegui import context
     try:
         route = context.get_client().request.path
-        
+
         # Detecta workspace baseado na rota
-        if '/visao-geral-escritorio' in route:
+        # Rotas /visao-geral/* pertencem ao workspace visao_geral_escritorio
+        if '/visao-geral' in route:
             target_workspace = 'visao_geral_escritorio'
         else:
             target_workspace = 'area_cliente_schmidmeier'

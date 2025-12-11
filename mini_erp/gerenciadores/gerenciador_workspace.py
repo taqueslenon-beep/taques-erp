@@ -86,8 +86,11 @@ def obter_workspaces_usuario(usuario_id: Optional[str] = None) -> List[str]:
     """
     Retorna lista de workspaces que o usuário tem acesso baseado no perfil.
     
+    Primeiro tenta buscar na coleção usuarios_sistema pelo firebase_uid.
+    Se não encontrar, usa o sistema antigo de custom_claims.
+    
     Args:
-        usuario_id: ID do usuário (opcional, usa usuário atual se None)
+        usuario_id: UID do Firebase Auth (opcional, usa usuário atual se None)
     
     Returns:
         Lista de IDs de workspaces disponíveis
@@ -99,7 +102,41 @@ def obter_workspaces_usuario(usuario_id: Optional[str] = None) -> List[str]:
             return [WORKSPACE_PADRAO]
         usuario_id = user.get('uid')
     
-    # Obtém perfil do usuário (importa aqui para evitar circular)
+    if not usuario_id:
+        return [WORKSPACE_PADRAO]
+    
+    # Mapeamento de IDs de workspace da coleção para IDs do sistema
+    MAPEAMENTO_WORKSPACES = {
+        'schmidmeier': 'area_cliente_schmidmeier',
+        'visao_geral': 'visao_geral_escritorio',
+    }
+    
+    # Tenta buscar na coleção usuarios_sistema primeiro
+    try:
+        from ..firebase_config import get_db
+        db = get_db()
+        
+        # Busca usuário pelo firebase_uid
+        query = db.collection('usuarios_sistema').where('firebase_uid', '==', usuario_id).limit(1)
+        docs = list(query.stream())
+        
+        if docs:
+            usuario = docs[0].to_dict()
+            workspaces_colecao = usuario.get('workspaces', [])
+            
+            # Converte IDs da coleção para IDs do sistema
+            workspaces_sistema = []
+            for ws_id in workspaces_colecao:
+                ws_sistema = MAPEAMENTO_WORKSPACES.get(ws_id)
+                if ws_sistema and ws_sistema in WORKSPACES:
+                    workspaces_sistema.append(ws_sistema)
+            
+            if workspaces_sistema:
+                return workspaces_sistema
+    except Exception as e:
+        print(f"Erro ao buscar usuário na coleção usuarios_sistema: {e}")
+    
+    # Fallback: usa sistema antigo de custom_claims
     from ..auth import get_user_profile
     profile = get_user_profile()
     
@@ -110,6 +147,18 @@ def obter_workspaces_usuario(usuario_id: Optional[str] = None) -> List[str]:
     # Perfil "interno" ou "df_projetos" → ambos workspaces
     if profile in ['interno', 'df_projetos']:
         return ['area_cliente_schmidmeier', 'visao_geral_escritorio']
+    
+    # Se é admin (custom_claims), retorna todos
+    user = get_current_user()
+    if user:
+        from firebase_admin import auth
+        try:
+            firebase_user = auth.get_user(usuario_id)
+            custom_claims = firebase_user.custom_claims or {}
+            if custom_claims.get('admin') or custom_claims.get('role') == 'admin':
+                return ['area_cliente_schmidmeier', 'visao_geral_escritorio']
+        except:
+            pass
     
     # Default: apenas workspace do cliente (segurança)
     return [WORKSPACE_PADRAO]

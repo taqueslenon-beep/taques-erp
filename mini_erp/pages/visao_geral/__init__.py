@@ -1,6 +1,8 @@
 """
 Módulo de páginas do workspace "Visão geral do escritório".
-Todas as páginas são placeholders por enquanto.
 """
-from . import painel, casos, processos, acordos, pessoas, configuracoes
+from . import painel, processos, acordos, configuracoes
+# Módulos que são subpacotes completos
+from .pessoas import pessoas_visao_geral
+from .casos import casos_visao_geral
 
