@@ -61,10 +61,11 @@ AREA_COLORS_CHART = {
 # CORES DE STATUS (para casos e processos)
 # =============================================================================
 STATUS_COLORS = {
-    'Em andamento': '#b45309',              # amarelo queimado
+    'Em andamento': '#eab308',              # amarelo
     'Concluído': '#166534',                 # verde escuro
     'Concluído com pendências': '#4d7c0f',  # verde militar
     'Em monitoramento': '#ea580c',          # laranja
+    'Substabelecido': '#059669',            # verde esmeralda
     'Sem status': '#6b7280',                # cinza
 }
 

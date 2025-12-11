@@ -251,7 +251,7 @@ def listar_casos_por_status(status: str) -> List[Dict[str, Any]]:
     Lista casos filtrados por status.
 
     Args:
-        status: Status do caso (Em andamento, Suspenso, Arquivado, Encerrado)
+        status: Status do caso (Em andamento, Concluído, Concluído com pendências, Em monitoramento, Substabelecido)
 
     Returns:
         Lista de casos com o status especificado

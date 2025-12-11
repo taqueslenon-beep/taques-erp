@@ -75,10 +75,11 @@ YEAR_OPTIONS = list(range(2000, current_year + 6))
 # =============================================================================
 
 STATUS_OPTIONS = [
-    'Em andamento', 
-    'Concluído', 
-    'Concluído com pendências', 
-    'Em monitoramento'
+    'Em andamento',
+    'Concluído',
+    'Concluído com pendências',
+    'Em monitoramento',
+    'Substabelecido'
 ]
 
 # =============================================================================

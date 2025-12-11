@@ -21,16 +21,23 @@ NUCLEO_CORES = {
 }
 
 # =============================================================================
-# CONSTANTES - STATUS
+# CONSTANTES - STATUS (SINCRONIZADO COM ÁREA DO CLIENTE)
 # =============================================================================
 
-STATUS_OPTIONS = ['Em andamento', 'Suspenso', 'Arquivado', 'Encerrado']
+STATUS_OPTIONS = [
+    'Em andamento',
+    'Concluído',
+    'Concluído com pendências',
+    'Em monitoramento',
+    'Substabelecido'
+]
 
 STATUS_CORES = {
-    'Em andamento': {'bg': '#3b82f6', 'text': 'white'},    # Azul
-    'Suspenso': {'bg': '#f59e0b', 'text': 'black'},        # Amarelo
-    'Arquivado': {'bg': '#6b7280', 'text': 'white'},       # Cinza
-    'Encerrado': {'bg': '#ef4444', 'text': 'white'},       # Vermelho
+    'Em andamento': {'bg': '#eab308', 'text': 'black'},           # Amarelo
+    'Concluído': {'bg': '#166534', 'text': 'white'},              # Verde escuro
+    'Concluído com pendências': {'bg': '#4d7c0f', 'text': 'white'}, # Verde militar
+    'Em monitoramento': {'bg': '#ea580c', 'text': 'white'},       # Laranja
+    'Substabelecido': {'bg': '#059669', 'text': 'white'},         # Verde esmeralda
 }
 
 # =============================================================================
@@ -61,7 +68,7 @@ class Caso(TypedDict, total=False):
     _id: str
     titulo: str                  # Título/Nome do caso (obrigatório)
     nucleo: str                  # Ambiental, Cobranças, Generalista (obrigatório)
-    status: str                  # Em andamento, Suspenso, Arquivado, Encerrado
+    status: str                  # Em andamento, Concluído, Concluído com pendências, Em monitoramento, Substabelecido
     categoria: str               # Contencioso, Consultivo, Outro
     estado: str                  # Santa Catarina, Paraná, Rio Grande do Sul
     clientes: List[str]          # Lista de IDs de clientes vinculados
