@@ -14,3 +14,21 @@
 - Formato de opções do `ui.select` padronizado para `{id: nome}` (dicionário) conforme esperado pelo NiceGUI
 - Fonte de dados unificada: modal de novo caso e edição de caso agora usam mesma função `listar_pessoas()`
 
+
+## [v1.8.0] - 2025-12-12
+
+### Adicionado
+- Novo status "Substabelecido" para casos com cor verde claro (#86efac)
+- Mapeamento de cores para o novo status em ui_components.py
+- Backup script para collections do Firebase
+- Relatórios de diagnóstico de bugs de usuários
+
+### Modificado
+- STATUS_OPTIONS em mini_erp/pages/casos/models.py padronizado
+- Opções de status no modal "Novo Caso" da Visão Geral corrigidas
+- Arquivos de configuração e core atualizados
+
+### Corrigido
+- Substituídas opções incorretas (Suspenso, Arquivado, Encerrado) pelas corretas
+- Alinhamento de opções de status entre workspaces Schmidmeier e Visão Geral
+
