@@ -6,9 +6,8 @@ from ..firebase_config import get_db, ensure_firebase_initialized, get_auth
 from ..auth import is_authenticated, get_current_user
 from ..storage import fazer_upload_avatar, obter_url_avatar, definir_display_name, obter_display_name
 from firebase_admin import auth
-from PIL import Image, ImageDraw
+from PIL import Image
 import io
-import base64
 import traceback
 
 @ui.page('/configuracoes')
@@ -85,316 +84,43 @@ def configuracoes():
 
                         # Handler de Upload Direto (sem editor)
                         async def handle_upload(e: events.UploadEventArguments):
-                            """Processa a imagem com PIL (executado em thread separada)"""
+                            """Upload direto de avatar - sem editor, processamento automático"""
                             try:
-                                if not img_bytes:
-                                    return None, None
-
-                                # Abrir imagem
-                                img = Image.open(io.BytesIO(img_bytes))
-                                
-                                # Converte para RGBA para garantir canal alfa
-                                if img.mode != 'RGBA':
-                                    img = img.convert('RGBA')
-                                
-                                # Redimensionar se for muito grande para melhorar performance do preview
-                                if img.width > 1500 or img.height > 1500:
-                                    img.thumbnail((1500, 1500))
-                                
-                                # Dimensões originais
-                                width, height = img.size
-                                
-                                # Lógica de Zoom:
-                                # Zoom 100% = menor dimensão da imagem cabe no círculo de 200px
-                                # Zoom > 100% = imagem maior (mostra menos da imagem no círculo)
-                                # Zoom < 100% = imagem menor (pode sobrar espaço)
-                                
-                                # Tamanho base (sem zoom) é o menor lado da imagem
-                                min_dim = min(width, height)
-                                
-                                # Tamanho do crop baseado no zoom
-                                # Se zoom = 100, crop_size = min_dim (mostra tudo do menor lado)
-                                # Se zoom = 200, crop_size = min_dim / 2 (mostra metade)
-                                crop_size = int(min_dim / (zoom / 100))
-                                
-                                center_x = width // 2
-                                center_y = height // 2
-                                
-                                # Aplica offsets (em pixels da imagem original)
-                                # Ajustamos a sensibilidade: offset 1 = 1% do tamanho do crop
-                                move_x = int(offset_x * (crop_size / 100) * 2) # Multiplicador de velocidade
-                                move_y = int(offset_y * (crop_size / 100) * 2)
-                                
-                                left = center_x - (crop_size // 2) + move_x
-                                top = center_y - (crop_size // 2) + move_y
-                                right = left + crop_size
-                                bottom = top + crop_size
-                                
-                                # Faz o crop
-                                img_cropped = img.crop((left, top, right, bottom))
-                                
-                                # Redimensiona para 200x200 (tamanho final)
-                                img_resized = img_cropped.resize((200, 200), Image.Resampling.LANCZOS)
-                                
-                                # Cria máscara circular
-                                mask = Image.new('L', (200, 200), 0)
-                                draw = ImageDraw.Draw(mask)
-                                draw.ellipse((0, 0, 200, 200), fill=255)
-                                
-                                # Aplica máscara
-                                output_img = Image.new('RGBA', (200, 200), (0, 0, 0, 0))
-                                output_img.paste(img_resized, (0, 0))
-                                output_img.putalpha(mask)
-                                
-                                # Salva em bytes PNG
-                                output_buffer = io.BytesIO()
-                                output_img.save(output_buffer, format='PNG')
-                                output_bytes = output_buffer.getvalue()
-                                
-                                # Gera base64 para preview
-                                img_str = base64.b64encode(output_bytes).decode()
-                                return f'data:image/png;base64,{img_str}', output_bytes
-                                
-                            except Exception as e:
-                                print(f"Erro no processamento de imagem: {e}")
-                                import traceback
-                                traceback.print_exc()
-                                return None, None
-
-                        async def update_preview():
-                            if not avatar_state['preview_img'] or not avatar_state['imagem_bytes']:
-                                return
-                            
-                            src, _ = await run.cpu_bound(
-                                processar_preview_sync, 
-                                avatar_state['imagem_bytes'],
-                                avatar_state['offset_x'],
-                                avatar_state['offset_y'],
-                                avatar_state['zoom']
-                            )
-                            
-                            if src:
-                                avatar_state['preview_img'].set_source(src)
-
-                        async def mover_foto(direcao):
-                            step = 5 # Passo de movimento
-                            if direcao == 'cima': avatar_state['offset_y'] -= step
-                            elif direcao == 'baixo': avatar_state['offset_y'] += step
-                            elif direcao == 'esquerda': avatar_state['offset_x'] -= step
-                            elif direcao == 'direita': avatar_state['offset_x'] += step
-                            
-                            # Atualiza preview
-                            await update_preview()
-
-                        async def salvar_avatar_editado():
-                            """Salva o avatar editado no Firebase Storage"""
-                            if not avatar_state['imagem_bytes']:
-                                ui.notify('Nenhuma imagem para salvar.', type='warning')
-                                return
-                            
-                            if not user_uid:
-                                ui.notify('Erro: Usuário não identificado.', type='negative')
-                                return
-
-                            # Feedback visual: mostra spinner de carregamento
-                            loading_notify = ui.notify(
-                                'Processando imagem...', 
-                                type='info', 
-                                spinner=True,
-                                position='top',
-                                timeout=0  # Não fecha automaticamente
-                            )
-                            
-                            try:
-                                # Processa imagem final
-                                _, img_bytes = await run.cpu_bound(
-                                    processar_preview_sync,
-                                    avatar_state['imagem_bytes'],
-                                    avatar_state['offset_x'],
-                                    avatar_state['offset_y'],
-                                    avatar_state['zoom']
-                                )
-                                
-                                if not img_bytes:
-                                    loading_notify.dismiss()
-                                    ui.notify('Erro ao processar imagem.', type='negative')
-                                    return
-
-                                # Fecha dialog antes do upload
-                                if avatar_state['dialog']:
-                                    avatar_state['dialog'].close()
-                                
-                                # Atualiza notificação
-                                loading_notify.message = 'Salvando no servidor...'
-                                
-                                # Salva no storage
-                                file_obj = io.BytesIO(img_bytes)
-                                url = await run.io_bound(fazer_upload_avatar, user_uid, file_obj)
-                                
-                                loading_notify.dismiss()
-                                
-                                if url:
-                                    # URL já vem com timestamp do storage.py para evitar cache
-                                    # Atualiza avatar na página de configurações
-                                    avatar_img.source = url
-                                    
-                                    # Dispara evento customizado para atualizar navbar
-                                    # sem recarregar toda a página
-                                    ui.run_javascript(f'''
-                                        if (window.dispatchEvent) {{
-                                            window.dispatchEvent(new CustomEvent('avatar-updated', {{
-                                                detail: {{ url: "{url}" }}
-                                            }}));
-                                        }}
-                                    ''')
-                                    
-                                    ui.notify('Avatar atualizado com sucesso!', type='positive', position='top')
-                                else:
-                                    ui.notify(
-                                        'Erro ao salvar imagem no servidor. '
-                                        'Verifique sua conexão e tente novamente.',
-                                        type='negative',
-                                        position='top'
-                                    )
-                            except Exception as ex:
-                                loading_notify.dismiss()
-                                print(f"Erro ao salvar avatar: {ex}")
-                                import traceback
-                                traceback.print_exc()
-                                ui.notify(
-                                    f'Erro ao salvar: {str(ex)}',
-                                    type='negative',
-                                    position='top'
-                                )
-
-                        def abrir_editor(imagem_bytes):
-                            avatar_state['imagem_bytes'] = imagem_bytes
-                            avatar_state['offset_x'] = 0
-                            avatar_state['offset_y'] = 0
-                            avatar_state['zoom'] = 100
-                            
-                            with ui.dialog() as dialog, ui.card().classes('p-0 overflow-hidden'):
-                                avatar_state['dialog'] = dialog
-                                
-                                # Cabeçalho
-                                with ui.row().classes('w-full bg-primary p-3 items-center justify-between'):
-                                    ui.label('Editar Avatar').classes('text-white font-bold text-lg')
-                                    ui.button(icon='close', on_click=dialog.close).props('flat round dense text-color=white')
-                                
-                                with ui.row().classes('p-6 gap-8 items-start'):
-                                    # Coluna Controles (Esquerda)
-                                    with ui.column().classes('gap-4 min-w-[200px]'):
-                                        ui.label('Ajustar Posição').classes('font-bold text-gray-700')
-                                        
-                                        # Grid de setas
-                                        with ui.element('div').classes('grid grid-cols-3 gap-2 w-32 mx-auto'):
-                                            ui.element('div') # Espaço vazio
-                                            ui.button(icon='keyboard_arrow_up', on_click=lambda: mover_foto('cima')).props('round dense color=primary')
-                                            ui.element('div') # Espaço vazio
-                                            
-                                            ui.button(icon='keyboard_arrow_left', on_click=lambda: mover_foto('esquerda')).props('round dense color=primary')
-                                            ui.element('div') # Centro (pode ser um reset se quiser)
-                                            ui.button(icon='keyboard_arrow_right', on_click=lambda: mover_foto('direita')).props('round dense color=primary')
-                                            
-                                            ui.element('div') # Espaço vazio
-                                            ui.button(icon='keyboard_arrow_down', on_click=lambda: mover_foto('baixo')).props('round dense color=primary')
-                                            ui.element('div') # Espaço vazio
-                                        
-                                        ui.separator().classes('my-2')
-                                        
-                                        ui.label('Zoom').classes('font-bold text-gray-700')
-                                        
-                                        # Slider de Zoom
-                                        async def on_zoom_change(e):
-                                            avatar_state['zoom'] = e.value
-                                            await update_preview()
-
-                                        ui.slider(min=50, max=150, value=100, step=5, on_change=on_zoom_change).props('label-always')
-                                        ui.label('50% - 150%').classes('text-xs text-gray-400 text-center w-full')
-
-                                    # Coluna Preview (Direita)
-                                    with ui.column().classes('items-center gap-2'):
-                                        ui.label('Preview').classes('font-bold text-gray-700')
-                                        
-                                        # Container do preview com fundo xadrez para ver transparência
-                                        with ui.element('div').style('width: 200px; height: 200px; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'):
-                                            avatar_state['preview_img'] = ui.image().style('width: 200px; height: 200px; border-radius: 50%; object-fit: cover;')
-                                
-                                # Rodapé
-                                with ui.row().classes('w-full justify-end gap-2 p-4 bg-gray-50'):
-                                    ui.button('Cancelar', on_click=dialog.close).props('flat text-color=grey')
-                                    ui.button('Salvar Avatar', on_click=salvar_avatar_editado).props('color=primary icon=save')
-                            
-                            dialog.open()
-                            # Gera preview inicial
-                            # Precisamos esperar o dialog renderizar o image? Não necessariamente.
-                            # Executa update inicial
-                            async def _init():
-                                await update_preview()
-                            ui.timer(0.1, _init, once=True)
-
-                        # Handler de Upload Inicial
-                        async def handle_upload(e: events.UploadEventArguments):
-                            """Handler para upload de avatar usando estrutura correta do NiceGUI."""
-                            try:
-                                # Debug: Verificar atributos disponíveis
-                                print(f"[UPLOAD] Evento recebido: {type(e)}")
-                                available_attrs = [a for a in dir(e) if not a.startswith('_')]
-                                print(f"[UPLOAD] Atributos disponíveis: {available_attrs}")
-                                
-                                # CORREÇÃO: e.file é SmallFileUpload, NÃO SpooledTemporaryFile
-                                print(f"[UPLOAD] Arquivo recebido: {type(e.file)}")
-                                
-                                # Debug: Verificar métodos disponíveis em SmallFileUpload
-                                file_methods = [m for m in dir(e.file) if not m.startswith('_')]
-                                print(f"[UPLOAD] Métodos disponíveis em SmallFileUpload: {file_methods}")
-                                
-                                # Verificar atributos específicos
-                                if hasattr(e.file, 'name'):
-                                    print(f"[UPLOAD] Nome do arquivo: {e.file.name}")
-                                if hasattr(e.file, 'content_type'):
-                                    print(f"[UPLOAD] Tipo MIME: {e.file.content_type}")
-                                if hasattr(e.file, 'size'):
-                                    print(f"[UPLOAD] Tamanho: {e.file.size}")
-                                
-                                # Lê os bytes do arquivo
-                                # SmallFileUpload pode ter read() assíncrono ou síncrono
-                                print(f"[UPLOAD] Lendo conteúdo do arquivo...")
-                                img_bytes = None
-                                
-                                # Tentativa 1: read() assíncrono (mais provável)
-                                try:
-                                    if hasattr(e.file, 'read'):
-                                        # Verifica se é coroutine (assíncrono)
-                                        import inspect
-                                        if inspect.iscoroutinefunction(e.file.read):
-                                            print(f"[UPLOAD] read() é assíncrono, usando await...")
-                                            img_bytes = await e.file.read()
-                                        else:
-                                            print(f"[UPLOAD] read() é síncrono, chamando diretamente...")
-                                            img_bytes = e.file.read()
-                                except Exception as read_err:
-                                    print(f"[UPLOAD] Erro ao usar read(): {type(read_err).__name__}: {str(read_err)}")
-                                
-                                # Tentativa 2: Se read() não funcionou, tenta outros atributos
-                                if not img_bytes:
-                                    if hasattr(e.file, 'content'):
-                                        print(f"[UPLOAD] Tentando usar e.file.content...")
-                                        img_bytes = e.file.content
-                                    elif hasattr(e.file, 'data'):
-                                        print(f"[UPLOAD] Tentando usar e.file.data...")
-                                        img_bytes = e.file.data
-                                    elif hasattr(e.file, 'bytes'):
-                                        print(f"[UPLOAD] Tentando usar e.file.bytes...")
-                                        img_bytes = e.file.bytes
-                                
-                                if not img_bytes:
-                                    ui.notify("Erro ao ler arquivo. Tente novamente.", type='negative')
-                                    print(f"[UPLOAD] ERRO: Não foi possível ler os bytes do arquivo")
+                                if not user_uid:
+                                    ui.notify('Usuário não autenticado', type='negative')
                                     upload_component.reset()
                                     return
                                 
-                                print(f"[UPLOAD] Bytes lidos: {len(img_bytes)} bytes")
+                                # Notifica início
+                                ui.notify('Processando imagem...', type='info')
+                                
+                                # Lê os bytes do arquivo
+                                img_bytes = None
+                                
+                                # Tenta ler usando read() (assíncrono ou síncrono)
+                                try:
+                                    if hasattr(e.file, 'read'):
+                                        import inspect
+                                        if inspect.iscoroutinefunction(e.file.read):
+                                            img_bytes = await e.file.read()
+                                        else:
+                                            img_bytes = e.file.read()
+                                except Exception as read_err:
+                                    print(f"[UPLOAD] Erro ao ler arquivo: {type(read_err).__name__}: {str(read_err)}")
+                                
+                                # Fallback: tenta outros atributos
+                                if not img_bytes:
+                                    if hasattr(e.file, 'content'):
+                                        img_bytes = e.file.content
+                                    elif hasattr(e.file, 'data'):
+                                        img_bytes = e.file.data
+                                    elif hasattr(e.file, 'bytes'):
+                                        img_bytes = e.file.bytes
+                                
+                                if not img_bytes or len(img_bytes) == 0:
+                                    ui.notify('Arquivo vazio ou inválido', type='negative')
+                                    upload_component.reset()
+                                    return
                                 
                                 # Validação de tamanho (5MB)
                                 if len(img_bytes) > 5 * 1024 * 1024:
@@ -402,55 +128,184 @@ def configuracoes():
                                     upload_component.reset()
                                     return
                                 
-                                if len(img_bytes) == 0:
-                                    ui.notify('Arquivo vazio ou inválido.', type='warning')
-                                    upload_component.reset()
-                                    return
-                                
-                                # Valida se é realmente uma imagem válida usando PIL
-                                print(f"[UPLOAD] Validando imagem com PIL...")
+                                # Valida e processa a imagem
                                 try:
-                                    from PIL import Image
-                                    img_test = Image.open(io.BytesIO(img_bytes))
-                                    img_test.verify()
+                                    img = Image.open(io.BytesIO(img_bytes))
+                                    img.verify()  # Valida integridade
                                     
                                     # Reabre após verify (verify fecha o arquivo)
-                                    img_test = Image.open(io.BytesIO(img_bytes))
+                                    img = Image.open(io.BytesIO(img_bytes))
                                     
-                                    # Detecta tipo MIME baseado no formato
-                                    format_map = {
-                                        'JPEG': 'image/jpeg',
-                                        'PNG': 'image/png',
-                                        'GIF': 'image/gif',
-                                        'WEBP': 'image/webp'
-                                    }
-                                    content_type = format_map.get(img_test.format, 'image/png')
-                                    print(f"[UPLOAD] Imagem válida: {img_test.format} (MIME: {content_type})")
+                                    # Converte para RGB se necessário (remove alpha para simplificar)
+                                    if img.mode in ('RGBA', 'P'):
+                                        img = img.convert('RGB')
                                     
-                                    # Validação adicional: formato suportado
-                                    formatos_suportados = ['JPEG', 'PNG', 'GIF', 'WEBP']
-                                    if img_test.format not in formatos_suportados:
-                                        ui.notify(f'Formato {img_test.format} não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
-                                        upload_component.reset()
-                                        return
+                                    # Faz crop quadrado centralizado
+                                    width, height = img.size
+                                    min_dim = min(width, height)
+                                    left = (width - min_dim) // 2
+                                    top = (height - min_dim) // 2
+                                    img = img.crop((left, top, left + min_dim, top + min_dim))
+                                    
+                                    # Redimensiona para 200x200
+                                    try:
+                                        img = img.resize((200, 200), Image.Resampling.LANCZOS)
+                                    except AttributeError:
+                                        # Versões antigas do PIL
+                                        img = img.resize((200, 200), Image.LANCZOS)
+                                    
+                                    # Converte para bytes PNG
+                                    buffer = io.BytesIO()
+                                    img.save(buffer, format='PNG', optimize=True)
+                                    processed_bytes = buffer.getvalue()
+                                    
+                                    print(f"[UPLOAD] Imagem processada: {len(processed_bytes)} bytes")
+                                    
+                                    # Faz upload para Firebase Storage
+                                    file_obj = io.BytesIO(processed_bytes)
+                                    url = await run.io_bound(fazer_upload_avatar, user_uid, file_obj)
+                                    
+                                    if url:
+                                        ui.notify('Foto atualizada com sucesso!', type='positive')
+                                        print(f"[UPLOAD] Avatar salvo: {url}")
+                                        
+                                        # Atualiza a imagem na página
+                                        avatar_img.source = url
+                                        
+                                        # Dispara evento para atualizar header
+                                        await ui.run_javascript('''
+                                            window.dispatchEvent(new CustomEvent('avatar-updated'));
+                                        ''')
+                                    else:
+                                        ui.notify('Erro ao salvar avatar', type='negative')
                                     
                                 except Exception as img_err:
                                     ui.notify('Arquivo não é uma imagem válida.', type='negative')
-                                    print(f"[UPLOAD] Erro na validação: {type(img_err).__name__}: {str(img_err)}")
+                                    print(f"[UPLOAD] Erro no processamento: {type(img_err).__name__}: {str(img_err)}")
                                     import traceback
                                     traceback.print_exc()
-                                    upload_component.reset()
-                                    return
                                 
-                                # Abre editor
-                                print(f"[UPLOAD] Abrindo editor de avatar...")
-                                abrir_editor(img_bytes)
+                                # Reset do componente de upload
+                                upload_component.reset()
                                 
                             except Exception as ex:
                                 print(f"[UPLOAD] ERRO GERAL: {type(ex).__name__}: {str(ex)}")
                                 import traceback
                                 traceback.print_exc()
-                                ui.notify(f'Erro ao processar arquivo: {str(ex)}', type='negative')
+                                ui.notify(f'Erro: {str(ex)}', type='negative')
+                                upload_component.reset()
+
+                        # Handler de Upload Direto (sem editor)
+                        async def handle_upload(e: events.UploadEventArguments):
+                            """Upload direto de avatar - sem editor, processamento automático"""
+                            try:
+                                if not user_uid:
+                                    ui.notify('Usuário não autenticado', type='negative')
+                                    upload_component.reset()
+                                    return
+                                
+                                # Notifica início
+                                ui.notify('Processando imagem...', type='info')
+                                
+                                # Lê os bytes do arquivo
+                                img_bytes = None
+                                
+                                # Tenta ler usando read() (assíncrono ou síncrono)
+                                try:
+                                    if hasattr(e.file, 'read'):
+                                        import inspect
+                                        if inspect.iscoroutinefunction(e.file.read):
+                                            img_bytes = await e.file.read()
+                                        else:
+                                            img_bytes = e.file.read()
+                                except Exception as read_err:
+                                    print(f"[UPLOAD] Erro ao ler arquivo: {type(read_err).__name__}: {str(read_err)}")
+                                
+                                # Fallback: tenta outros atributos
+                                if not img_bytes:
+                                    if hasattr(e.file, 'content'):
+                                        img_bytes = e.file.content
+                                    elif hasattr(e.file, 'data'):
+                                        img_bytes = e.file.data
+                                    elif hasattr(e.file, 'bytes'):
+                                        img_bytes = e.file.bytes
+                                
+                                if not img_bytes or len(img_bytes) == 0:
+                                    ui.notify('Arquivo vazio ou inválido', type='negative')
+                                    upload_component.reset()
+                                    return
+                                
+                                # Validação de tamanho (5MB)
+                                if len(img_bytes) > 5 * 1024 * 1024:
+                                    ui.notify('Arquivo muito grande! Máximo 5MB.', type='warning')
+                                    upload_component.reset()
+                                    return
+                                
+                                # Valida e processa a imagem
+                                try:
+                                    img = Image.open(io.BytesIO(img_bytes))
+                                    img.verify()  # Valida integridade
+                                    
+                                    # Reabre após verify (verify fecha o arquivo)
+                                    img = Image.open(io.BytesIO(img_bytes))
+                                    
+                                    # Converte para RGB se necessário (remove alpha para simplificar)
+                                    if img.mode in ('RGBA', 'P'):
+                                        img = img.convert('RGB')
+                                    
+                                    # Faz crop quadrado centralizado
+                                    width, height = img.size
+                                    min_dim = min(width, height)
+                                    left = (width - min_dim) // 2
+                                    top = (height - min_dim) // 2
+                                    img = img.crop((left, top, left + min_dim, top + min_dim))
+                                    
+                                    # Redimensiona para 200x200
+                                    try:
+                                        img = img.resize((200, 200), Image.Resampling.LANCZOS)
+                                    except AttributeError:
+                                        # Versões antigas do PIL
+                                        img = img.resize((200, 200), Image.LANCZOS)
+                                    
+                                    # Converte para bytes PNG
+                                    buffer = io.BytesIO()
+                                    img.save(buffer, format='PNG', optimize=True)
+                                    processed_bytes = buffer.getvalue()
+                                    
+                                    print(f"[UPLOAD] Imagem processada: {len(processed_bytes)} bytes")
+                                    
+                                    # Faz upload para Firebase Storage
+                                    file_obj = io.BytesIO(processed_bytes)
+                                    url = await run.io_bound(fazer_upload_avatar, user_uid, file_obj)
+                                    
+                                    if url:
+                                        ui.notify('Foto atualizada com sucesso!', type='positive')
+                                        print(f"[UPLOAD] Avatar salvo: {url}")
+                                        
+                                        # Atualiza a imagem na página
+                                        avatar_img.source = url
+                                        
+                                        # Dispara evento para atualizar header
+                                        await ui.run_javascript('''
+                                            window.dispatchEvent(new CustomEvent('avatar-updated'));
+                                        ''')
+                                    else:
+                                        ui.notify('Erro ao salvar avatar', type='negative')
+                                    
+                                except Exception as img_err:
+                                    ui.notify('Arquivo não é uma imagem válida.', type='negative')
+                                    print(f"[UPLOAD] Erro no processamento: {type(img_err).__name__}: {str(img_err)}")
+                                    import traceback
+                                    traceback.print_exc()
+                                
+                                # Reset do componente de upload
+                                upload_component.reset()
+                                
+                            except Exception as ex:
+                                print(f"[UPLOAD] ERRO GERAL: {type(ex).__name__}: {str(ex)}")
+                                import traceback
+                                traceback.print_exc()
+                                ui.notify(f'Erro: {str(ex)}', type='negative')
                                 upload_component.reset()
 
                         upload_component = ui.upload(

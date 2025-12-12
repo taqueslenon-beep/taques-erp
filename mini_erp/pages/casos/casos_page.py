@@ -47,7 +47,8 @@ from .database import (
     renumber_cases_of_type,
     renumber_all_cases,
     save_case,
-    save_process
+    save_process,
+    get_usuarios_ativos
 )
 
 from .utils import (
@@ -254,12 +255,111 @@ def casos():
             
             client_chips_container()
             
+            # Responsáveis pelo Caso
+            _usuarios = get_usuarios_ativos()
+            selected_responsaveis = []
+            
+            # Criar opções para o select (formato: "Nome - Cargo" ou apenas "Nome")
+            responsaveis_options = {}
+            for usuario in _usuarios:
+                usuario_id = usuario.get('_id', '')
+                nome = usuario.get('nome_completo', '')
+                cargo = usuario.get('cargo') or usuario.get('funcao', '')
+                
+                if cargo:
+                    label = f"{nome} - {cargo}"
+                else:
+                    label = nome
+                
+                responsaveis_options[usuario_id] = label
+            
+            with ui.row().classes('items-center gap-2 mt-4 mb-1'):
+                ui.icon('people', size='sm').classes('text-gray-600')
+                ui.label('Responsáveis pelo Caso').classes('text-sm text-gray-600')
+            
+            with ui.row().classes('w-full gap-2 mb-2'):
+                responsaveis_select = ui.select(
+                    options=responsaveis_options,
+                    label='Selecione responsável(is)',
+                    with_input=True
+                ).classes('flex-grow')
+                
+                def add_responsavel():
+                    """Adiciona responsável à lista do caso."""
+                    if responsaveis_select.value:
+                        usuario_id = responsaveis_select.value
+                        usuario_obj = next((u for u in _usuarios if u.get('_id') == usuario_id), None)
+                        
+                        if usuario_obj:
+                            # Verifica se já não foi adicionado
+                            if not any(r.get('usuario_id') == usuario_id for r in selected_responsaveis):
+                                selected_responsaveis.append({
+                                    'usuario_id': usuario_id,
+                                    'nome': usuario_obj.get('nome_completo', ''),
+                                    'email': usuario_obj.get('email', '')
+                                })
+                                responsaveis_select.value = None  # Limpa o select
+                                responsaveis_chips_container.refresh()
+                            else:
+                                ui.notify('Responsável já adicionado!', type='warning')
+                        else:
+                            ui.notify('Usuário não encontrado!', type='negative')
+                
+                ui.button(icon='add', on_click=add_responsavel).props('flat color=primary').classes('mt-4')
+            
+            @ui.refreshable
+            def responsaveis_chips_container():
+                if selected_responsaveis:
+                    with ui.row().classes('w-full gap-2 flex-wrap'):
+                        for responsavel in selected_responsaveis:
+                            nome = responsavel.get('nome', '')
+                            with ui.card().classes('px-3 py-1 flex items-center gap-2').style(
+                                f'background-color: {PRIMARY_COLOR}; color: white; border-radius: 16px;'
+                            ):
+                                ui.icon('person', size='sm').classes('text-white')
+                                ui.label(nome).classes('text-sm')
+                                
+                                def remove_responsavel(resp=responsavel):
+                                    selected_responsaveis.remove(resp)
+                                    responsaveis_chips_container.refresh()
+                                
+                                ui.button(icon='close', on_click=remove_responsavel).props(
+                                    'flat dense round size=xs color=white'
+                                ).classes('ml-1')
+                else:
+                    ui.label('Nenhum responsável selecionado').classes('text-sm text-gray-400 italic')
+            
+            responsaveis_chips_container()
+            
             ui.space().classes('mb-4')
             
             def save_new_case():
                 if not case_name.value or not case_year.value:
                     ui.notify('Nome e Ano são obrigatórios!', type='warning')
                     return
+                
+                # Validação: pelo menos um responsável é obrigatório
+                if not selected_responsaveis:
+                    ui.notify('Selecione pelo menos um responsável pelo caso!', type='warning')
+                    return
+                
+                # Validação: verificar se os usuários selecionados ainda existem
+                usuarios_ids = {u.get('_id') for u in _usuarios}
+                responsaveis_validos = []
+                for resp in selected_responsaveis:
+                    usuario_id = resp.get('usuario_id')
+                    if usuario_id in usuarios_ids:
+                        responsaveis_validos.append(resp)
+                    else:
+                        ui.notify(f'Usuário "{resp.get("nome", "desconhecido")}" não encontrado no sistema. Removendo da lista.', type='warning')
+                
+                if not responsaveis_validos:
+                    ui.notify('Nenhum responsável válido encontrado. Selecione pelo menos um responsável ativo!', type='warning')
+                    return
+                
+                # Usa apenas responsáveis válidos
+                selected_responsaveis.clear()
+                selected_responsaveis.extend(responsaveis_validos)
                 
                 new_case = create_new_case_dict(
                     case_name=case_name.value,
@@ -271,7 +371,8 @@ def casos():
                     state=case_state.value,
                     parte_contraria=case_parte_contraria.value,
                     parte_contraria_options=PARTE_CONTRARIA_OPTIONS,
-                    selected_clients=selected_clients
+                    selected_clients=selected_clients,
+                    selected_responsaveis=selected_responsaveis
                 )
                 
                 # Garantir ordem cronológica: renumera antes e, para "Novo", logo após salvar
@@ -293,7 +394,9 @@ def casos():
                 status.value = 'Em andamento'
                 case_state.value = None
                 selected_clients.clear()
+                selected_responsaveis.clear()
                 client_chips_container.refresh()
+                responsaveis_chips_container.refresh()
 
             with ui.row().classes('w-full justify-end gap-2'):
                 ui.button('Cancelar', on_click=new_case_dialog.close).props('flat color=grey')

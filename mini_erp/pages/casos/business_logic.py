@@ -5,6 +5,8 @@ Contém funções de cálculo, validação e processamento de casos
 sem dependência de UI (lógica pura).
 """
 
+from google.cloud.firestore import SERVER_TIMESTAMP
+
 from ...core import (
     get_cases_list,
     get_clients_list,
@@ -228,7 +230,8 @@ def create_new_case_dict(
     state: str,
     parte_contraria: str,
     parte_contraria_options: dict,
-    selected_clients: list
+    selected_clients: list,
+    selected_responsaveis: list = None
 ) -> dict:
     """
     Cria um dicionário para um novo caso com todos os campos necessários.
@@ -244,6 +247,7 @@ def create_new_case_dict(
         parte_contraria: Código da parte contrária
         parte_contraria_options: Dicionário com opções de parte contrária
         selected_clients: Lista de clientes selecionados
+        selected_responsaveis: Lista de responsáveis selecionados (opcional)
         
     Returns:
         Dicionário com dados do novo caso
@@ -259,6 +263,17 @@ def create_new_case_dict(
     # Inclui prefixo e número no slug para garantir unicidade
     slug = slugify(f"{prefix}-{case_num} {case_name} {year_str}")
     
+    # Processar responsáveis com timestamp
+    responsaveis_data = []
+    if selected_responsaveis:
+        for resp in selected_responsaveis:
+            responsaveis_data.append({
+                'usuario_id': resp.get('usuario_id', ''),
+                'nome': resp.get('nome', ''),
+                'email': resp.get('email', ''),
+                'data_atribuicao': SERVER_TIMESTAMP
+            })
+    
     return {
         'title': formatted_title,
         'name': case_name,
@@ -271,6 +286,7 @@ def create_new_case_dict(
         'parte_contraria': parte_contraria or '-',
         'parte_contraria_nome': parte_contraria_options.get(parte_contraria or '-', ''),
         'clients': selected_clients.copy(),
+        'responsaveis': responsaveis_data,
         # Tipo de caso: Antigo, Novo ou Futuro
         'case_type': case_type,
         # Categoria: Contencioso ou Consultivo

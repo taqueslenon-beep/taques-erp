@@ -1,0 +1,70 @@
+{
+  "vg_casos": {
+    "Ig4JtBDOF0iDPKjzfxNE": {
+      "categoria": "Contencioso",
+      "nucleo": "Ambiental",
+      "status": "Em andamento",
+      "clientes": [
+        "ypAZ30jsMoyJP8KYQGU4",
+        "ab7bFmerjEIBijj2hVqO"
+      ],
+      "titulo": "ELIEZER JANTSCH",
+      "descricao": "",
+      "links": [],
+      "clientes_nomes": [
+        "ELIEZER JANTSCH",
+        "PATRICIA WAWRZYNIAK JANTSCH"
+      ],
+      "prioridade": "P1",
+      "created_at": "2025-12-12T13:02:59.010027+00:00",
+      "estado": "Santa Catarina",
+      "updated_at": "2025-12-12 13:14:57.335593+00:00"
+    },
+    "PAxsh8o0TIVWyHhGuwsx": {
+      "categoria": "Contencioso",
+      "nucleo": "Generalista",
+      "status": "Em andamento",
+      "clientes": [],
+      "titulo": "TESTE",
+      "descricao": "",
+      "clientes_nomes": [],
+      "prioridade": "P1",
+      "created_at": "2025-12-12 12:39:06.215457+00:00",
+      "estado": "Santa Catarina",
+      "updated_at": "2025-12-12 12:39:06.215466+00:00"
+    },
+    "aBRXtUopWPymV5URtrTr": {
+      "categoria": "Contencioso",
+      "clientes": [],
+      "status": "Em andamento",
+      "nucleo": "Cobranças",
+      "descricao": "",
+      "titulo": "TESTANDO UM CASO",
+      "links": [
+        {
+          "title": "teste",
+          "url": "http://127.0.0.1:8083/visao-geral/casos/aBRXtUopWPymV5URtrTr",
+          "type": "Google Drive"
+        },
+        {
+          "title": "teste",
+          "url": "http://127.0.0.1:8083/visao-geral/casos/aBRXtUopWPymV5URtrTr",
+          "type": "NotebookLM"
+        },
+        {
+          "url": "http://127.0.0.1:8081/visao-geral/casos/aBRXtUopWPymV5URtrTr",
+          "tipo": "Google Drive",
+          "titulo": "TESTE"
+        }
+      ],
+      "clientes_nomes": [],
+      "created_at": "2025-12-11T18:31:46.707510+00:00",
+      "estado": "Santa Catarina",
+      "updated_at": "2025-12-12 13:06:35.360791+00:00"
+    }
+  },
+  "prioridades": {},
+  "users": {},
+  "pessoas": {},
+  "processos": {}
+}

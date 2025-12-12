@@ -6,6 +6,8 @@ incluindo operações de CRUD e sincronização de dados.
 """
 
 import traceback
+import time
+from typing import List, Dict, Any
 
 from ...core import (
     get_cases_list,
@@ -21,6 +23,11 @@ from ...core import (
 
 from .models import CASE_TYPE_OPTIONS, CASE_TYPE_PREFIX
 from .business_logic import get_cases_by_type, get_case_sort_key, get_case_type
+
+# Cache para usuários (5 minutos TTL)
+_usuarios_cache = None
+_usuarios_cache_timestamp = 0
+CACHE_DURATION = 300  # 5 minutos
 
 
 def remove_case(case_to_remove: dict) -> bool:
@@ -183,4 +190,61 @@ def save_process(process: dict):
         process: Dicionário com dados do processo
     """
     save_process_core(process)
+
+
+def get_usuarios_ativos() -> List[Dict[str, Any]]:
+    """
+    Busca todos os usuários ativos da coleção 'usuarios_sistema' no Firestore.
+    
+    Retorna lista com: _id, nome_completo, email, cargo/função (se houver).
+    Ordena por nome_completo em ordem alfabética.
+    Implementa cache local para evitar múltiplas consultas.
+    
+    Returns:
+        Lista de dicionários com dados dos usuários ativos
+    """
+    global _usuarios_cache, _usuarios_cache_timestamp
+    
+    now = time.time()
+    
+    # Verifica cache
+    if _usuarios_cache is not None and (now - _usuarios_cache_timestamp) < CACHE_DURATION:
+        return _usuarios_cache
+    
+    try:
+        db = get_db()
+        docs = db.collection('usuarios_sistema').stream()
+        
+        usuarios = []
+        for doc in docs:
+            usuario = doc.to_dict() or {}
+            usuario_id = doc.id
+            
+            # Verifica se usuário está ativo (assume ativo se não houver campo de status)
+            status = usuario.get('status', 'ativo')
+            active = usuario.get('active', True)
+            
+            # Considera ativo se status == 'ativo' ou active == True ou não houver campo
+            if status == 'ativo' or active is True or (status is None and active is None):
+                usuarios.append({
+                    '_id': usuario_id,
+                    'nome_completo': usuario.get('nome_completo') or usuario.get('name') or usuario.get('full_name') or '(sem nome)',
+                    'email': usuario.get('email') or '',
+                    'cargo': usuario.get('cargo') or usuario.get('funcao') or usuario.get('role') or '',
+                    'funcao': usuario.get('funcao') or usuario.get('cargo') or usuario.get('role') or ''
+                })
+        
+        # Ordena por nome_completo em ordem alfabética
+        usuarios.sort(key=lambda x: x['nome_completo'].lower())
+        
+        # Atualiza cache
+        _usuarios_cache = usuarios
+        _usuarios_cache_timestamp = now
+        
+        return usuarios
+    except Exception as e:
+        print(f"Erro ao buscar usuários ativos: {e}")
+        traceback.print_exc()
+        # Retorna cache antigo se houver erro
+        return _usuarios_cache or []
 
