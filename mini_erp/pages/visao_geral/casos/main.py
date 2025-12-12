@@ -16,6 +16,7 @@ from nicegui import ui
 from ....core import layout, PRIMARY_COLOR
 from ....auth import is_authenticated
 from ....gerenciadores.gerenciador_workspace import definir_workspace
+from ....firebase_config import ensure_firebase_initialized, get_auth
 from .database import listar_casos, excluir_caso, buscar_caso, atualizar_caso, atualizar_prioridade_caso
 from .caso_dialog import abrir_dialog_caso, confirmar_exclusao
 from .models import (
@@ -742,6 +743,9 @@ def _renderizar_aba_dados_basicos(caso: dict, todas_pessoas: list, caso_id: str,
     """Renderiza a aba de dados básicos do caso com autosave."""
     # Estado local para clientes selecionados (cópia para manipulação)
     clientes_selecionados = list(caso.get('clientes', []))
+    
+    # Estado local para responsáveis selecionados
+    responsaveis_selecionados = list(caso.get('responsaveis', []))
 
     with ui.card().classes('w-full detail-card p-6'):
         with ui.column().classes('w-full gap-4'):
@@ -916,6 +920,130 @@ def _renderizar_aba_dados_basicos(caso: dict, todas_pessoas: list, caso_id: str,
 
             # Renderizar chips iniciais
             atualizar_chips_clientes()
+
+            # ════════════════════════════════════════════════════════════════
+            # SEÇÃO: RESPONSÁVEIS VINCULADOS
+            # ════════════════════════════════════════════════════════════════
+            ui.separator().classes('my-4')
+            ui.label('RESPONSÁVEIS VINCULADOS').classes('text-sm font-bold text-gray-600 mb-2')
+            
+            # Buscar usuários do Firebase Auth
+            ensure_firebase_initialized()
+            auth_instance = get_auth()
+            _usuarios_firebase = []
+            
+            try:
+                page = auth_instance.list_users()
+                while page:
+                    for user in page.users:
+                        _usuarios_firebase.append({
+                            '_id': user.uid,
+                            'name': user.display_name or (user.email.split('@')[0] if user.email else 'Sem nome'),
+                            'email': user.email or '',
+                        })
+                    try:
+                        page = page.get_next_page()
+                    except (StopIteration, Exception):
+                        break
+            except Exception as e:
+                print(f"[DADOS BÁSICOS] Erro ao buscar usuários: {e}")
+                _usuarios_firebase = []
+            
+            # Preparar opções de responsáveis (formato: {id: "Nome (email)"})
+            opcoes_responsaveis = {}
+            for u in _usuarios_firebase:
+                nome = u.get('name', 'Sem nome')
+                email = u.get('email', '')
+                u_id = u.get('_id', nome)
+                display = f"{nome} ({email})" if email else nome
+                opcoes_responsaveis[u_id] = display
+            
+            # Linha com select + botão adicionar
+            with ui.row().classes('w-full gap-2 items-end'):
+                if len(opcoes_responsaveis) > 0:
+                    select_responsavel = ui.select(
+                        options=opcoes_responsaveis,
+                        label='Buscar responsável...',
+                        with_input=True
+                    ).props('dense outlined clearable use-input input-debounce="200"').classes('flex-1')
+                else:
+                    ui.label('Nenhum usuário cadastrado no sistema').classes('text-amber-600 flex-1')
+                    select_responsavel = None
+                
+                def ao_clicar_adicionar_responsavel():
+                    nonlocal responsaveis_selecionados
+                    if select_responsavel and select_responsavel.value:
+                        responsavel_id = select_responsavel.value
+                        if responsavel_id not in responsaveis_selecionados:
+                            responsaveis_selecionados.append(responsavel_id)
+                            
+                            # Atualiza IDs
+                            caso['responsaveis'] = responsaveis_selecionados
+                            
+                            # Atualiza dados completos dos responsáveis
+                            caso['responsaveis_dados'] = [
+                                {
+                                    'usuario_id': rid,
+                                    'nome': next((u.get('name', '') for u in _usuarios_firebase if u.get('_id') == rid), ''),
+                                    'email': next((u.get('email', '') for u in _usuarios_firebase if u.get('_id') == rid), '')
+                                }
+                                for rid in responsaveis_selecionados
+                            ]
+                            
+                            # Disparar autosave
+                            _trigger_autosave(caso, caso_id)
+                            atualizar_chips_responsaveis()
+                            ui.notify(f'Responsável adicionado!', type='positive')
+                        else:
+                            ui.notify('Responsável já vinculado!', type='warning')
+                        
+                        select_responsavel.value = None
+                
+                ui.button(icon='add', on_click=ao_clicar_adicionar_responsavel).props('flat dense').classes('text-primary')
+            
+            # Container dos chips de responsáveis
+            container_chips_responsaveis = ui.column().classes('w-full mt-2')
+            
+            def atualizar_chips_responsaveis():
+                container_chips_responsaveis.clear()
+                with container_chips_responsaveis:
+                    if not responsaveis_selecionados:
+                        ui.label('Nenhum responsável vinculado').classes('text-gray-400 italic text-sm')
+                    else:
+                        with ui.row().classes('gap-2 flex-wrap'):
+                            for rid in responsaveis_selecionados:
+                                nome_exibir = opcoes_responsaveis.get(rid, rid)
+                                
+                                def criar_remover_responsavel(responsavel_id_para_remover):
+                                    def remover():
+                                        nonlocal responsaveis_selecionados
+                                        if responsavel_id_para_remover in responsaveis_selecionados:
+                                            responsaveis_selecionados.remove(responsavel_id_para_remover)
+                                            
+                                            caso['responsaveis'] = responsaveis_selecionados
+                                            caso['responsaveis_dados'] = [
+                                                {
+                                                    'usuario_id': r,
+                                                    'nome': next((u.get('name', '') for u in _usuarios_firebase if u.get('_id') == r), ''),
+                                                    'email': next((u.get('email', '') for u in _usuarios_firebase if u.get('_id') == r), '')
+                                                }
+                                                for r in responsaveis_selecionados
+                                            ]
+                                            
+                                            _trigger_autosave(caso, caso_id)
+                                            atualizar_chips_responsaveis()
+                                            ui.notify('Responsável removido!', type='info')
+                                    return remover
+                                
+                                chip = ui.chip(
+                                    text=nome_exibir,
+                                    removable=True,
+                                    color='green'
+                                ).props('outline')
+                                chip.on('remove', criar_remover_responsavel(rid))
+            
+            # Renderizar chips iniciais de responsáveis
+            atualizar_chips_responsaveis()
 
             # Descrição
             ui.separator().classes('my-2')

@@ -14,6 +14,7 @@ from .models import (
     criar_caso_vazio, validar_caso, sanitizar_estado
 )
 from ..pessoas.database import listar_pessoas
+from ....firebase_config import ensure_firebase_initialized, get_auth
 
 
 def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] = None):
@@ -34,6 +35,9 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
     # Estado local para clientes selecionados
     clientes_selecionados = list(dados.get('clientes', []))
     todos_selecionados = {'value': False}
+    
+    # Estado local para responsáveis selecionados
+    responsaveis_selecionados = list(dados.get('responsaveis', []))
 
     with ui.dialog() as dialog, ui.card().classes('w-full max-w-2xl'):
         # Header
@@ -89,6 +93,54 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                     value=sanitizar_estado(dados.get('estado', 'Santa Catarina')),
                     label='Estado'
                 ).classes('w-full').props('dense outlined clearable')
+
+                # ====== RESPONSÁVEIS PELO CASO ======
+                ui.separator().classes('my-2')
+                ui.label('RESPONSÁVEIS *').classes('text-sm font-bold text-gray-600')
+                
+                # Buscar usuários do Firebase Authentication
+                ensure_firebase_initialized()
+                auth_instance = get_auth()
+                _usuarios = []
+                
+                try:
+                    page = auth_instance.list_users()
+                    while page:
+                        for user in page.users:
+                            _usuarios.append({
+                                '_id': user.uid,
+                                'name': user.display_name or (user.email.split('@')[0] if user.email else 'Sem nome'),
+                                'full_name': user.display_name or (user.email.split('@')[0] if user.email else 'Sem nome'),
+                                'email': user.email or '',
+                            })
+                        try:
+                            page = page.get_next_page()
+                        except (StopIteration, Exception):
+                            break
+                except Exception as e:
+                    print(f"[DIALOG CASO] Erro ao buscar usuários: {e}")
+                    _usuarios = []
+                
+                # Monta opções no formato {id: 'Nome (email)'}
+                responsavel_options = {}
+                for u in _usuarios:
+                    nome = u.get('name') or u.get('full_name') or u.get('email', 'Sem nome')
+                    email = u.get('email', '')
+                    u_id = u.get('_id', nome)
+                    display = f"{nome} ({email})" if email else nome
+                    responsavel_options[u_id] = display
+                
+                # Se não houver usuários, mostra mensagem
+                if not responsavel_options:
+                    responsavel_options = {'-': 'Nenhum usuário cadastrado'}
+                
+                responsavel_select = ui.select(
+                    options=responsavel_options,
+                    value=responsaveis_selecionados if responsaveis_selecionados else [],
+                    label='Selecione o(s) responsável(eis)',
+                    with_input=True,
+                    multiple=True
+                ).classes('w-full').props('dense outlined use-chips clearable')
 
                 # Seção Clientes
                 ui.separator().classes('my-2')
@@ -211,6 +263,15 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
             ui.button('Cancelar', on_click=dialog.close).props('flat color=grey')
 
             def salvar():
+                # Validar responsáveis obrigatórios
+                valores_responsaveis = responsavel_select.value or []
+                if isinstance(valores_responsaveis, str):
+                    valores_responsaveis = [valores_responsaveis] if valores_responsaveis else []
+                
+                if not valores_responsaveis or valores_responsaveis == ['-']:
+                    ui.notify('Selecione pelo menos um responsável!', type='warning')
+                    return
+                
                 # Coleta dados do formulário (simplificado)
                 novos_dados = {
                     'titulo': titulo_input.value.strip() if titulo_input.value else '',
@@ -219,6 +280,25 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                     'categoria': categoria_select.value or 'Contencioso',
                     'estado': estado_select.value or '',
                     'prioridade': prioridade_select.value or PRIORIDADE_PADRAO,
+                    # Responsáveis
+                    'responsaveis': valores_responsaveis,
+                    'responsaveis_dados': [
+                        {
+                            'usuario_id': resp_id,
+                            'nome': next(
+                                (u.get('name') or u.get('full_name', '')
+                                 for u in _usuarios if u.get('_id') == resp_id),
+                                ''
+                            ),
+                            'email': next(
+                                (u.get('email', '')
+                                 for u in _usuarios if u.get('_id') == resp_id),
+                                ''
+                            )
+                        }
+                        for resp_id in valores_responsaveis
+                        if resp_id and resp_id != '-'
+                    ],
                     'clientes': clientes_selecionados.copy(),
                     'clientes_nomes': [
                         next(
