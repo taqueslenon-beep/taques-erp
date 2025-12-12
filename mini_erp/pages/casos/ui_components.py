@@ -263,14 +263,16 @@ def render_cases_list():
                             'Em andamento': 'text-gray-900',
                             'Concluído': 'text-white',
                             'Concluído com pendências': 'text-white',
-                            'Em monitoramento': 'text-white'
+                            'Em monitoramento': 'text-white',
+                            'Substabelecido': 'text-green-800'
                         }.get(case['status'], 'bg-gray-200 text-gray-800')
                         
                         status_bg = {
                             'Em andamento': '#eab308',           # amarelo claro
                             'Concluído': '#166534',              # verde escuro
                             'Concluído com pendências': '#4d7c0f', # verde militar
-                            'Em monitoramento': '#ea580c'         # laranja
+                            'Em monitoramento': '#ea580c',        # laranja
+                            'Substabelecido': '#86efac'           # verde claro
                         }.get(case['status'], '#9ca3af')
 
                         # Chip de status

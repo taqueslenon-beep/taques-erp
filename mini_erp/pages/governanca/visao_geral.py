@@ -2,7 +2,7 @@
 # Dashboard, matriz de responsabilidades e riscos
 
 from nicegui import ui
-from ...core import PRIMARY_COLOR
+from ...core import PRIMARY_COLOR, get_clients_list
 
 
 def render_visao_geral():
@@ -30,8 +30,34 @@ def render_visao_geral():
 
 def _render_dashboard():
     """Renderiza o dashboard com cards de resumo"""
+    # Contagem de clientes
+    try:
+        clientes = get_clients_list()
+        total_clientes = len(clientes) if clientes else 0
+        
+        # Separar por tipo: PJ se client_type == 'PJ', caso contrário PF
+        clientes_pf = 0
+        clientes_pj = 0
+        for cliente in clientes or []:
+            client_type = cliente.get('client_type', '')
+            if client_type == 'PJ':
+                clientes_pj += 1
+            else:  # PF, não definido, ou qualquer outro valor
+                clientes_pf += 1
+    except Exception:
+        # Em caso de erro, mostra zeros
+        total_clientes = 0
+        clientes_pf = 0
+        clientes_pj = 0
+    
     # Cards de resumo
     with ui.row().classes('w-full gap-4 flex-wrap mb-4'):
+        # Card de Clientes Cadastrados (primeiro card)
+        with ui.card().classes('flex-1 min-w-48 p-4'):
+            ui.label('Clientes Cadastrados').classes('text-sm text-gray-500')
+            ui.label(str(total_clientes)).classes('text-2xl font-bold').style(f'color: {PRIMARY_COLOR}')
+            ui.label(f'{clientes_pf} PF, {clientes_pj} PJ').classes('text-xs text-gray-500')
+        
         with ui.card().classes('flex-1 min-w-48 p-4'):
             ui.label('Total de Processos').classes('text-sm text-gray-500')
             ui.label('12').classes('text-2xl font-bold text-gray-800')

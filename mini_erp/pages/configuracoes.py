@@ -2,13 +2,14 @@ import threading
 from datetime import datetime
 from nicegui import ui, run, context, events
 from ..core import layout
-from ..firebase_config import get_db
+from ..firebase_config import get_db, ensure_firebase_initialized, get_auth
 from ..auth import is_authenticated, get_current_user
-from ..storage import fazer_upload_avatar, obter_url_avatar
+from ..storage import fazer_upload_avatar, obter_url_avatar, definir_display_name, obter_display_name
 from firebase_admin import auth
 from PIL import Image, ImageDraw
 import io
 import base64
+import traceback
 
 @ui.page('/configuracoes')
 def configuracoes():
@@ -82,19 +83,8 @@ def configuracoes():
 
                         ui.timer(0.1, load_current_avatar, once=True)
 
-                        # --- EDITOR DE AVATAR ---
-                        
-                        # Estado do editor (usando dicionário para mutabilidade dentro de closures)
-                        avatar_state = {
-                            'offset_x': 0,
-                            'offset_y': 0,
-                            'zoom': 100,
-                            'imagem_bytes': None,
-                            'dialog': None,
-                            'preview_img': None
-                        }
-                        
-                        def processar_preview_sync(img_bytes, offset_x, offset_y, zoom):
+                        # Handler de Upload Direto (sem editor)
+                        async def handle_upload(e: events.UploadEventArguments):
                             """Processa a imagem com PIL (executado em thread separada)"""
                             try:
                                 if not img_bytes:
@@ -347,12 +337,64 @@ def configuracoes():
                         async def handle_upload(e: events.UploadEventArguments):
                             """Handler para upload de avatar usando estrutura correta do NiceGUI."""
                             try:
-                                print(f"[UPLOAD] Iniciando - Nome: {e.name}, Tipo: {e.type}")
+                                # Debug: Verificar atributos disponíveis
+                                print(f"[UPLOAD] Evento recebido: {type(e)}")
+                                available_attrs = [a for a in dir(e) if not a.startswith('_')]
+                                print(f"[UPLOAD] Atributos disponíveis: {available_attrs}")
                                 
-                                # Lê os bytes do arquivo usando e.content.read()
-                                img_bytes = e.content.read()
+                                # CORREÇÃO: e.file é SmallFileUpload, NÃO SpooledTemporaryFile
+                                print(f"[UPLOAD] Arquivo recebido: {type(e.file)}")
                                 
-                                print(f"[UPLOAD] Bytes lidos: {len(img_bytes)}")
+                                # Debug: Verificar métodos disponíveis em SmallFileUpload
+                                file_methods = [m for m in dir(e.file) if not m.startswith('_')]
+                                print(f"[UPLOAD] Métodos disponíveis em SmallFileUpload: {file_methods}")
+                                
+                                # Verificar atributos específicos
+                                if hasattr(e.file, 'name'):
+                                    print(f"[UPLOAD] Nome do arquivo: {e.file.name}")
+                                if hasattr(e.file, 'content_type'):
+                                    print(f"[UPLOAD] Tipo MIME: {e.file.content_type}")
+                                if hasattr(e.file, 'size'):
+                                    print(f"[UPLOAD] Tamanho: {e.file.size}")
+                                
+                                # Lê os bytes do arquivo
+                                # SmallFileUpload pode ter read() assíncrono ou síncrono
+                                print(f"[UPLOAD] Lendo conteúdo do arquivo...")
+                                img_bytes = None
+                                
+                                # Tentativa 1: read() assíncrono (mais provável)
+                                try:
+                                    if hasattr(e.file, 'read'):
+                                        # Verifica se é coroutine (assíncrono)
+                                        import inspect
+                                        if inspect.iscoroutinefunction(e.file.read):
+                                            print(f"[UPLOAD] read() é assíncrono, usando await...")
+                                            img_bytes = await e.file.read()
+                                        else:
+                                            print(f"[UPLOAD] read() é síncrono, chamando diretamente...")
+                                            img_bytes = e.file.read()
+                                except Exception as read_err:
+                                    print(f"[UPLOAD] Erro ao usar read(): {type(read_err).__name__}: {str(read_err)}")
+                                
+                                # Tentativa 2: Se read() não funcionou, tenta outros atributos
+                                if not img_bytes:
+                                    if hasattr(e.file, 'content'):
+                                        print(f"[UPLOAD] Tentando usar e.file.content...")
+                                        img_bytes = e.file.content
+                                    elif hasattr(e.file, 'data'):
+                                        print(f"[UPLOAD] Tentando usar e.file.data...")
+                                        img_bytes = e.file.data
+                                    elif hasattr(e.file, 'bytes'):
+                                        print(f"[UPLOAD] Tentando usar e.file.bytes...")
+                                        img_bytes = e.file.bytes
+                                
+                                if not img_bytes:
+                                    ui.notify("Erro ao ler arquivo. Tente novamente.", type='negative')
+                                    print(f"[UPLOAD] ERRO: Não foi possível ler os bytes do arquivo")
+                                    upload_component.reset()
+                                    return
+                                
+                                print(f"[UPLOAD] Bytes lidos: {len(img_bytes)} bytes")
                                 
                                 # Validação de tamanho (5MB)
                                 if len(img_bytes) > 5 * 1024 * 1024:
@@ -365,24 +407,38 @@ def configuracoes():
                                     upload_component.reset()
                                     return
                                 
-                                # Validação de tipo de arquivo
-                                file_name = e.name or ''
-                                if file_name:
-                                    ext = file_name.lower().split('.')[-1] if '.' in file_name else ''
-                                    if ext and ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-                                        ui.notify('Formato não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
-                                        upload_component.reset()
-                                        return
-                                
-                                # Valida se é realmente uma imagem válida
+                                # Valida se é realmente uma imagem válida usando PIL
+                                print(f"[UPLOAD] Validando imagem com PIL...")
                                 try:
                                     from PIL import Image
                                     img_test = Image.open(io.BytesIO(img_bytes))
                                     img_test.verify()
-                                    print(f"[UPLOAD] Imagem válida: {img_test.format}")
+                                    
+                                    # Reabre após verify (verify fecha o arquivo)
+                                    img_test = Image.open(io.BytesIO(img_bytes))
+                                    
+                                    # Detecta tipo MIME baseado no formato
+                                    format_map = {
+                                        'JPEG': 'image/jpeg',
+                                        'PNG': 'image/png',
+                                        'GIF': 'image/gif',
+                                        'WEBP': 'image/webp'
+                                    }
+                                    content_type = format_map.get(img_test.format, 'image/png')
+                                    print(f"[UPLOAD] Imagem válida: {img_test.format} (MIME: {content_type})")
+                                    
+                                    # Validação adicional: formato suportado
+                                    formatos_suportados = ['JPEG', 'PNG', 'GIF', 'WEBP']
+                                    if img_test.format not in formatos_suportados:
+                                        ui.notify(f'Formato {img_test.format} não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
+                                        upload_component.reset()
+                                        return
+                                    
                                 except Exception as img_err:
                                     ui.notify('Arquivo não é uma imagem válida.', type='negative')
-                                    print(f"[UPLOAD] Erro validação: {img_err}")
+                                    print(f"[UPLOAD] Erro na validação: {type(img_err).__name__}: {str(img_err)}")
+                                    import traceback
+                                    traceback.print_exc()
                                     upload_component.reset()
                                     return
                                 
@@ -391,7 +447,7 @@ def configuracoes():
                                 abrir_editor(img_bytes)
                                 
                             except Exception as ex:
-                                print(f"[UPLOAD] Erro geral: {ex}")
+                                print(f"[UPLOAD] ERRO GERAL: {type(ex).__name__}: {str(ex)}")
                                 import traceback
                                 traceback.print_exc()
                                 ui.notify(f'Erro ao processar arquivo: {str(ex)}', type='negative')
@@ -409,6 +465,86 @@ def configuracoes():
                     # Coluna de Dados
                     with ui.column().classes('flex-grow max-w-md gap-4'):
                         ui.input('Email', value=user_email).props('readonly').classes('w-full')
+                        
+                        # Campo de Nome de Exibição
+                        display_name_input = ui.input(
+                            'Nome de Exibição',
+                            placeholder='Como você quer ser chamado(a)?'
+                        ).classes('w-full')
+                        
+                        # Carrega nome de exibição atual
+                        async def load_display_name():
+                            """Carrega o nome de exibição atual do usuário"""
+                            try:
+                                if not user_uid:
+                                    return
+                                display_name = await run.io_bound(obter_display_name, user_uid)
+                                if display_name and display_name != "Usuário":
+                                    display_name_input.value = display_name
+                            except Exception as e:
+                                print(f"Erro ao carregar nome de exibição: {e}")
+                        
+                        ui.timer(0.2, load_display_name, once=True)
+                        
+                        # Botão para salvar nome de exibição
+                        async def salvar_display_name():
+                            """Salva o nome de exibição do usuário"""
+                            nome = display_name_input.value.strip()
+                            
+                            # Validação
+                            if not nome:
+                                ui.notify('Nome de exibição não pode estar vazio', type='warning')
+                                return
+                            
+                            if len(nome) < 2:
+                                ui.notify('Nome de exibição deve ter pelo menos 2 caracteres', type='warning')
+                                return
+                            
+                            if len(nome) > 50:
+                                ui.notify('Nome de exibição deve ter no máximo 50 caracteres', type='warning')
+                                return
+                            
+                            if not user_uid:
+                                ui.notify('Erro: Usuário não identificado', type='negative')
+                                return
+                            
+                            # Desabilita botão durante salvamento
+                            save_btn.disable()
+                            save_btn.props('loading')
+                            
+                            try:
+                                # Salva nome de exibição
+                                sucesso = await run.io_bound(definir_display_name, user_uid, nome)
+                                
+                                if sucesso:
+                                    ui.notify('Nome atualizado com sucesso!', type='positive')
+                                    
+                                    # Dispara evento para atualizar header
+                                    ui.run_javascript(f'''
+                                        if (window.dispatchEvent) {{
+                                            window.dispatchEvent(new CustomEvent('display-name-updated', {{
+                                                detail: {{ name: "{nome}" }}
+                                            }}));
+                                        }}
+                                    ''')
+                                else:
+                                    ui.notify('Erro ao salvar nome de exibição', type='negative')
+                            except Exception as e:
+                                print(f"Erro ao salvar nome de exibição: {e}")
+                                traceback.print_exc()
+                                ui.notify(f'Erro: {str(e)}', type='negative')
+                            finally:
+                                save_btn.enable()
+                                save_btn.props(remove='loading')
+                        
+                        with ui.row().classes('w-full items-center gap-2'):
+                            save_btn = ui.button(
+                                'Salvar Nome',
+                                icon='check',
+                                on_click=salvar_display_name
+                            ).props('color=primary').classes('flex-shrink-0')
+                            
+                            ui.label('Mínimo 2 caracteres, máximo 50').classes('text-xs text-gray-400')
                         
                         # Mostrar claims/role se disponível
                         role = 'Usuário'
@@ -453,8 +589,15 @@ def configuracoes():
                 def listar_usuarios_firebase():
                     """Lista todos os usuários do Firebase Authentication"""
                     try:
+                        # Garante que Firebase está inicializado
+                        ensure_firebase_initialized()
+                        
+                        # Obtém instância do Auth
+                        auth_instance = get_auth()
+                        
+                        # Lista usuários (código simples que funciona)
                         usuarios = []
-                        page = auth.list_users()
+                        page = auth_instance.list_users()
                         
                         while page:
                             for user in page.users:
@@ -466,24 +609,45 @@ def configuracoes():
                                     role = 'Administrador'
                                 elif custom_claims.get('role'):
                                     role = custom_claims.get('role').capitalize()
-
+                                
+                                # Obtém nome de exibição usando a MESMA função que a aba Perfil usa
+                                # Isso garante consistência entre as duas abas
+                                try:
+                                    display_name = obter_display_name(user.uid)
+                                    # Se retornou "Usuário" (fallback padrão), trata como não encontrado
+                                    if display_name == "Usuário":
+                                        display_name = user.email.split('@')[0] if user.email else '-'
+                                except Exception as e:
+                                    print(f"Erro ao obter display_name para {user.uid}: {e}")
+                                    # Fallback: usa parte do email
+                                    display_name = user.email.split('@')[0] if user.email else '-'
+                                
                                 usuarios.append({
                                     'email': user.email,
                                     'uid': user.uid,
+                                    'nome': display_name,
                                     'criacao': format_date(user.user_metadata.creation_timestamp),
                                     'ultimo_login': format_date(user.user_metadata.last_sign_in_timestamp),
                                     'role': role,
                                     'status': 'Inativo' if user.disabled else 'Ativo',
-                                    'raw_ts': user.user_metadata.last_sign_in_timestamp or 0 # Para ordenação
+                                    'raw_ts': user.user_metadata.last_sign_in_timestamp or 0
                                 })
-                            page = page.get_next_page()
+                            
+                            try:
+                                page = page.get_next_page()
+                            except StopIteration:
+                                break
+                            except Exception:
+                                break
                         
                         # Ordena por último login (mais recente primeiro)
                         usuarios.sort(key=lambda x: x['raw_ts'], reverse=True)
+                        
                         return usuarios
                     except Exception as e:
                         print(f"Erro ao listar usuários: {e}")
-                        return []
+                        traceback.print_exc()
+                        raise  # Re-lança exceção para ser tratada em refresh_data
 
                 # Interface
                 with ui.row().classes('w-full justify-between items-center mb-4'):
@@ -494,6 +658,7 @@ def configuracoes():
                 # Definição das colunas
                 columns = [
                     {'name': 'email', 'label': 'Email / Usuário', 'field': 'email', 'align': 'left', 'sortable': True},
+                    {'name': 'nome', 'label': 'Nome', 'field': 'nome', 'align': 'left', 'sortable': True},
                     {'name': 'role', 'label': 'Função', 'field': 'role', 'align': 'left', 'sortable': True},
                     {'name': 'criacao', 'label': 'Data Criação', 'field': 'criacao', 'align': 'left', 'sortable': True},
                     {'name': 'ultimo_login', 'label': 'Último Login', 'field': 'ultimo_login', 'align': 'left', 'sortable': True},
@@ -514,37 +679,49 @@ def configuracoes():
                     ui.label('Nenhum usuário encontrado').classes('text-gray-400 mt-2')
 
                 async def refresh_data():
-                    # Só atualiza se a aba Usuários estiver ativa
-                    # Verifica se o timer ainda está ativo (evita chamadas após mudança de aba)
-                    if timer_ref['timer'] and not timer_ref['timer'].active:
-                        return
-                    
-                    # UI State: Loading
+                    """Atualiza lista de usuários com tratamento robusto de erros"""
+                    # UI State: Loading (sempre ativa primeiro)
                     users_table.visible = False
                     empty_div.classes('hidden')
                     loading_div.set_visibility(True)
                     refresh_btn.disable()
                     
-                    # Fetch Data (in background)
-                    rows = await run.io_bound(listar_usuarios_firebase)
-                    
-                    # Verifica novamente se ainda está na aba Usuários
-                    if timer_ref['timer'] and not timer_ref['timer'].active:
-                        refresh_btn.enable()
-                        return
-                    
-                    # UI State: Show Data
-                    users_table.rows = rows
-                    loading_div.set_visibility(False)
-                    
-                    if not rows:
-                        empty_div.classes(remove='hidden')
+                    try:
+                        # Fetch Data (in background)
+                        rows = await run.io_bound(listar_usuarios_firebase)
+                        
+                        # UI State: Show Data
+                        if rows and len(rows) > 0:
+                            users_table.rows = rows
+                            users_table.visible = True
+                            empty_div.classes('hidden')
+                            ui.notify(f'{len(rows)} usuário(s) carregado(s)!', type='positive', position='top')
+                        else:
+                            users_table.visible = False
+                            empty_div.classes(remove='hidden')
+                            ui.notify('Nenhum usuário encontrado', type='info', position='top')
+                        
+                    except Exception as e:
+                        # Erro ao carregar dados
+                        error_msg = str(e)
+                        print(f"Erro ao carregar usuários: {error_msg}")
+                        traceback.print_exc()
+                        
+                        # UI State: Mostra erro
                         users_table.visible = False
-                    else:
-                        users_table.visible = True
+                        empty_div.classes(remove='hidden')
+                        empty_div.clear()
+                        with empty_div:
+                            ui.icon('error', size='3em', color='red')
+                            ui.label('Erro ao carregar usuários').classes('text-red-500 mt-2 font-bold')
+                            ui.label(error_msg).classes('text-gray-500 text-sm mt-1')
+                        
+                        ui.notify(f'Erro: {error_msg}', type='negative', position='top', timeout=5000)
                     
-                    refresh_btn.enable()
-                    ui.notify('Lista de usuários atualizada!', type='positive', position='top')
+                    finally:
+                        # SEMPRE desativa loading e reabilita botão
+                        loading_div.set_visibility(False)
+                        refresh_btn.enable()
 
                 # Conecta botão
                 refresh_btn.on_click(refresh_data)
@@ -565,25 +742,35 @@ def configuracoes():
             # Definida após a criação do timer para ter acesso a ele
             def on_tab_change(e):
                 """Ativa/desativa timer da aba Usuários conforme a aba selecionada"""
-                # O valor do evento é o tab selecionado
-                if e.value == usuarios_tab:
+                # Obtém valor da aba selecionada
+                # No NiceGUI, tab_panels passa o valor diretamente no evento
+                try:
+                    # Tenta obter do evento (pode ser o valor direto ou e.args[0])
+                    if hasattr(e, 'args') and len(e.args) > 0:
+                        current_tab = e.args[0]
+                    elif hasattr(e, 'value'):
+                        current_tab = e.value
+                    else:
+                        # Fallback: usa tab_panels.value
+                        current_tab = tab_panels.value
+                except:
+                    # Último recurso: usa tab_panels.value
+                    current_tab = tab_panels.value
+                
+                if current_tab == usuarios_tab:
                     # Ativa timer da aba usuários
                     if timer_ref['timer']:
                         timer_ref['timer'].activate()
-                        print("[TIMER] Timer da aba Usuários ativado")
-                        # Faz carga inicial quando entrar na aba pela primeira vez (se ainda não carregou)
-                        if refresh_data_ref['func']:
-                            # Verifica se precisa carregar dados iniciais
-                            # Usa um timer único para não bloquear a UI
-                            async def carga_inicial():
-                                if refresh_data_ref['func']:
-                                    await refresh_data_ref['func']()
-                            ui.timer(0.1, carga_inicial, once=True)
+                    # Faz carga inicial quando entrar na aba
+                    if refresh_data_ref['func']:
+                        # Usa timer para não bloquear a UI
+                        async def carga_inicial():
+                            await refresh_data_ref['func']()
+                        ui.timer(0.1, carga_inicial, once=True)
                 else:
                     # Desativa timer quando sair da aba
                     if timer_ref['timer']:
                         timer_ref['timer'].deactivate()
-                        print("[TIMER] Timer da aba Usuários desativado")
             
-            # Conecta evento de mudança de aba
-            tabs.on('update:model-value', on_tab_change)
+            # Conecta evento de mudança de aba usando tab_panels
+            tab_panels.on('update:model-value', on_tab_change)

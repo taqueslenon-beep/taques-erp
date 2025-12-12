@@ -2146,9 +2146,33 @@ def layout(page_title: str, breadcrumbs: list = None):
                                 print("[AVATAR HEADER] Usuário não encontrado")
                                 return
                                 
-                            # Define iniciais
+                            # Define iniciais (usa display_name se disponível)
                             email = user.get('email', '')
-                            initials = email[:2].upper() if email else 'U'
+                            uid = user.get('uid')
+                            
+                            # Tenta obter display_name
+                            display_name = None
+                            if uid:
+                                try:
+                                    from .storage import obter_display_name
+                                    display_name = await run.io_bound(obter_display_name, uid)
+                                    # Se retornou "Usuário" (fallback), trata como None
+                                    if display_name == "Usuário":
+                                        display_name = None
+                                except:
+                                    pass
+                            
+                            # Usa display_name para iniciais, senão usa email
+                            if display_name and len(display_name) >= 2:
+                                # Pega primeiras 2 letras do nome
+                                initials = display_name[:2].upper()
+                                # Tooltip com nome completo
+                                avatar_label.tooltip = display_name
+                            else:
+                                # Fallback: usa email
+                                initials = email[:2].upper() if email else 'U'
+                                avatar_label.tooltip = email
+                            
                             avatar_label.text = initials
                             
                             # Carrega avatar do Storage
@@ -2177,8 +2201,35 @@ def layout(page_title: str, breadcrumbs: list = None):
 
                     ui.timer(0.1, load_user_avatar, once=True)
                     
+                    # Escuta evento customizado para atualizar display name quando alterado
+                    ui.run_javascript("""
+                        window.addEventListener('display-name-updated', function(event) {
+                            // Força reload da página para atualizar iniciais no header
+                            // (alternativa: poderia fazer uma chamada AJAX, mas reload é mais simples)
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 500);
+                        });
+                    """)
+                    
                     # Escuta evento customizado para atualizar avatar quando alterado
-                    # Usa polling suave para detectar mudanças sem recarregar página
+                    async def on_avatar_updated():
+                        """Atualiza avatar no header quando evento é disparado"""
+                        print("[AVATAR HEADER] Evento 'avatar-updated' recebido, recarregando avatar...")
+                        await load_user_avatar()
+                    
+                    # Listener JavaScript para evento avatar-updated
+                    ui.run_javascript("""
+                        window.addEventListener('avatar-updated', function(event) {
+                            console.log('[AVATAR HEADER] Evento avatar-updated recebido', event.detail);
+                            // Força recarregamento do avatar após 500ms
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 500);
+                        });
+                    """)
+                    
+                    # Polling suave para detectar mudanças (backup caso evento não funcione)
                     async def check_avatar_update():
                         """Verifica se o avatar foi atualizado e recarrega se necessário"""
                         try:
@@ -2198,15 +2249,16 @@ def layout(page_title: str, breadcrumbs: list = None):
                                     url_base = url.split('?')[0]  # Remove timestamp
                                     
                                     if current_src != url_base:
+                                        print(f"[AVATAR HEADER] Avatar atualizado detectado: {url_base}")
                                         avatar_comp.clear()
                                         with avatar_comp:
-                                            ui.image(url).classes('w-full h-full object-cover')
+                                            ui.image(url).classes('w-full h-full object-cover rounded-full')
                                         avatar_comp._last_avatar_url = url_base
                         except Exception as e:
-                            print(f"Erro ao verificar atualização de avatar: {e}")
+                            print(f"[AVATAR HEADER] Erro ao verificar atualização de avatar: {e}")
                     
-                    # Verifica atualizações a cada 2 segundos quando na página
-                    ui.timer(2.0, check_avatar_update)
+                    # Verifica atualizações a cada 5 segundos quando na página (menos frequente)
+                    ui.timer(5.0, check_avatar_update)
 
     # Sidebar - Renderiza baseado no workspace ativo
     from .componentes.sidebar_base import render_sidebar, obter_itens_menu_por_workspace

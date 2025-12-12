@@ -628,9 +628,8 @@ def case_detail(case_slug: str):
                             case['status'] = e.value
                             trigger_autosave()
                         
-                        status_options = ['Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento']
                         edit_status = ui.select(
-                            status_options, 
+                            STATUS_OPTIONS, 
                             value=case.get('status'),
                             on_change=on_status_change
                         ).classes('w-full').props('dense outlined')
@@ -1254,9 +1253,8 @@ def case_detail(case_slug: str):
                                             ).props('dense outlined').classes('w-56')
                                         
                                         with ui.row().classes('w-full gap-3'):
-                                            status_options = ['Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento']
                                             process_form_fields['status_select'] = ui.select(
-                                                status_options, 
+                                                STATUS_OPTIONS, 
                                                 label='Status *', 
                                                 value='Em andamento'
                                             ).props('dense outlined').classes('flex-1')

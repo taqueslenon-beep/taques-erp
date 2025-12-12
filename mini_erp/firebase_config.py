@@ -1,5 +1,5 @@
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 import os
 import json
 
@@ -30,8 +30,9 @@ def init_firebase():
             cred = credentials.Certificate(firebase_config)
         
         # Configurações adicionais (Storage)
+        # Bucket correto: taques-erp.firebasestorage.app
         options = {
-            'storageBucket': 'taques-erp.appspot.com'
+            'storageBucket': 'taques-erp.firebasestorage.app'
         }
         
         # Pode haver cenários (scripts CLI, reloads) em que o app
@@ -46,6 +47,27 @@ def init_firebase():
     return firestore.client()
 
 
+def ensure_firebase_initialized():
+    """
+    Garante que Firebase Admin está inicializado e Auth está disponível.
+    Retorna True se inicializado com sucesso, False caso contrário.
+    """
+    try:
+        # Inicializa se necessário
+        if not firebase_admin._apps:
+            init_firebase()
+        
+        # Verifica se Auth está acessível (tenta uma operação simples)
+        # Não vamos listar usuários aqui, apenas verificar se o módulo está disponível
+        # A verificação real será feita quando tentar usar auth.list_users()
+        return True
+    except Exception as e:
+        print(f"[FIREBASE_INIT] Erro ao garantir inicialização: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 # Cliente Firestore global
 db = None
 
@@ -56,3 +78,12 @@ def get_db():
     if db is None:
         db = init_firebase()
     return db
+
+
+def get_auth():
+    """
+    Retorna instância do Firebase Auth.
+    Garante que Firebase está inicializado antes de retornar.
+    """
+    ensure_firebase_initialized()
+    return auth

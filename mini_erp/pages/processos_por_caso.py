@@ -17,14 +17,16 @@ STATUS_COLORS = {
     'Em andamento': '#eab308',
     'Concluído': '#166534',
     'Concluído com pendências': '#4d7c0f',
-    'Em monitoramento': '#ea580c'
+    'Em monitoramento': '#ea580c',
+    'Substabelecido': '#86efac'
 }
 
 STATUS_TEXT_COLORS = {
     'Em andamento': '#1f2937',
     'Concluído': '#ffffff',
     'Concluído com pendências': '#ffffff',
-    'Em monitoramento': '#ffffff'
+    'Em monitoramento': '#ffffff',
+    'Substabelecido': '#166534'
 }
 
 # Cores das áreas do direito

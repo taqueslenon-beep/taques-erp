@@ -65,6 +65,7 @@ STATUS_COLORS = {
     'Concluído': '#166534',                 # verde escuro
     'Concluído com pendências': '#4d7c0f',  # verde militar
     'Em monitoramento': '#ea580c',          # laranja
+    'Substabelecido': '#86efac',            # verde claro
     'Sem status': '#6b7280',                # cinza
 }
 

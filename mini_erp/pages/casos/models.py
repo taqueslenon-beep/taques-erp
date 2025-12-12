@@ -78,7 +78,8 @@ STATUS_OPTIONS = [
     'Em andamento', 
     'Concluído', 
     'Concluído com pendências', 
-    'Em monitoramento'
+    'Em monitoramento',
+    'Substabelecido'
 ]
 
 # =============================================================================
