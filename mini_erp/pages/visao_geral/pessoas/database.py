@@ -264,3 +264,56 @@ def contar_pessoas() -> int:
     except Exception as e:
         print(f"Erro ao contar pessoas: {e}")
         return 0
+
+
+def listar_pessoas_colecao_people() -> List[Dict[str, Any]]:
+    """
+    Retorna todas as pessoas da coleção 'people' (principal do sistema).
+    Usada para vincular clientes aos casos.
+
+    Returns:
+        Lista de dicionários com dados das pessoas
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("[ERRO] Conexão com Firebase não disponível")
+            return []
+
+        docs = db.collection('people').stream()
+        pessoas = []
+
+        for doc in docs:
+            pessoa = doc.to_dict()
+            pessoa['_id'] = doc.id
+
+            # Monta nome de exibição
+            nome = pessoa.get('name') or pessoa.get('full_name') or pessoa.get('display_name', '')
+            apelido = pessoa.get('nickname', '')
+
+            if not nome:
+                continue
+
+            # Formato para exibição
+            if apelido and apelido != nome:
+                nome_exibicao = f"{nome} ({apelido})"
+            else:
+                nome_exibicao = nome
+
+            pessoa['nome_exibicao'] = nome_exibicao
+
+            # Converte timestamps para evitar erro de serialização JSON
+            pessoa = _converter_timestamps(pessoa)
+            pessoas.append(pessoa)
+
+        # Ordena alfabeticamente
+        pessoas.sort(key=lambda p: (p.get('nome_exibicao') or '').upper())
+
+        print(f"[PESSOAS] {len(pessoas)} pessoas carregadas da coleção 'people'")
+        return pessoas
+
+    except Exception as e:
+        print(f"[ERRO] Falha ao listar pessoas da coleção 'people': {e}")
+        import traceback
+        traceback.print_exc()
+        return []

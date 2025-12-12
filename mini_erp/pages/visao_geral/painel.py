@@ -24,3 +24,5 @@ def painel():
             ui.label('Módulo em desenvolvimento').classes('text-xl font-bold text-gray-500 mt-4')
             ui.label('Este módulo estará disponível em breve.').classes('text-gray-400')
 
+
+

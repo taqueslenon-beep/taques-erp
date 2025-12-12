@@ -6,3 +6,5 @@ from . import painel, processos, acordos, configuracoes
 from .pessoas import pessoas_visao_geral
 from .casos import casos_visao_geral
 
+
+

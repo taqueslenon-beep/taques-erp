@@ -168,29 +168,40 @@ def casos():
             # Multi-client selection
             selected_clients = []
             all_clients_selected = {'value': False}
-            client_options = [format_option_for_search(c) for c in _clients]
-            
+            # CORRIGIDO: Usa dicionário (ID: Nome) para evitar o erro [object Object]
+            # e usa a função de formatação padronizada do core
+            client_options = {c.get('_id'): format_client_option_for_select(c) for c in _clients}
+
             ui.label('Clientes').classes('text-sm text-gray-600 mt-2 mb-1')
-            
+
             with ui.row().classes('w-full gap-2 mb-2'):
                 client_select = ui.select(
-                    options=client_options, 
+                    options=client_options,
                     label='Selecione cliente(s)',
                     with_input=True
                 ).classes('flex-grow')
-                
+
                 def add_client():
+                    """Adiciona cliente à lista do caso."""
                     if client_select.value:
-                        full_name = get_option_value(client_select.value, _clients)
-                        if full_name not in selected_clients:
-                            selected_clients.append(full_name)
-                            client_select.value = None
-                            all_clients_selected['value'] = False
-                            all_clients_checkbox.value = False
-                            client_chips_container.refresh()
+                        client_id = client_select.value  # Valor agora é o ID
+                        
+                        # Busca o objeto do cliente pelo ID para obter o nome completo
+                        client_obj = next((c for c in _clients if c.get('_id') == client_id), None)
+                        
+                        if client_obj:
+                            full_name = client_obj.get('full_name') or client_obj.get('name', '')
+                            if full_name not in selected_clients:
+                                selected_clients.append(full_name)
+                                client_select.value = None # Limpa o select
+                                all_clients_selected['value'] = False
+                                all_clients_checkbox.value = False
+                                client_chips_container.refresh()
+                            else:
+                                ui.notify('Cliente já adicionado!', type='warning')
                         else:
-                            ui.notify('Cliente já adicionado!', type='warning')
-                
+                            ui.notify('Cliente não encontrado!', type='negative')
+
                 ui.button(icon='add', on_click=add_client).props('flat color=primary').classes('mt-4')
             
             def handle_all_clients(checked):
@@ -391,7 +402,9 @@ def case_detail(case_slug: str):
     def get_short_name(full_name: str, source_list: list) -> str:
         """Retorna sigla/apelido ou primeiro nome"""
         for item in source_list:
-            if item.get('name') == full_name:
+            # Busca por múltiplos campos de nome (compatibilidade)
+            item_name = item.get('name') or item.get('full_name') or item.get('nome_exibicao', '')
+            if item_name == full_name:
                 # Prioridade: nickname > alias > primeiro nome
                 if item.get('nickname'):
                     return item['nickname']
@@ -401,15 +414,16 @@ def case_detail(case_slug: str):
                 return full_name.split()[0] if full_name else full_name
         # Se não encontrou na lista, retorna primeiro nome
         return full_name.split()[0] if full_name else full_name
-    
+
     def format_option_for_search(item: dict) -> str:
         """Formata opção para busca: inclui nome e sigla/apelido"""
-        name = item.get('name', '')
+        # Busca por múltiplos campos de nome (compatibilidade)
+        name = item.get('name') or item.get('full_name') or item.get('nome_exibicao', '')
         nickname = item.get('nickname', '')
         if nickname and nickname != name:
             return f"{name} ({nickname})"
         return name
-    
+
     def get_option_value(formatted_option: str, source_list: list) -> str:
         """Extrai o nome completo de uma opção formatada"""
         # Remove a parte entre parênteses se existir
@@ -723,95 +737,100 @@ def case_detail(case_slug: str):
                 # ========== SEPARADOR ==========
                 ui.separator().style('margin: 20px 0;')
                 
-                # ========== CLIENTES (clean e compacto) ==========
-                # Multi-client editing
-                if 'clients' not in case and 'client' in case:
-                    case['clients'] = [case['client']] if case.get('client') else []
-                elif 'clients' not in case:
+                # ========== CLIENTES VINCULADOS (CORRIGIDO) ==========
+                ui.label('CLIENTES VINCULADOS').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 8px;')
+
+                # Garantir que clients existe no caso
+                if 'clients' not in case:
                     case['clients'] = []
+
+                # Lista local de clientes vinculados ao caso
+                case_clients_local = case.get('clients', []).copy()
+
+                # Carregar opções de clientes do módulo Pessoas
+                try:
+                    _clients_fresh = get_clients_list()
+                    client_options_fresh = [format_option_for_search(c) for c in _clients_fresh]
+                    
+                    print(f"[CLIENTES VINCULADOS] Opções carregadas: {len(client_options_fresh)}")
+                    print(f"[CLIENTES VINCULADOS] Clientes já vinculados: {case_clients_local}")
+                    
+                    # Aviso se não houver clientes carregados (possível problema de conexão)
+                    if len(client_options_fresh) == 0:
+                        print(f"[CLIENTES VINCULADOS] ⚠️ AVISO: Nenhum cliente carregado! Verifique a conexão com o Firestore.")
+                except Exception as e:
+                    print(f"[CLIENTES VINCULADOS] ❌ ERRO ao carregar clientes: {e}")
+                    _clients_fresh = []
+                    client_options_fresh = []
                 
-                case_clients = case.get('clients', []).copy()
-                edit_all_clients_selected = {'value': False}  # Estado do checkbox "Todos os Clientes"
-                client_options = [format_option_for_search(c) for c in _clients]
-                
-                ui.label('CLIENTES').style('font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; margin-bottom: 8px;')
-                
-                # Seletor de cliente compacto
+                # Aviso visual se não houver clientes carregados (possível problema de conexão)
+                if len(client_options_fresh) == 0:
+                    ui.label('⚠️ Nenhum cliente disponível. Verifique a conexão com o Firestore.').classes('text-orange-600 text-sm italic mb-2')
+
                 with ui.row().style('gap: 8px; width: 100%; align-items: center; margin-bottom: 12px;'):
-                    edit_client_select = ui.select(
-                        options=client_options, 
-                        label='Adicionar cliente',
+                    linked_client_select = ui.select(
+                        options=client_options_fresh,
+                        label='Buscar pessoa...',
                         with_input=True
-                    ).props('dense outlined').style('max-width: 300px;')
+                    ).props('dense outlined clearable').style('flex-grow: 1; min-width: 250px;')
                     
-                    def add_case_client():
-                        if edit_client_select.value:
-                            # Extrair nome completo da opção formatada
-                            full_name = get_option_value(edit_client_select.value, _clients)
-                            if full_name not in case_clients:
-                                case_clients.append(full_name)
-                                case['clients'] = case_clients.copy()
-                                edit_client_select.value = None
-                                edit_all_clients_selected['value'] = False
-                                edit_all_clients_checkbox.value = False
-                                case_client_chips.refresh()
-                                trigger_autosave()
-                            else:
-                                ui.notify('Cliente já adicionado!', type='warning')
-                    
-                    ui.button(icon='add', on_click=add_case_client).props('flat dense color=primary')
-                    
-                    # Checkbox "Todos os Clientes" inline
-                    def handle_edit_all_clients(checked):
-                        """Vincula ou desvincula todos os clientes"""
-                        edit_all_clients_selected['value'] = checked
-                        if checked:
-                            # Adicionar todos os clientes
-                            case_clients.clear()
-                            for client in _clients:
-                                full_name = client.get('name') or client.get('full_name', '')
-                                if full_name and full_name not in case_clients:
-                                    case_clients.append(full_name)
-                            case['clients'] = case_clients.copy()
-                            total = len(case_clients)
-                            ui.notify(f'✅ Todos os clientes foram adicionados! ({total})', type='positive')
-                        else:
-                            # Remover todos os clientes
-                            case_clients.clear()
-                            case['clients'] = []
-                            ui.notify('❌ Todos os clientes foram removidos!', type='info')
-                        case_client_chips.refresh()
-                        trigger_autosave()
-                    
-                    # Verifica se todos os clientes estão selecionados ao abrir
-                    all_client_names = [c.get('name') or c.get('full_name', '') for c in _clients if c.get('name') or c.get('full_name', '')]
-                    if set(case_clients) == set(all_client_names) and len(case_clients) > 0:
-                        edit_all_clients_selected['value'] = True
-                    
-                    edit_all_clients_checkbox = ui.checkbox(
-                        text=f'Todos ({len(_clients)})',
-                        value=edit_all_clients_selected['value'],
-                        on_change=lambda e: handle_edit_all_clients(e.value)
-                    ).style('font-size: 13px;')
-                
-                @ui.refreshable
-                def case_client_chips():
-                    if edit_all_clients_selected['value'] and case_clients:
-                        # Mostra texto especial quando "Todos os Clientes" está marcado
-                        ui.label(f'🌐 Interesse de Todos os Clientes ({len(case_clients)})').style(
-                            'color: #0c5460; font-size: 14px; font-weight: 500; margin-top: 4px;'
-                        )
-                    elif case_clients:
-                        # Exibe nomes dos clientes em texto corrido, separados por vírgula
-                        clientes_nomes = [get_short_name(name, _clients) for name in case_clients]
-                        clientes_texto = ', '.join(clientes_nomes)
+                    def add_linked_client():
+                        """Adiciona cliente selecionado ao caso."""
+                        print(f"[ADD_CLIENT] Botão clicado, valor: {linked_client_select.value}")
                         
-                        with ui.row().style('gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 4px;'):
-                            ui.label(clientes_texto).style('color: #333; font-size: 14px; font-weight: 500;')
+                        if not linked_client_select.value:
+                            ui.notify('Selecione um cliente primeiro!', type='warning')
+                            return
+                        
+                        # Extrair nome completo da opção formatada
+                        full_name = get_option_value(linked_client_select.value, _clients_fresh)
+                        print(f"[ADD_CLIENT] Nome extraído: {full_name}")
+                        
+                        if not full_name:
+                            ui.notify('Erro ao identificar cliente!', type='negative')
+                            return
+                        
+                        if full_name in case_clients_local:
+                            ui.notify('Cliente já vinculado!', type='warning')
+                            return
+                        
+                        # Adiciona à lista local
+                        case_clients_local.append(full_name)
+                        case['clients'] = case_clients_local.copy()
+                        
+                        # Limpa seleção
+                        linked_client_select.value = None
+                        
+                        # Atualiza UI
+                        render_linked_clients_chips.refresh()
+                        
+                        # Dispara autosave
+                        trigger_autosave()
+                        
+                        ui.notify(f'Cliente "{full_name}" vinculado!', type='positive')
+                    
+                    ui.button(icon='add', on_click=add_linked_client).props('flat dense color=primary')
+
+                # Container para chips dos clientes vinculados
+                @ui.refreshable
+                def render_linked_clients_chips():
+                    if case_clients_local:
+                        with ui.row().classes('w-full gap-2 flex-wrap'):
+                            for client_name in case_clients_local:
+                                short_name = get_short_name(client_name, _clients_fresh)
+                                with ui.badge(short_name, color='green').classes('px-2 py-1'):
+                                    def remove_linked_client(name=client_name):
+                                        case_clients_local.remove(name)
+                                        case['clients'] = case_clients_local.copy()
+                                        render_linked_clients_chips.refresh()
+                                        trigger_autosave()
+                                        ui.notify(f'Cliente "{name}" removido!', type='info')
+                                    
+                                    ui.button(icon='close', on_click=remove_linked_client).props('flat dense round size=xs color=white')
                     else:
-                        ui.label('-').style('color: #ccc; font-size: 14px; margin-top: 4px;')
-                
-                case_client_chips()
+                        ui.label('Nenhum cliente vinculado').classes('text-red-600 text-sm italic')
+
+                render_linked_clients_chips()
 
 
             # Tab 2: Processos

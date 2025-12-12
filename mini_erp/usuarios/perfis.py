@@ -50,3 +50,5 @@ def listar_perfis() -> list:
     return [
         {'id': k, **v} for k, v in PERFIS_ACESSO.items()
     ]
+
+

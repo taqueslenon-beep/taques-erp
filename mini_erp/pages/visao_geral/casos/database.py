@@ -5,6 +5,11 @@ Usa coleção Firebase: vg_casos
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from ....firebase_config import get_db
+from ....models.prioridade import (
+    validar_prioridade,
+    normalizar_prioridade,
+    PRIORIDADE_PADRAO
+)
 
 # Nome da coleção Firebase para este workspace
 COLECAO_CASOS = 'vg_casos'
@@ -127,6 +132,13 @@ def criar_caso(dados: Dict[str, Any]) -> Optional[str]:
         dados['created_at'] = datetime.now()
         dados['updated_at'] = datetime.now()
 
+        # Garante que prioridade seja definida (default: P4)
+        if 'prioridade' not in dados or not dados.get('prioridade'):
+            dados['prioridade'] = PRIORIDADE_PADRAO
+        else:
+            # Normaliza a prioridade
+            dados['prioridade'] = normalizar_prioridade(dados['prioridade'])
+
         # Remove _id se existir
         dados.pop('_id', None)
 
@@ -158,6 +170,11 @@ def atualizar_caso(caso_id: str, dados: Dict[str, Any]) -> bool:
             return False
 
         dados['updated_at'] = datetime.now()
+        
+        # Normaliza prioridade se estiver presente
+        if 'prioridade' in dados and dados.get('prioridade'):
+            dados['prioridade'] = normalizar_prioridade(dados['prioridade'])
+        
         dados.pop('_id', None)
 
         db.collection(COLECAO_CASOS).document(caso_id).update(dados)
@@ -276,3 +293,135 @@ def listar_casos_por_status(status: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"Erro ao listar casos por status: {e}")
         return []
+
+
+# =============================================================================
+# FUNÇÕES DE PRIORIDADE
+# =============================================================================
+
+def atualizar_prioridade_caso(caso_id: str, prioridade: str) -> bool:
+    """
+    Atualiza a prioridade de um caso específico.
+    
+    Args:
+        caso_id: ID do caso no Firestore
+        prioridade: Código da prioridade (P1, P2, P3, P4)
+    
+    Returns:
+        True se atualização foi bem-sucedida, False caso contrário
+    """
+    if not caso_id:
+        print("⚠️  ID do caso não fornecido")
+        return False
+    
+    # Normaliza e valida a prioridade
+    prioridade_normalizada = normalizar_prioridade(prioridade)
+    
+    if not validar_prioridade(prioridade_normalizada):
+        print(f"⚠️  Prioridade inválida: {prioridade}")
+        return False
+    
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+        
+        case_ref = db.collection(COLECAO_CASOS).document(caso_id)
+        
+        # Verifica se o caso existe
+        if not case_ref.get().exists:
+            print(f"⚠️  Caso não encontrado: {caso_id}")
+            return False
+        
+        # Atualiza a prioridade
+        case_ref.update({
+            'prioridade': prioridade_normalizada,
+            'updated_at': datetime.now()
+        })
+        
+        print(f"✅ Prioridade do caso {caso_id} atualizada para {prioridade_normalizada}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao atualizar prioridade do caso {caso_id}: {e}")
+        return False
+
+
+def listar_casos_por_prioridade(prioridade: str) -> List[Dict[str, Any]]:
+    """
+    Retorna lista de casos filtrados por prioridade.
+    
+    Args:
+        prioridade: Código da prioridade (P1, P2, P3, P4)
+    
+    Returns:
+        Lista de dicionários com dados dos casos da prioridade especificada
+    """
+    if not validar_prioridade(prioridade):
+        print(f"⚠️  Prioridade inválida: {prioridade}")
+        return []
+    
+    try:
+        # Normaliza a prioridade
+        prioridade_normalizada = normalizar_prioridade(prioridade)
+        
+        db = get_db()
+        if not db:
+            return []
+        
+        # Busca casos com a prioridade especificada
+        docs = db.collection(COLECAO_CASOS).where('prioridade', '==', prioridade_normalizada).stream()
+        casos = []
+        
+        for doc in docs:
+            caso = doc.to_dict()
+            caso['_id'] = doc.id
+            caso = _converter_timestamps(caso)
+            casos.append(caso)
+        
+        # Ordena por data de criação (mais recente primeiro)
+        casos.sort(key=lambda c: c.get('created_at', ''), reverse=True)
+        
+        return casos
+        
+    except Exception as e:
+        print(f"⚠️  Erro ao listar casos por prioridade {prioridade}: {e}")
+        return []
+
+
+def contar_casos_por_prioridade() -> Dict[str, int]:
+    """
+    Retorna dicionário com contagem de casos por prioridade.
+    
+    Returns:
+        Dicionário no formato: {'P1': 5, 'P2': 10, 'P3': 8, 'P4': 20}
+    """
+    try:
+        db = get_db()
+        if not db:
+            return {'P1': 0, 'P2': 0, 'P3': 0, 'P4': 0}
+        
+        collection_ref = db.collection(COLECAO_CASOS)
+        
+        # Inicializa contadores
+        contadores = {'P1': 0, 'P2': 0, 'P3': 0, 'P4': 0}
+        
+        # Busca todos os casos
+        docs = collection_ref.stream()
+        
+        for doc in docs:
+            case_data = doc.to_dict()
+            if case_data:
+                prioridade = normalizar_prioridade(case_data.get('prioridade'))
+                if prioridade in contadores:
+                    contadores[prioridade] += 1
+                else:
+                    # Casos sem prioridade ou com prioridade inválida contam como P4
+                    contadores['P4'] += 1
+        
+        return contadores
+        
+    except Exception as e:
+        print(f"⚠️  Erro ao contar casos por prioridade: {e}")
+        return {'P1': 0, 'P2': 0, 'P3': 0, 'P4': 0}

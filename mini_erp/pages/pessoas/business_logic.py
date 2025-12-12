@@ -39,16 +39,28 @@ def get_people_options_for_partners() -> Tuple[Dict[str, str], Dict[str, Dict[st
 def get_all_people_options() -> List[str]:
     """
     Retorna lista simples de pessoas para dropdown de vínculos.
+    Se não houver pessoas, retorna uma mensagem de erro.
     
     Returns:
-        Lista de strings no formato "[C] Nome" ou "[PC] Nome"
+        Lista de strings no formato "[C] Nome" ou "[PC] Nome", ou lista com mensagem de erro.
     """
+    clients = get_clients_list()
+    opposing_parties = get_opposing_parties_list()
+
+    if not clients and not opposing_parties:
+        return ["⚠ Erro: Nenhuma pessoa encontrada"]
+
     people = []
-    for c in get_clients_list():
-        people.append(f"[C] {get_full_name(c)}")
-    for op in get_opposing_parties_list():
-        people.append(f"[PC] {get_full_name(op)}")
-    return people
+    for c in clients:
+        full_name = get_full_name(c)
+        if full_name:
+            people.append(f"[C] {full_name}")
+    for op in opposing_parties:
+        full_name = get_full_name(op)
+        if full_name:
+            people.append(f"[PC] {full_name}")
+
+    return sorted(people, key=str.lower)
 
 
 def group_clients_by_type() -> List[Tuple[str, List[Tuple[int, Dict[str, Any]]]]]:

@@ -2143,23 +2143,35 @@ def layout(page_title: str, breadcrumbs: list = None):
                             
                             user = get_current_user()
                             if not user:
+                                print("[AVATAR HEADER] Usuário não encontrado")
                                 return
                                 
                             # Define iniciais
                             email = user.get('email', '')
-                            initials = email[:2].upper() if email else 'LT'
+                            initials = email[:2].upper() if email else 'U'
                             avatar_label.text = initials
                             
-                            # Carrega avatar
+                            # Carrega avatar do Storage
                             uid = user.get('uid')
+                            print(f"[AVATAR HEADER] Carregando para UID: {uid}")
+                            
                             if uid:
                                 url = await run.io_bound(obter_url_avatar, uid)
+                                print(f"[AVATAR HEADER] URL obtida: {url}")
+                                
                                 if url:
+                                    # Limpa o avatar e adiciona a imagem
                                     avatar_comp.clear()
                                     with avatar_comp:
-                                        ui.image(url).classes('w-full h-full object-cover')
+                                        # Adiciona a imagem com estilo circular
+                                        ui.image(url).classes('w-full h-full object-cover rounded-full')
+                                    print(f"[AVATAR HEADER] Imagem aplicada com sucesso!")
+                                else:
+                                    print(f"[AVATAR HEADER] Nenhuma URL retornada, mantendo iniciais")
                         except Exception as e:
-                            print(f"Erro ao carregar avatar: {e}")
+                            print(f"[AVATAR HEADER] Erro ao carregar avatar: {e}")
+                            import traceback
+                            traceback.print_exc()
                         finally:
                             avatar_navbar_loading['status'] = False
 

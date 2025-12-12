@@ -110,3 +110,5 @@ def excluir_usuario(usuario_id: str) -> bool:
 def vincular_firebase_uid(usuario_id: str, firebase_uid: str) -> bool:
     """Vincula um UID do Firebase Auth a um usuário do sistema."""
     return atualizar_usuario(usuario_id, {'firebase_uid': firebase_uid})
+
+

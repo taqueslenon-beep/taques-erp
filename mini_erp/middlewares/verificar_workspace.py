@@ -127,3 +127,5 @@ def verificar_e_definir_workspace_automatico():
         print(f"Erro ao verificar workspace automático: {e}")
         return False
 
+
+

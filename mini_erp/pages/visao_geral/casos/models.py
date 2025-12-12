@@ -3,10 +3,20 @@ Módulo de modelos e constantes para Casos do workspace Visão Geral.
 Define tipos de dados, constantes e estruturas usadas no módulo.
 
 Campos simplificados:
-- titulo, nucleo, status, categoria, estado, clientes, descricao
+- titulo, nucleo, status, categoria, estado, clientes, descricao, prioridade
 - REMOVIDOS: ano, mes, parte_contraria
 """
 from typing import TypedDict, List, Any
+
+# Imports de prioridades
+from ....models.prioridade import (
+    PRIORIDADES_PADRAO,
+    PRIORIDADE_PADRAO,
+    CODIGOS_PRIORIDADE,
+    get_cor_por_prioridade,
+    validar_prioridade,
+    normalizar_prioridade
+)
 
 # =============================================================================
 # CONSTANTES - NÚCLEOS
@@ -51,6 +61,19 @@ CATEGORIA_CORES = {
 
 ESTADOS = ['Santa Catarina', 'Paraná', 'Rio Grande do Sul']
 
+# Mapeamento de abreviações para nomes completos
+ESTADO_ABREVIACOES = {
+    'SC': 'Santa Catarina',
+    'PR': 'Paraná',
+    'RS': 'Rio Grande do Sul',
+}
+
+# =============================================================================
+# CONSTANTES - PRIORIDADES
+# =============================================================================
+
+PRIORIDADE_OPTIONS = CODIGOS_PRIORIDADE  # ['P1', 'P2', 'P3', 'P4']
+
 # =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
 # =============================================================================
@@ -64,6 +87,7 @@ class Caso(TypedDict, total=False):
     status: str                  # Em andamento, Suspenso, Arquivado, Encerrado
     categoria: str               # Contencioso, Consultivo, Outro
     estado: str                  # Santa Catarina, Paraná, Rio Grande do Sul
+    prioridade: str              # P1, P2, P3, P4 (opcional, default: P4)
     clientes: List[str]          # Lista de IDs de clientes vinculados
     clientes_nomes: List[str]    # Lista de nomes de clientes (para exibição)
     descricao: str               # Descrição/observações do caso
@@ -91,6 +115,23 @@ def obter_cor_categoria(categoria: str) -> dict:
     return CATEGORIA_CORES.get(categoria, {'bg': '#f3f4f6', 'text': '#374151', 'border': '#d1d5db'})
 
 
+def obter_cor_prioridade(codigo: str) -> str:
+    """
+    Retorna a cor hexadecimal de uma prioridade.
+    
+    Args:
+        codigo: Código da prioridade (P1, P2, P3, P4)
+    
+    Returns:
+        Cor hexadecimal (ex: '#DC2626')
+    """
+    try:
+        return get_cor_por_prioridade(codigo)
+    except (ValueError, TypeError):
+        # Fallback para P4 se código inválido
+        return get_cor_por_prioridade(PRIORIDADE_PADRAO)
+
+
 def criar_caso_vazio() -> dict:
     """Retorna um dicionário com estrutura padrão de caso vazio."""
     return {
@@ -99,10 +140,31 @@ def criar_caso_vazio() -> dict:
         'status': 'Em andamento',
         'categoria': 'Contencioso',
         'estado': 'Santa Catarina',
+        'prioridade': PRIORIDADE_PADRAO,  # P4 por padrão
         'clientes': [],
         'clientes_nomes': [],
         'descricao': '',
     }
+
+
+def sanitizar_estado(valor: str) -> str:
+    """
+    Converte abreviação de estado para nome completo.
+    Resolve o erro 'ValueError: Invalid value: SC' do NiceGUI.
+
+    Args:
+        valor: Valor do estado (pode ser 'SC', 'PR', 'RS' ou nome completo)
+
+    Returns:
+        Nome completo do estado ou string vazia
+    """
+    if not valor:
+        return ''
+    # Se já é nome completo, retorna
+    if valor in ESTADOS:
+        return valor
+    # Converte abreviação para nome completo
+    return ESTADO_ABREVIACOES.get(valor.upper(), valor)
 
 
 def validar_caso(dados: dict) -> tuple:
@@ -142,5 +204,10 @@ def validar_caso(dados: dict) -> tuple:
     estado = dados.get('estado', '')
     if estado and estado not in ESTADOS:
         return False, 'Estado inválido.'
+
+    # Prioridade válida (se informada)
+    prioridade = dados.get('prioridade', PRIORIDADE_PADRAO)
+    if prioridade and not validar_prioridade(prioridade):
+        return False, 'Prioridade inválida. Deve ser P1, P2, P3 ou P4.'
 
     return True, None

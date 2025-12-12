@@ -10,7 +10,8 @@ from typing import Optional, Callable
 from .database import criar_caso, atualizar_caso
 from .models import (
     NUCLEO_OPTIONS, STATUS_OPTIONS, CATEGORIA_OPTIONS, ESTADOS,
-    criar_caso_vazio, validar_caso
+    PRIORIDADE_OPTIONS, PRIORIDADE_PADRAO,
+    criar_caso_vazio, validar_caso, sanitizar_estado
 )
 from ..pessoas.database import listar_pessoas
 
@@ -26,8 +27,9 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
     is_edicao = caso is not None
     dados = caso.copy() if caso else criar_caso_vazio()
 
-    # Carregar clientes da coleção vg_pessoas
+    # Carregar clientes da coleção 'people' (principal do sistema)
     todas_pessoas = listar_pessoas()
+    print(f"[DIALOG CASO] {len(todas_pessoas)} pessoas carregadas de vg_pessoas")
 
     # Estado local para clientes selecionados
     clientes_selecionados = list(dados.get('clientes', []))
@@ -74,10 +76,17 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                         label='Categoria'
                     ).classes('flex-1').props('dense outlined')
 
-                # Linha 3: Estado
+                # Linha 2.5: Prioridade
+                prioridade_select = ui.select(
+                    options=PRIORIDADE_OPTIONS,
+                    value=dados.get('prioridade', PRIORIDADE_PADRAO),
+                    label='Prioridade'
+                ).classes('w-full').props('dense outlined')
+
+                # Linha 3: Estado (com sanitização para evitar erro SC/PR)
                 estado_select = ui.select(
                     options=[''] + ESTADOS,
-                    value=dados.get('estado', 'Santa Catarina'),
+                    value=sanitizar_estado(dados.get('estado', 'Santa Catarina')),
                     label='Estado'
                 ).classes('w-full').props('dense outlined clearable')
 
@@ -87,11 +96,11 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
 
                 # Dropdown para adicionar cliente + botão
                 with ui.row().classes('w-full gap-2 items-end'):
-                    # Preparar opções de clientes
-                    opcoes_clientes = [
-                        {'label': p.get('nome_exibicao', p.get('full_name', 'Sem nome')), 'value': p['_id']}
+                    # Preparar opções de clientes (dicionário {value: label} para NiceGUI)
+                    opcoes_clientes = {
+                        p['_id']: p.get('nome_exibicao', p.get('full_name', 'Sem nome'))
                         for p in todas_pessoas
-                    ]
+                    }
 
                     cliente_select = ui.select(
                         options=opcoes_clientes,
@@ -209,6 +218,7 @@ def abrir_dialog_caso(caso: Optional[dict] = None, on_save: Optional[Callable] =
                     'status': status_select.value or 'Em andamento',
                     'categoria': categoria_select.value or 'Contencioso',
                     'estado': estado_select.value or '',
+                    'prioridade': prioridade_select.value or PRIORIDADE_PADRAO,
                     'clientes': clientes_selecionados.copy(),
                     'clientes_nomes': [
                         next(

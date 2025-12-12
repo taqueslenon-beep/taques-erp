@@ -70,3 +70,5 @@ def get_collections_for_workspace(workspace: str) -> dict:
     """
     return WORKSPACE_COLLECTIONS.get(workspace, SCHMIDMEIER_COLLECTIONS)
 
+
+

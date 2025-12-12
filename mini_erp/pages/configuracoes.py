@@ -1,6 +1,6 @@
 import threading
 from datetime import datetime
-from nicegui import ui, run, context
+from nicegui import ui, run, context, events
 from ..core import layout
 from ..firebase_config import get_db
 from ..auth import is_authenticated, get_current_user
@@ -30,12 +30,17 @@ def configuracoes():
         return
     
     with layout('Configurações', breadcrumbs=[('Configurações', None)]):
+        # Estado do timer da aba Usuários (isolado para evitar interferência)
+        timer_ref = {'timer': None}
+        # Referência para função refresh_data (será definida dentro da aba Usuários)
+        refresh_data_ref = {'func': None}
+        
         with ui.tabs().classes('w-full') as tabs:
             perfil_tab = ui.tab('Perfil')
             geral_tab = ui.tab('Geral')
             usuarios_tab = ui.tab('Usuários')
         
-        with ui.tab_panels(tabs, value=perfil_tab).classes('w-full bg-white p-4 rounded shadow-sm'):
+        with ui.tab_panels(tabs, value=perfil_tab).classes('w-full bg-white p-4 rounded shadow-sm') as tab_panels:
             
             # --- PERFIL ---
             with ui.tab_panel(perfil_tab):
@@ -339,30 +344,15 @@ def configuracoes():
                             ui.timer(0.1, _init, once=True)
 
                         # Handler de Upload Inicial
-                        async def handle_upload(e):
+                        async def handle_upload(e: events.UploadEventArguments):
+                            """Handler para upload de avatar usando estrutura correta do NiceGUI."""
                             try:
-                                # No NiceGUI, UploadEventArguments tem um atributo 'file' do tipo FileUpload
-                                if not hasattr(e, 'file'):
-                                    ui.notify('Erro: evento de upload inválido.', type='negative')
-                                    return
+                                print(f"[UPLOAD] Iniciando - Nome: {e.name}, Tipo: {e.type}")
                                 
-                                file_upload = e.file
+                                # Lê os bytes do arquivo usando e.content.read()
+                                img_bytes = e.content.read()
                                 
-                                # FileUpload tem métodos read() e name
-                                file_name = getattr(file_upload, 'name', '')
-                                
-                                # Validação de tipo de arquivo
-                                if file_name:
-                                    ext = file_name.lower().split('.')[-1] if '.' in file_name else ''
-                                    if ext and ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-                                        ui.notify('Formato não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
-                                        upload_component.reset()
-                                        return
-                                
-                                # Lê os bytes do arquivo
-                                # FileUpload é um objeto file-like com método read() assíncrono
-                                # SmallFileUpload não tem seek(), então lemos diretamente
-                                img_bytes = await file_upload.read()
+                                print(f"[UPLOAD] Bytes lidos: {len(img_bytes)}")
                                 
                                 # Validação de tamanho (5MB)
                                 if len(img_bytes) > 5 * 1024 * 1024:
@@ -375,21 +365,33 @@ def configuracoes():
                                     upload_component.reset()
                                     return
                                 
+                                # Validação de tipo de arquivo
+                                file_name = e.name or ''
+                                if file_name:
+                                    ext = file_name.lower().split('.')[-1] if '.' in file_name else ''
+                                    if ext and ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                                        ui.notify('Formato não suportado! Use JPG, PNG, GIF ou WEBP.', type='negative')
+                                        upload_component.reset()
+                                        return
+                                
                                 # Valida se é realmente uma imagem válida
                                 try:
                                     from PIL import Image
                                     img_test = Image.open(io.BytesIO(img_bytes))
                                     img_test.verify()
-                                except Exception:
+                                    print(f"[UPLOAD] Imagem válida: {img_test.format}")
+                                except Exception as img_err:
                                     ui.notify('Arquivo não é uma imagem válida.', type='negative')
+                                    print(f"[UPLOAD] Erro validação: {img_err}")
                                     upload_component.reset()
                                     return
                                 
                                 # Abre editor
+                                print(f"[UPLOAD] Abrindo editor de avatar...")
                                 abrir_editor(img_bytes)
                                 
                             except Exception as ex:
-                                print(f"Erro no upload: {ex}")
+                                print(f"[UPLOAD] Erro geral: {ex}")
                                 import traceback
                                 traceback.print_exc()
                                 ui.notify(f'Erro ao processar arquivo: {str(ex)}', type='negative')
@@ -512,6 +514,11 @@ def configuracoes():
                     ui.label('Nenhum usuário encontrado').classes('text-gray-400 mt-2')
 
                 async def refresh_data():
+                    # Só atualiza se a aba Usuários estiver ativa
+                    # Verifica se o timer ainda está ativo (evita chamadas após mudança de aba)
+                    if timer_ref['timer'] and not timer_ref['timer'].active:
+                        return
+                    
                     # UI State: Loading
                     users_table.visible = False
                     empty_div.classes('hidden')
@@ -520,6 +527,11 @@ def configuracoes():
                     
                     # Fetch Data (in background)
                     rows = await run.io_bound(listar_usuarios_firebase)
+                    
+                    # Verifica novamente se ainda está na aba Usuários
+                    if timer_ref['timer'] and not timer_ref['timer'].active:
+                        refresh_btn.enable()
+                        return
                     
                     # UI State: Show Data
                     users_table.rows = rows
@@ -534,11 +546,44 @@ def configuracoes():
                     refresh_btn.enable()
                     ui.notify('Lista de usuários atualizada!', type='positive', position='top')
 
-                # Conecta botão e timer
+                # Conecta botão
                 refresh_btn.on_click(refresh_data)
                 
-                # Timer para atualização automática (5 min)
-                ui.timer(300, refresh_data)
+                # Armazena referência para refresh_data no escopo externo
+                refresh_data_ref['func'] = refresh_data
                 
-                # Carga inicial
-                ui.timer(0.1, refresh_data, once=True)
+                # Cria timer para atualização automática (5 min)
+                # Timer é criado desativado e será ativado apenas quando a aba Usuários estiver visível
+                timer_ref['timer'] = ui.timer(300, refresh_data)
+                timer_ref['timer'].deactivate()  # Inicia desativado
+                
+                # Carga inicial apenas se a aba Usuários for a aba padrão
+                # Como a aba padrão é Perfil, não fazemos carga inicial automática
+                # O usuário pode clicar no botão "Atualizar" ou mudar para a aba Usuários
+            
+            # Função para gerenciar timer baseado na aba ativa
+            # Definida após a criação do timer para ter acesso a ele
+            def on_tab_change(e):
+                """Ativa/desativa timer da aba Usuários conforme a aba selecionada"""
+                # O valor do evento é o tab selecionado
+                if e.value == usuarios_tab:
+                    # Ativa timer da aba usuários
+                    if timer_ref['timer']:
+                        timer_ref['timer'].activate()
+                        print("[TIMER] Timer da aba Usuários ativado")
+                        # Faz carga inicial quando entrar na aba pela primeira vez (se ainda não carregou)
+                        if refresh_data_ref['func']:
+                            # Verifica se precisa carregar dados iniciais
+                            # Usa um timer único para não bloquear a UI
+                            async def carga_inicial():
+                                if refresh_data_ref['func']:
+                                    await refresh_data_ref['func']()
+                            ui.timer(0.1, carga_inicial, once=True)
+                else:
+                    # Desativa timer quando sair da aba
+                    if timer_ref['timer']:
+                        timer_ref['timer'].deactivate()
+                        print("[TIMER] Timer da aba Usuários desativado")
+            
+            # Conecta evento de mudança de aba
+            tabs.on('update:model-value', on_tab_change)
