@@ -29,7 +29,7 @@ from .models import (
     sanitizar_estado,
 )
 from .componentes import criar_badge_prioridade
-from ..pessoas.database import listar_pessoas_colecao_people
+from ..pessoas.database import listar_pessoas
 
 
 # =============================================================================
@@ -45,6 +45,56 @@ LINK_ICONS = {
     'Slack': 'chat',
     'Outros': 'link',
 }
+
+
+def _render_logo(link_type: str):
+    """
+    Renderiza o ícone SVG customizado para o tipo de link.
+    Copiado do workspace 'ÁREA DO CLIENTE' para manter consistência visual.
+    """
+    if link_type == 'Google Drive':
+        ui.html('''
+            <svg width="24" height="24" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+            </svg>
+        ''', sanitize=False).classes('flex-shrink-0')
+    elif link_type == 'NotebookLM':
+        ui.html('''
+            <svg width="24" height="24" viewBox="0 0 106 80" xmlns="http://www.w3.org/2000/svg">
+              <g fill="#4285F4">
+                <path d="M52.96.1C23.71.1,0,23.61,0,52.62v25.15h9.76v-2.51c0-11.77,9.61-21.31,21.48-21.31s21.48,9.54,21.48,21.31v2.51h9.76v-2.51c0-17.11-13.99-30.98-31.24-30.98-6.72,0-12.94,2.1-18.03,5.69,5.33-10.51,16.31-17.73,28.99-17.73,17.91,0,32.43,14.41,32.43,32.16v13.36h9.76v-13.36c0-23.11-18.89-41.85-42.19-41.85-10.48,0-20.06,3.79-27.44,10.06,7.25-13.59,21.63-22.84,38.21-22.84,23.86,0,43.2,19.18,43.2,42.84v25.15h9.76v-25.15C105.92,23.61,82.21.1,52.96.1Z"/>
+              </g>
+            </svg>
+        ''', sanitize=False).classes('flex-shrink-0')
+    elif link_type == 'Ayoa':
+        ui.html('''
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="11" fill="#FD4556"/>
+                <text x="12" y="16" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="bold">A</text>
+            </svg>
+        ''', sanitize=False).classes('flex-shrink-0')
+    elif link_type == 'Slack':
+        ui.html('''
+            <svg width="24" height="24" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none">
+                    <path d="M19.712.133a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386h5.376V5.52A5.381 5.381 0 0 0 19.712.133m0 14.365H5.376A5.381 5.381 0 0 0 0 19.884a5.381 5.381 0 0 0 5.376 5.387h14.336a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386" fill="#36c5f0"/>
+                    <path d="M53.76 19.884a5.381 5.381 0 0 0-5.376-5.386 5.381 5.381 0 0 0-5.376 5.386v5.387h5.376a5.381 5.381 0 0 0 5.376-5.387m-14.336 0V5.52A5.381 5.381 0 0 0 34.048.133a5.381 5.381 0 0 0-5.376 5.387v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387" fill="#2eb67d"/>
+                    <path d="M34.048 54a5.381 5.381 0 0 0 5.376-5.387 5.381 5.381 0 0 0-5.376-5.386h-5.376v5.386A5.381 5.381 0 0 0 34.048 54m0-14.365h14.336a5.381 5.381 0 0 0 5.376-5.386 5.381 5.381 0 0 0-5.376-5.387H34.048a5.381 5.381 0 0 0-5.376 5.387 5.381 5.381 0 0 0 5.376 5.386" fill="#ecb22e"/>
+                    <path d="M0 34.249a5.381 5.381 0 0 0 5.376 5.386 5.381 5.381 0 0 0 5.376-5.386v-5.387H5.376A5.381 5.381 0 0 0 0 34.25m14.336 0v14.364a5.381 5.381 0 0 0 5.376 5.387 5.381 5.381 0 0 0 5.376-5.387V34.25a5.381 5.381 0 0 0-5.376-5.387 5.381 5.381 0 0 0-5.376 5.387" fill="#e01e5a"/>
+                </g>
+            </svg>
+        ''', sanitize=False).classes('flex-shrink-0')
+    else:
+        ui.html(f'''
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="{PRIMARY_COLOR}" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            </svg>
+        ''', sanitize=False).classes('flex-shrink-0')
 
 
 # =============================================================================
@@ -535,8 +585,8 @@ def _renderizar_detalhes_caso(caso: dict):
     titulo = caso.get('titulo', 'Caso sem título')
     caso_id = caso.get('_id', '')
 
-    # Carregar clientes da coleção 'people' (principal do sistema)
-    todas_pessoas = listar_pessoas_colecao_people()
+    # Carregar clientes da coleção 'vg_pessoas' (mesma fonte do modal)
+    todas_pessoas = listar_pessoas()
     print(f"[DETALHES CASO] {len(todas_pessoas)} pessoas carregadas para seleção")
 
     with layout(
@@ -786,16 +836,7 @@ def _renderizar_aba_dados_basicos(caso: dict, todas_pessoas: list, caso_id: str,
             ui.separator().classes('my-2')
             ui.label('CLIENTES VINCULADOS').classes('text-sm font-bold text-gray-600 mb-2')
 
-            # Preparar opções de clientes para o select
-            opcoes_clientes = [
-                {
-                    'label': p.get('nome_exibicao', p.get('full_name', 'Sem nome')),
-                    'value': p['_id']
-                }
-                for p in todas_pessoas
-            ]
-
-            # Criar dicionário de opcoes_pessoas (id -> nome) para uso nos chips
+            # Preparar opções de clientes (formato correto: dicionário {id: nome})
             opcoes_pessoas = {
                 p['_id']: p.get('nome_exibicao', p.get('full_name', 'Sem nome'))
                 for p in todas_pessoas
@@ -803,11 +844,6 @@ def _renderizar_aba_dados_basicos(caso: dict, todas_pessoas: list, caso_id: str,
 
             # Linha com select + botão adicionar
             with ui.row().classes('w-full gap-2 items-end'):
-                cliente_select = ui.select(
-                    options=opcoes_clientes,
-                    label='Buscar pessoa...',
-                    with_input=True
-                ).classes('flex-grow').props('dense outlined clearable use-input input-debounce="300"')
                 if len(opcoes_pessoas) > 0:
                     select_cliente = ui.select(
                         options=opcoes_pessoas,
@@ -815,7 +851,7 @@ def _renderizar_aba_dados_basicos(caso: dict, todas_pessoas: list, caso_id: str,
                         with_input=True
                     ).props('dense outlined clearable use-input input-debounce="200"').classes('flex-1')
                 else:
-                    ui.label('⚠️ Erro: Nenhuma pessoa encontrada').classes('text-red-500 flex-1')
+                    ui.label('Nenhum cliente cadastrado no sistema').classes('text-amber-600 flex-1')
                     select_cliente = None
                 
                 def ao_clicar_adicionar():
@@ -1231,202 +1267,117 @@ def _renderizar_aba_links(caso: dict, caso_id: str):
     """
     Renderiza a aba de links úteis com CRUD.
     Tipos: Google Drive, NotebookLM, Ayoa, Slack, Outros.
+    Sincronizado com workspace 'ÁREA DO CLIENTE' para manter consistência visual.
     """
-    with ui.card().classes('w-full detail-card p-6'):
-        # Header
-        with ui.row().classes('w-full justify-between items-center mb-4'):
-            ui.label('Links Úteis').classes('text-lg font-bold text-gray-800')
-
-            def novo_link():
-                _abrir_dialog_link(caso, caso_id, None, render_links_list)
-
-            ui.button('Adicionar Link', icon='add_link', on_click=novo_link).props(
-                'color=primary'
-            )
-
-        ui.separator().classes('mb-4')
-
-        # Lista de links
-        @ui.refreshable
-        def render_links_list():
-            links = caso.get('links', [])
-
-            if not links:
-                with ui.column().classes('w-full items-center py-8'):
-                    ui.icon('link_off', size='48px').classes('text-gray-300')
-                    ui.label('Nenhum link cadastrado').classes('text-gray-500 mt-2')
-                    ui.label('Clique em "Adicionar Link" para começar.').classes(
-                        'text-sm text-gray-400'
-                    )
+    ui.label('Links úteis').classes('text-lg font-bold mb-4')
+    
+    if not isinstance(caso.get('links'), list):
+        caso['links'] = []
+    
+    edit_state = {'is_editing': False, 'edit_index': None}
+    
+    with ui.dialog() as add_link_dialog, ui.card().classes('w-full max-w-md p-6'):
+        dialog_title = ui.label('Adicionar Link').classes('text-xl font-bold mb-4 text-primary')
+        
+        link_title = ui.input('Título do Link').classes('w-full mb-2').props('outlined')
+        link_url = ui.input('URL do Link').classes('w-full mb-2').props('outlined')
+        
+        link_type = ui.select(options=LINK_TYPES, label='Tipo do Link', value='Outros').classes('w-full mb-4')
+        
+        def save_link():
+            if not link_title.value or not link_url.value:
+                ui.notify('Título e URL são obrigatórios!', type='warning')
                 return
-
-            # Grid de cards de links
-            with ui.element('div').classes('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'):
-                for i, link in enumerate(links):
-                    _renderizar_card_link(link, i, caso, caso_id, render_links_list)
-
-        render_links_list()
-
-
-def _renderizar_card_link(link: dict, index: int, caso: dict, caso_id: str, refresh_func):
-    """Renderiza um card de link."""
-    titulo = link.get('titulo', 'Sem título')
-    url = link.get('url', '#')
-    tipo = link.get('tipo', 'Outros')
-    icon = LINK_ICONS.get(tipo, 'link')
-
-    with ui.card().classes('p-4 link-card border').style(f'border-color: {PRIMARY_COLOR};'):
-        with ui.row().classes('w-full justify-between items-start'):
-            # Ícone e título
-            with ui.row().classes('items-center gap-2 flex-1'):
-                ui.icon(icon, size='24px').style(f'color: {PRIMARY_COLOR};')
-                with ui.column().classes('gap-0'):
-                    ui.link(titulo, url, new_tab=True).classes(
-                        'text-base font-medium text-gray-800 hover:underline'
-                    )
-                    ui.label(tipo).classes('text-xs text-gray-500')
-
-            # Menu de ações
-            with ui.button(icon='more_vert').props('flat round dense size=sm'):
-                with ui.menu():
-                    def editar(idx=index):
-                        _abrir_dialog_link(caso, caso_id, idx, refresh_func)
-
-                    def excluir(idx=index):
-                        _confirmar_exclusao_link(caso, caso_id, idx, refresh_func)
-
-                    ui.menu_item('Editar', on_click=editar)
-                    ui.menu_item('Excluir', on_click=excluir)
-
-
-def _abrir_dialog_link(caso: dict, caso_id: str, index: int = None, refresh_func=None):
-    """
-    Abre dialog para criar ou editar um link.
-
-    Args:
-        caso: Dicionário do caso
-        caso_id: ID do caso
-        index: Índice do link (None para novo)
-        refresh_func: Função para atualizar a lista
-    """
-    is_edicao = index is not None
-    links = caso.get('links', [])
-
-    if is_edicao:
-        link = links[index].copy()
-    else:
-        link = {
-            'titulo': '',
-            'url': '',
-            'tipo': 'Google Drive',
-        }
-
-    with ui.dialog() as dialog, ui.card().classes('w-full max-w-md'):
-        # Header
-        with ui.row().classes('w-full items-center justify-between p-4').style(
-            f'background: {PRIMARY_COLOR};'
-        ):
-            ui.label('Editar Link' if is_edicao else 'Novo Link').classes(
-                'text-white font-bold text-lg'
-            )
-            ui.button(icon='close', on_click=dialog.close).props('flat round color=white')
-
-        # Formulário
-        with ui.column().classes('w-full gap-4 p-4'):
-            titulo_input = ui.input(
-                label='Título *',
-                value=link.get('titulo', ''),
-                placeholder='Nome do link'
-            ).classes('w-full').props('dense outlined')
-
-            url_input = ui.input(
-                label='URL *',
-                value=link.get('url', ''),
-                placeholder='https://...'
-            ).classes('w-full').props('dense outlined')
-
-            tipo_select = ui.select(
-                options=LINK_TYPES,
-                value=link.get('tipo', 'Google Drive'),
-                label='Tipo'
-            ).classes('w-full').props('dense outlined')
-
-        ui.separator()
-
-        # Botões
-        with ui.row().classes('w-full justify-end gap-2 p-4'):
-            ui.button('Cancelar', on_click=dialog.close).props('flat color=grey')
-
-            def salvar():
-                # Validação
-                if not titulo_input.value or not titulo_input.value.strip():
-                    ui.notify('Título é obrigatório.', type='negative')
-                    return
-
-                if not url_input.value or not url_input.value.strip():
-                    ui.notify('URL é obrigatória.', type='negative')
-                    return
-
-                # Coleta dados
-                novo_link = {
-                    'titulo': titulo_input.value.strip(),
-                    'url': url_input.value.strip(),
-                    'tipo': tipo_select.value,
-                }
-
-                # Atualiza lista de links
-                if 'links' not in caso:
-                    caso['links'] = []
-
-                if is_edicao:
-                    caso['links'][index] = novo_link
-                    msg = 'Link atualizado com sucesso!'
-                else:
-                    caso['links'].append(novo_link)
-                    msg = 'Link adicionado com sucesso!'
-
-                # Salva o caso
-                _trigger_autosave(caso, caso_id)
-
-                ui.notify(msg, type='positive')
-                dialog.close()
-
-                if refresh_func:
-                    refresh_func.refresh()
-
-            ui.button('Salvar', icon='save', on_click=salvar).props('color=primary')
-
-    dialog.open()
-
-
-def _confirmar_exclusao_link(caso: dict, caso_id: str, index: int, refresh_func=None):
-    """Dialog de confirmação de exclusão de link."""
-    links = caso.get('links', [])
-    if index >= len(links):
-        return
-
-    link = links[index]
-    titulo = link.get('titulo', 'Link')
-
-    with ui.dialog() as dialog, ui.card().classes('w-full max-w-md p-6'):
-        with ui.row().classes('items-center gap-3 mb-4'):
-            ui.icon('warning', color='negative', size='32px')
-            ui.label('Confirmar Exclusão').classes('text-xl font-bold text-gray-800')
-
-        ui.label(f'Deseja excluir o link "{titulo}"?').classes('text-gray-600 mb-2')
-        ui.label('Esta ação não pode ser desfeita.').classes('text-sm text-red-500 mb-4')
-
+            
+            # Compatibilidade: salva em ambos os formatos (title/titulo, type/tipo)
+            link_data = {
+                'title': link_title.value,
+                'titulo': link_title.value,
+                'url': link_url.value,
+                'type': link_type.value,
+                'tipo': link_type.value
+            }
+            
+            if edit_state['is_editing']:
+                caso['links'][edit_state['edit_index']] = link_data
+                ui.notify('Link atualizado!')
+            else:
+                caso['links'].append(link_data)
+                ui.notify('Link adicionado!')
+            
+            _trigger_autosave(caso, caso_id)
+            render_links_list.refresh()
+            add_link_dialog.close()
+            link_title.value = ''
+            link_url.value = ''
+            link_type.value = 'Outros'
+            edit_state['is_editing'] = False
+            edit_state['edit_index'] = None
+        
         with ui.row().classes('w-full justify-end gap-2'):
-            ui.button('Cancelar', on_click=dialog.close).props('flat color=grey')
+            ui.button('Cancelar', on_click=add_link_dialog.close).props('flat color=grey')
+            ui.button('Salvar', on_click=save_link).classes('bg-primary text-white')
+    
+    def open_add_dialog():
+        dialog_title.text = 'Adicionar Link'
+        link_title.value = ''
+        link_url.value = ''
+        link_type.value = 'Outros'
+        edit_state['is_editing'] = False
+        edit_state['edit_index'] = None
+        add_link_dialog.open()
+    
+    def open_edit_dialog(idx, link):
+        dialog_title.text = 'Editar Link'
+        # Compatibilidade: lê de ambos os formatos
+        link_title.value = link.get('title') or link.get('titulo', '')
+        link_url.value = link.get('url', '')
+        link_type.value = link.get('type') or link.get('tipo', 'Outros')
+        edit_state['is_editing'] = True
+        edit_state['edit_index'] = idx
+        add_link_dialog.open()
+    
+    with ui.row().classes('w-full justify-end mb-4'):
+        ui.button('Adicionar Link', icon='add_link', on_click=open_add_dialog).classes('bg-primary text-white')
+    
+    @ui.refreshable
+    def render_links_list():
+        if not caso.get('links'):
+            with ui.card().classes('w-full p-8 flex justify-center items-center bg-gray-50'):
+                ui.label('Nenhum link cadastrado.').classes('text-gray-400 italic')
+            return
+        
+        with ui.column().classes('w-full gap-2'):
+            for idx, link in enumerate(caso.get('links', [])):
+                # Compatibilidade: lê de ambos os formatos
+                link_type = link.get('type') or link.get('tipo', 'Outros')
+                
+                with ui.card().classes('w-full p-3 hover:shadow-md transition-shadow duration-200 border-l-4').style(f'border-left-color: {PRIMARY_COLOR}'):
+                    with ui.row().classes('w-full items-center gap-3 justify-between'):
+                        with ui.row().classes('items-center gap-3 flex-grow'):
+                            _render_logo(link_type)
+                            # Compatibilidade: lê de ambos os formatos
+                            link_title_text = link.get('title') or link.get('titulo', 'Sem título')
+                            ui.link(link_title_text, link['url'], new_tab=True).classes('text-base font-medium text-gray-800 hover:text-primary hover:underline no-underline')
+                        
+                        with ui.row().classes('gap-1'):
+                            ui.button(icon='edit', on_click=lambda i=idx, l=link: open_edit_dialog(i, l)).props('flat round dense').classes('text-gray-600').tooltip('Editar link')
+                            
+                            def delete_link(index=idx):
+                                caso['links'].pop(index)
+                                _trigger_autosave(caso, caso_id)
+                                ui.notify('Link removido!')
+                                render_links_list.refresh()
+                            
+                            ui.button(icon='delete', on_click=delete_link).props('flat round dense').classes('text-red-500').tooltip('Remover link')
+    
+    render_links_list()
 
-            def executar():
-                caso['links'].pop(index)
-                _trigger_autosave(caso, caso_id)
-                ui.notify('Link excluído com sucesso!', type='positive')
-                dialog.close()
-                if refresh_func:
-                    refresh_func.refresh()
 
-            ui.button('Excluir', on_click=executar).props('color=negative')
+# Função _renderizar_card_link removida - agora renderizada diretamente em _renderizar_aba_links
+# para manter consistência com workspace 'ÁREA DO CLIENTE'
 
-    dialog.open()
+
+# Funções _abrir_dialog_link e _confirmar_exclusao_link removidas
+# Agora o dialog e ações são gerenciados diretamente em _renderizar_aba_links
+# para manter consistência com workspace 'ÁREA DO CLIENTE'
