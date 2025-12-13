@@ -20,6 +20,22 @@ TIPO_PESSOA_LABELS = {
 TIPO_PESSOA_PADRAO = 'PF'
 
 # =============================================================================
+# CONSTANTES - TIPOS DE ENVOLVIDO
+# =============================================================================
+
+# Opções de tipo de envolvido
+TIPOS_ENVOLVIDO = ['PF', 'PJ', 'Ente Público']
+
+# Labels para exibição
+TIPO_ENVOLVIDO_LABELS = {
+    'PF': 'Pessoa Física',
+    'PJ': 'Pessoa Jurídica',
+    'Ente Público': 'Ente Público',
+}
+
+TIPO_ENVOLVIDO_PADRAO = 'PF'
+
+# =============================================================================
 # CONSTANTES - TIPOS DE FILIAL (para PJ)
 # =============================================================================
 
@@ -83,6 +99,20 @@ class Pessoa(TypedDict, total=False):
     observacoes: str
     created_at: Any
     updated_at: Any
+
+
+class Envolvido(TypedDict, total=False):
+    """Estrutura de um outro envolvido no sistema."""
+    _id: str                 # ID do documento (gerado automaticamente)
+    nome_completo: str       # Nome completo / Razão social (opcional)
+    nome_exibicao: str       # Nome de exibição (opcional)
+    cpf_cnpj: str           # CPF ou CNPJ (opcional, apenas dígitos)
+    email: str              # Email (opcional)
+    telefone: str            # Telefone (opcional)
+    tipo_envolvido: str     # 'PF', 'PJ' ou 'Ente Público' (default: 'PF')
+    observacoes: str        # Observações (opcional)
+    created_at: Any         # Data de criação
+    updated_at: Any         # Data de atualização
 
 
 # =============================================================================
@@ -161,6 +191,19 @@ def criar_pessoa_vazia() -> dict:
         'tipo_filial': 'Matriz',
         'socios': [],
         'vinculos': [],
+        'observacoes': '',
+    }
+
+
+def criar_envolvido_vazio() -> dict:
+    """Retorna um dicionário com estrutura padrão de envolvido vazio."""
+    return {
+        'nome_completo': '',
+        'nome_exibicao': '',
+        'cpf_cnpj': '',
+        'email': '',
+        'telefone': '',
+        'tipo_envolvido': TIPO_ENVOLVIDO_PADRAO,
         'observacoes': '',
     }
 

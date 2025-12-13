@@ -8,6 +8,7 @@ from ....firebase_config import get_db
 
 # Nome da coleção Firebase para este workspace
 COLECAO_PESSOAS = 'vg_pessoas'
+COLECAO_ENVOLVIDOS = 'vg_envolvidos'
 
 
 def _converter_timestamps(documento: Dict[str, Any]) -> Dict[str, Any]:
@@ -317,3 +318,190 @@ def listar_pessoas_colecao_people() -> List[Dict[str, Any]]:
         import traceback
         traceback.print_exc()
         return []
+
+
+# =============================================================================
+# FUNÇÕES CRUD PARA OUTROS ENVOLVIDOS
+# =============================================================================
+
+
+def listar_envolvidos() -> List[Dict[str, Any]]:
+    """
+    Retorna todos os envolvidos da coleção vg_envolvidos.
+
+    Returns:
+        Lista de dicionários com dados dos envolvidos
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return []
+
+        docs = db.collection(COLECAO_ENVOLVIDOS).stream()
+        envolvidos = []
+
+        for doc in docs:
+            envolvido = doc.to_dict()
+            envolvido['_id'] = doc.id
+            # Converte timestamps para evitar erro de serialização JSON
+            envolvido = _converter_timestamps(envolvido)
+            envolvidos.append(envolvido)
+
+        # Ordena por nome de exibição (ou nome completo se não houver)
+        envolvidos.sort(key=lambda e: (e.get('nome_exibicao') or e.get('nome_completo') or '').lower())
+
+        return envolvidos
+
+    except Exception as e:
+        print(f"Erro ao listar envolvidos: {e}")
+        return []
+
+
+def buscar_envolvido(envolvido_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Busca um envolvido específico pelo ID.
+
+    Args:
+        envolvido_id: ID do documento no Firebase
+
+    Returns:
+        Dicionário com dados do envolvido ou None se não encontrado
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return None
+
+        doc = db.collection(COLECAO_ENVOLVIDOS).document(envolvido_id).get()
+
+        if doc.exists:
+            envolvido = doc.to_dict()
+            envolvido['_id'] = doc.id
+            # Converte timestamps para evitar erro de serialização JSON
+            envolvido = _converter_timestamps(envolvido)
+            return envolvido
+
+        return None
+
+    except Exception as e:
+        print(f"Erro ao buscar envolvido {envolvido_id}: {e}")
+        return None
+
+
+def criar_envolvido(dados: Dict[str, Any]) -> Optional[str]:
+    """
+    Cria um novo envolvido na coleção.
+
+    Args:
+        dados: Dicionário com dados do envolvido
+
+    Returns:
+        ID do documento criado ou None em caso de erro
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return None
+
+        # Adiciona timestamps
+        dados['created_at'] = datetime.now()
+        dados['updated_at'] = datetime.now()
+
+        # Garante que tipo_envolvido tenha um valor padrão se não fornecido
+        if 'tipo_envolvido' not in dados or not dados.get('tipo_envolvido'):
+            dados['tipo_envolvido'] = 'PF'
+
+        # Remove _id se existir (será gerado pelo Firebase)
+        dados.pop('_id', None)
+
+        # Cria documento
+        doc_ref = db.collection(COLECAO_ENVOLVIDOS).add(dados)
+
+        # Retorna o ID do documento criado
+        return doc_ref[1].id
+
+    except Exception as e:
+        print(f"Erro ao criar envolvido: {e}")
+        return None
+
+
+def atualizar_envolvido(envolvido_id: str, dados: Dict[str, Any]) -> bool:
+    """
+    Atualiza um envolvido existente.
+
+    Args:
+        envolvido_id: ID do documento no Firebase
+        dados: Dicionário com dados a atualizar
+
+    Returns:
+        True se atualizado com sucesso, False caso contrário
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+
+        # Adiciona timestamp de atualização
+        dados['updated_at'] = datetime.now()
+
+        # Remove _id dos dados (não deve ser atualizado)
+        dados.pop('_id', None)
+
+        # Atualiza documento
+        db.collection(COLECAO_ENVOLVIDOS).document(envolvido_id).update(dados)
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao atualizar envolvido {envolvido_id}: {e}")
+        return False
+
+
+def excluir_envolvido(envolvido_id: str) -> bool:
+    """
+    Remove um envolvido da coleção.
+
+    Args:
+        envolvido_id: ID do documento no Firebase
+
+    Returns:
+        True se removido com sucesso, False caso contrário
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+
+        db.collection(COLECAO_ENVOLVIDOS).document(envolvido_id).delete()
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao excluir envolvido {envolvido_id}: {e}")
+        return False
+
+
+def contar_envolvidos() -> int:
+    """
+    Retorna o total de envolvidos cadastrados.
+
+    Returns:
+        Número total de envolvidos
+    """
+    try:
+        db = get_db()
+        if not db:
+            return 0
+
+        # Conta documentos na coleção
+        docs = db.collection(COLECAO_ENVOLVIDOS).stream()
+        return sum(1 for _ in docs)
+
+    except Exception as e:
+        print(f"Erro ao contar envolvidos: {e}")
+        return 0

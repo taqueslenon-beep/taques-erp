@@ -16,7 +16,7 @@ WORKSPACES = {
         'id': 'area_cliente_schmidmeier',
         'nome': 'Área do cliente: Schmidmeier 🇩🇪',
         'prefixo_colecoes': 'schmidmeier_',
-        'rota_inicial': '/visao-geral/painel',  # ALTERADO: Agora redireciona para Painel ao invés de '/'
+        'rota_inicial': '/',  # CORRIGIDO: Voltou para '/' que agora renderiza baseado no workspace
         'icon': 'folder_open'
     },
     'visao_geral_escritorio': {

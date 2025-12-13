@@ -766,27 +766,13 @@ def prazos():
                 columns=columns,
                 rows=rows,
                 row_key='id'
-            ).classes('w-full').props('flat dense')
+            ).classes('w-full tabela-prazos').props('flat dense')
 
-            # Slot para linha inteira com cores alternadas
-            table.add_slot('body-row', '''
-                <q-tr 
-                    :props="props" 
-                    :style="
-                        props.row.atrasado 
-                            ? 'background-color: #FFCDD2;' 
-                            : (props.row._indice % 2 === 0 
-                                ? 'background-color: #FFFFFF;' 
-                                : 'background-color: #F5F5F5;')
-                    "
-                >
-                    <slot></slot>
-                </q-tr>
-            ''')
-
-            # Slot para checkbox de concluído
+            # Slot para checkbox de concluído - adiciona data-atrasado para JavaScript
             table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" style="vertical-align: middle;">
+                <q-td :props="props" 
+                      style="vertical-align: middle;"
+                      :data-atrasado="props.row.atrasado ? 'true' : 'false'">
                     <q-checkbox
                         :model-value="props.value"
                         @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
@@ -822,15 +808,15 @@ def prazos():
 
             # Slot para Prazo de Segurança (amarelo pastel sempre)
             table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" style="background-color: #FFF9C4; vertical-align: middle; text-align: center;">
-                    {{ props.value }}
+                <q-td :props="props" style="vertical-align: middle; text-align: center;">
+                    <span class="celula-prazo-seguranca">{{ props.value }}</span>
                 </q-td>
             ''')
 
             # Slot para Prazo Fatal (vermelho pastel sempre, mais escuro se atrasado)
             table.add_slot('body-cell-prazo_fatal', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #EF9A9A; vertical-align: middle; text-align: center; font-weight: bold;' : 'background-color: #FFCDD2; vertical-align: middle; text-align: center;'">
-                    {{ props.value }}
+                <q-td :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
+                    <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.value }}</span>
                 </q-td>
             ''')
 
@@ -978,27 +964,13 @@ def prazos():
                 columns=columns,
                 rows=rows,
                 row_key='id'
-            ).classes('w-full').props('flat dense')
+            ).classes('w-full tabela-prazos').props('flat dense')
 
-            # Slot para linha inteira com cores alternadas
-            table.add_slot('body-row', '''
-                <q-tr 
-                    :props="props" 
-                    :style="
-                        props.row.atrasado 
-                            ? 'background-color: #FFCDD2;' 
-                            : (props.row._indice % 2 === 0 
-                                ? 'background-color: #FFFFFF;' 
-                                : 'background-color: #F5F5F5;')
-                    "
-                >
-                    <slot></slot>
-                </q-tr>
-            ''')
-
-            # Slot para checkbox de concluído
+            # Slot para checkbox de concluído - adiciona data-atrasado para JavaScript
             table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" style="vertical-align: middle;">
+                <q-td :props="props" 
+                      style="vertical-align: middle;"
+                      :data-atrasado="props.row.atrasado ? 'true' : 'false'">
                     <q-checkbox
                         :model-value="props.value"
                         @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
@@ -1027,15 +999,15 @@ def prazos():
 
             # Slot para Prazo de Segurança (amarelo pastel sempre)
             table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" style="background-color: #FFF9C4; vertical-align: middle; text-align: center;">
-                    {{ props.value }}
+                <q-td :props="props" style="vertical-align: middle; text-align: center;">
+                    <span class="celula-prazo-seguranca">{{ props.value }}</span>
                 </q-td>
             ''')
 
             # Slot para Prazo Fatal (vermelho pastel sempre, mais escuro se atrasado)
             table.add_slot('body-cell-prazo_fatal', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #EF9A9A; vertical-align: middle; text-align: center; font-weight: bold;' : 'background-color: #FFCDD2; vertical-align: middle; text-align: center;'">
-                    {{ props.value }}
+                <q-td :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
+                    <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.value }}</span>
                 </q-td>
             ''')
 

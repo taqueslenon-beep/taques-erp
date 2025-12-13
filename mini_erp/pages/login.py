@@ -80,20 +80,20 @@ def login_page():
                         workspace_info = obter_info_workspace(workspace_id)
                         rota_redirecionamento = workspace_info.get('rota_inicial', '/visao-geral/painel')
                     elif tipo_usuario == 'cliente':
-                        # Cliente → Painel (Visão Geral do Escritório)
-                        # ALTERADO: Agora clientes também vão para o Painel ao invés de Área do Cliente
-                        workspace_id = 'visao_geral_escritorio'
+                        # Cliente → Área do Cliente
+                        # CORRIGIDO: Clientes voltam a ir para o workspace 'area_cliente_schmidmeier'
+                        workspace_id = 'area_cliente_schmidmeier'
                         definir_workspace(workspace_id)
                         workspace_info = obter_info_workspace(workspace_id)
-                        rota_redirecionamento = workspace_info.get('rota_inicial', '/visao-geral/painel')
+                        rota_redirecionamento = workspace_info.get('rota_inicial', '/')
                     else:
                         # Tipo desconhecido: usa comportamento padrão (workspace persistido)
-                        # ALTERADO: Fallback agora usa Painel ao invés de '/'
+                        # CORRIGIDO: Fallback usa rota_inicial do workspace carregado
                         from ..gerenciadores.gerenciador_workspace import carregar_workspace_persistido
                         workspace_id = carregar_workspace_persistido()
                         definir_workspace(workspace_id)
                         workspace_info = obter_info_workspace(workspace_id)
-                        rota_redirecionamento = workspace_info.get('rota_inicial', '/visao-geral/painel') if workspace_info else '/visao-geral/painel'
+                        rota_redirecionamento = workspace_info.get('rota_inicial', '/') if workspace_info else '/'
                     
                     ui.notify('Login realizado com sucesso!', type='positive')
                     ui.navigate.to(rota_redirecionamento)
