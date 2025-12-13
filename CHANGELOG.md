@@ -56,3 +56,30 @@
 - Editor de avatar com preview/zoom/ajuste de posição
 - Código morto e imports não utilizados
 - Funções `abrir_editor()`, `update_preview()`, `processar_preview_sync()`
+
+## [v1.3.0] - 2024-12-13
+
+### Adicionado
+- **Módulo Entregáveis**: Sistema completo de gerenciamento de tarefas/entregáveis
+- **Visualização Kanban**: Arrastar e soltar cards entre colunas de status
+- **Colunas de Status**: Em espera (laranja), Pendente (vermelho), Em andamento (amarelo), Concluído (verde)
+- **Visualização por Categoria**: Operacional, Marketing, Vendas, Administrativo, Estratégico
+- **Filtros avançados**: Por categoria, prioridade e responsável
+- **Ordenação automática**: Cards ordenados por prioridade (P1 primeiro)
+- **Campo Link no Slack**: Vincular entregáveis a mensagens do Slack
+- **CRUD completo**: Criar, visualizar, editar e excluir entregáveis
+- **Drag & Drop**: Mover entregáveis entre status arrastando
+- **Estatísticas no Painel**: Gráficos de entregáveis por responsável, status, categoria e prioridade
+- **Contador mensal**: Total de entregáveis concluídos no mês
+- **Sistema de abas no Painel**: Alternar entre estatísticas de Casos e Entregáveis
+
+### Modificado
+- **Painel**: Cards clicáveis alternam visualização de estatísticas
+- **Sidebar**: Adicionado item "Entregáveis" no menu lateral
+
+### Técnico
+- Nova collection no Firestore: `entregaveis`
+- Novo service: `EntregavelService`
+- Novo modelo: `Entregavel`
+- Integração com Firebase Auth para listar responsáveis
+
