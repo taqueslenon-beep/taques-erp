@@ -16,7 +16,7 @@ WORKSPACES = {
         'id': 'area_cliente_schmidmeier',
         'nome': 'Área do cliente: Schmidmeier 🇩🇪',
         'prefixo_colecoes': 'schmidmeier_',
-        'rota_inicial': '/',
+        'rota_inicial': '/visao-geral/painel',  # ALTERADO: Agora redireciona para Painel ao invés de '/'
         'icon': 'folder_open'
     },
     'visao_geral_escritorio': {
@@ -29,7 +29,8 @@ WORKSPACES = {
 }
 
 # Workspace padrão (fallback)
-WORKSPACE_PADRAO = 'area_cliente_schmidmeier'
+# ALTERADO: Agora usa 'visao_geral_escritorio' como padrão ao invés de 'area_cliente_schmidmeier'
+WORKSPACE_PADRAO = 'visao_geral_escritorio'
 
 
 # =============================================================================

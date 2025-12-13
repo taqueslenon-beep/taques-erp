@@ -41,7 +41,14 @@ def _renderizar_pagina_pessoas():
             margin-bottom: 16px;
         }
         .tabela-pessoas {
-            width: 100%;
+            width: 100% !important;
+        }
+        .tabela-pessoas .q-table__container {
+            width: 100% !important;
+        }
+        .tabela-pessoas .q-table {
+            width: 100% !important;
+            table-layout: fixed !important;
         }
         .tabela-pessoas .q-table__top {
             padding: 0;
@@ -50,12 +57,32 @@ def _renderizar_pagina_pessoas():
             font-weight: 600 !important;
             color: #374151 !important;
             background-color: #f3f4f6 !important;
+            padding: 12px 16px !important;
         }
         .tabela-pessoas td {
             padding: 12px 16px !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .tabela-pessoas tbody tr:hover {
             background-color: #f9fafb !important;
+            transition: background-color 0.2s ease;
+        }
+        /* Larguras proporcionais das colunas - 3 colunas apenas */
+        .tabela-pessoas .q-table thead th:nth-child(1),
+        .tabela-pessoas .q-table tbody td:nth-child(1) {
+            width: 70% !important;
+            min-width: 300px;
+        }
+        .tabela-pessoas .q-table thead th:nth-child(2),
+        .tabela-pessoas .q-table tbody td:nth-child(2) {
+            width: 15% !important;
+            min-width: 100px;
+        }
+        .tabela-pessoas .q-table thead th:nth-child(3),
+        .tabela-pessoas .q-table tbody td:nth-child(3) {
+            width: 15% !important;
+            min-width: 120px;
         }
         .contador-resultados {
             font-size: 0.875rem;
@@ -69,6 +96,13 @@ def _renderizar_pagina_pessoas():
             padding: 4rem 2rem;
             text-align: center;
         }
+        /* Estilos para abas - seguindo padrão do módulo pessoas */
+        .main-tabs .q-tab {
+            font-size: 1.1rem !important;
+            font-weight: 600 !important;
+            color: #1f2937 !important;
+            margin-right: 2rem !important;
+        }
         </style>
         ''')
 
@@ -81,72 +115,98 @@ def _renderizar_pagina_pessoas():
         # Referência para o refreshable (será definida depois)
         refresh_ref = {'func': None}
 
-        # Container principal com card
-        with ui.card().classes('w-full'):
-            # Header
-            with ui.row().classes('w-full justify-between items-center p-4'):
-                with ui.column().classes('gap-0'):
-                    ui.label('Pessoas').classes('text-xl font-bold text-gray-800')
-                    ui.label('Gerenciamento de pessoas do escritório').classes('text-sm text-gray-500')
+        # Container principal com abas
+        with ui.column().classes('w-full gap-0'):
+            # Abas principais - alinhadas à esquerda
+            with ui.tabs().classes('w-full justify-start main-tabs').props('no-caps align=left') as main_tabs:
+                clientes_tab = ui.tab('Clientes')
+                outros_envolvidos_tab = ui.tab('Outros Envolvidos')
+                parceiros_tab = ui.tab('Parceiros')
 
-                # Botão Nova Pessoa
-                def nova_pessoa():
-                    if refresh_ref['func']:
-                        abrir_dialog_pessoa(on_save=lambda: refresh_ref['func'].refresh())
-                    else:
-                        abrir_dialog_pessoa()
+            # Painel de conteúdo das abas
+            with ui.tab_panels(main_tabs, value=clientes_tab).classes('w-full bg-white p-4 rounded shadow-sm'):
+                # ========== ABA: CLIENTES ==========
+                with ui.tab_panel(clientes_tab):
+                    # Container principal com card
+                    with ui.card().classes('w-full'):
+                        # Header
+                        with ui.row().classes('w-full justify-between items-center p-4'):
+                            with ui.column().classes('gap-0'):
+                                ui.label('Pessoas').classes('text-xl font-bold text-gray-800')
+                                ui.label('Gerenciamento de pessoas do escritório').classes('text-sm text-gray-500')
 
-                ui.button('Nova Pessoa', icon='add', on_click=nova_pessoa).props('color=primary')
+                            # Botão Nova Pessoa
+                            def nova_pessoa():
+                                if refresh_ref['func']:
+                                    abrir_dialog_pessoa(on_save=lambda: refresh_ref['func'].refresh())
+                                else:
+                                    abrir_dialog_pessoa()
 
-            ui.separator()
+                            ui.button('Nova Pessoa', icon='add', on_click=nova_pessoa).props('color=primary')
 
-            # Container dos filtros
-            with ui.element('div').classes('filtros-container mx-4 mt-4'):
-                with ui.row().classes('w-full items-end gap-4'):
-                    # Campo de busca
-                    busca_input = ui.input(
-                        label='Buscar',
-                        placeholder='Nome, email ou documento...'
-                    ).classes('flex-1').props('dense outlined clearable')
+                        ui.separator()
 
-                    # Filtro por tipo
-                    tipo_select = ui.select(
-                        options=['Todos'] + TIPO_PESSOA_OPTIONS,
-                        value='Todos',
-                        label='Tipo'
-                    ).classes('w-32').props('dense outlined')
+                        # Container dos filtros
+                        with ui.element('div').classes('filtros-container mx-4 mt-4'):
+                            with ui.row().classes('w-full items-end gap-4'):
+                                # Campo de busca
+                                busca_input = ui.input(
+                                    label='Buscar',
+                                    placeholder='Nome, email ou documento...'
+                                ).classes('flex-1').props('dense outlined clearable')
 
-                    # Botão limpar filtros
-                    def limpar_filtros():
-                        busca_input.value = ''
-                        tipo_select.value = 'Todos'
-                        filtros['busca'] = ''
-                        filtros['tipo'] = 'Todos'
-                        if refresh_ref['func']:
-                            refresh_ref['func'].refresh()
+                                # Filtro por tipo
+                                tipo_select = ui.select(
+                                    options=['Todos'] + TIPO_PESSOA_OPTIONS,
+                                    value='Todos',
+                                    label='Tipo'
+                                ).classes('w-32').props('dense outlined')
 
-                    ui.button('Limpar', icon='clear', on_click=limpar_filtros).props('flat dense')
+                                # Botão limpar filtros
+                                def limpar_filtros():
+                                    busca_input.value = ''
+                                    tipo_select.value = 'Todos'
+                                    filtros['busca'] = ''
+                                    filtros['tipo'] = 'Todos'
+                                    if refresh_ref['func']:
+                                        refresh_ref['func'].refresh()
 
-                    # Eventos de filtro
-                    def aplicar_filtros():
-                        filtros['busca'] = busca_input.value or ''
-                        filtros['tipo'] = tipo_select.value
-                        if refresh_ref['func']:
-                            refresh_ref['func'].refresh()
+                                ui.button('Limpar', icon='clear', on_click=limpar_filtros).props('flat dense')
 
-                    busca_input.on('update:model-value', lambda: aplicar_filtros())
-                    tipo_select.on('update:model-value', lambda: aplicar_filtros())
+                                # Eventos de filtro
+                                def aplicar_filtros():
+                                    filtros['busca'] = busca_input.value or ''
+                                    filtros['tipo'] = tipo_select.value
+                                    if refresh_ref['func']:
+                                        refresh_ref['func'].refresh()
 
-            # Conteúdo principal (tabela)
-            @ui.refreshable
-            def renderizar_conteudo():
-                _renderizar_tabela(filtros, renderizar_conteudo)
+                                busca_input.on('update:model-value', lambda: aplicar_filtros())
+                                tipo_select.on('update:model-value', lambda: aplicar_filtros())
 
-            # Guarda referência para uso posterior
-            refresh_ref['func'] = renderizar_conteudo
+                        # Conteúdo principal (tabela)
+                        @ui.refreshable
+                        def renderizar_conteudo():
+                            _renderizar_tabela(filtros, renderizar_conteudo)
 
-            with ui.element('div').classes('p-4'):
-                renderizar_conteudo()
+                        # Guarda referência para uso posterior
+                        refresh_ref['func'] = renderizar_conteudo
+
+                        with ui.element('div').classes('w-full p-4').style('width: 100%; overflow-x: auto'):
+                            renderizar_conteudo()
+
+                # ========== ABA: OUTROS ENVOLVIDOS ==========
+                with ui.tab_panel(outros_envolvidos_tab):
+                    with ui.column().classes('w-full items-center justify-center py-16'):
+                        ui.icon('construction', size='64px').classes('text-gray-400')
+                        ui.label('Em desenvolvimento').classes('text-xl font-bold text-gray-500 mt-4')
+                        ui.label('Esta funcionalidade estará disponível em breve.').classes('text-gray-400')
+
+                # ========== ABA: PARCEIROS ==========
+                with ui.tab_panel(parceiros_tab):
+                    with ui.column().classes('w-full items-center justify-center py-16'):
+                        ui.icon('construction', size='64px').classes('text-gray-400')
+                        ui.label('Em desenvolvimento').classes('text-xl font-bold text-gray-500 mt-4')
+                        ui.label('Esta funcionalidade estará disponível em breve.').classes('text-gray-400')
 
 
 def _renderizar_tabela(filtros: dict, refresh_callback):
@@ -207,23 +267,20 @@ def _renderizar_tabela(filtros: dict, refresh_callback):
             '_dados_completos': dados_seguros,
         })
 
-    # Colunas da tabela
+    # Colunas da tabela - apenas Nome, Tipo e Ações
     colunas = [
-        {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left', 'sortable': True},
-        {'name': 'tipo_pessoa', 'label': 'Tipo', 'field': 'tipo_pessoa', 'align': 'center'},
-        {'name': 'cpf_cnpj_formatado', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj_formatado', 'align': 'left'},
-        {'name': 'email', 'label': 'Email', 'field': 'email', 'align': 'left'},
-        {'name': 'telefone', 'label': 'Telefone', 'field': 'telefone', 'align': 'left'},
-        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center'},
+        {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left', 'sortable': True, 'style': 'width: 70%'},
+        {'name': 'tipo_pessoa', 'label': 'Tipo', 'field': 'tipo_pessoa', 'align': 'center', 'style': 'width: 15%'},
+        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 15%'},
     ]
 
-    # Cria tabela
+    # Cria tabela com largura total
     tabela = ui.table(
         columns=colunas,
         rows=dados_tabela,
         row_key='_id',
         pagination={'rowsPerPage': 15},
-    ).classes('w-full tabela-pessoas')
+    ).classes('w-full tabela-pessoas').style('width: 100%')
 
     # Slot para coluna de tipo (badge colorido)
     tabela.add_slot('body-cell-tipo_pessoa', '''

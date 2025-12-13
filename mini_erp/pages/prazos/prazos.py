@@ -21,6 +21,8 @@ from .database import (
     buscar_usuarios_para_select,
     buscar_clientes_para_select,
     buscar_casos_para_select,
+    criar_proximo_prazo_recorrente,
+    calcular_proximo_prazo_fatal,
 )
 from .modal_prazo import render_prazo_dialog
 from .models import STATUS_LABELS
@@ -101,6 +103,24 @@ def verificar_prazo_atrasado(timestamp: Any, status: str) -> bool:
         return False
     except Exception:
         return False
+
+
+def formatar_titulo_prazo(prazo: Dict[str, Any]) -> str:
+    """
+    Formata o título do prazo, adicionando emoji 🔁 se for recorrente.
+
+    Args:
+        prazo: Dicionário com dados do prazo
+
+    Returns:
+        Título formatado com emoji se recorrente
+    """
+    titulo = prazo.get('titulo', 'Sem título')
+    is_recorrente = prazo.get('recorrente', False)
+    
+    if is_recorrente:
+        return f"🔁 {titulo}"
+    return titulo
 
 
 # =============================================================================
@@ -339,6 +359,80 @@ def prazos():
 
     print("[PRAZOS] Iniciando carregamento da página...")
 
+    # CSS para cores alternadas e prazos atrasados
+    ui.add_head_html('''
+    <style>
+        /* Cores alternadas nas linhas */
+        .tabela-prazos tbody tr:nth-child(even) {
+            background-color: #FFFFFF !important;
+        }
+        .tabela-prazos tbody tr:nth-child(odd) {
+            background-color: #F5F5F5 !important;
+        }
+        
+        /* Prazos atrasados sobrepõem a alternância */
+        .tabela-prazos tbody tr.linha-atrasada,
+        .tabela-prazos tbody tr.linha-atrasada td {
+            background-color: #FFCDD2 !important;
+        }
+        
+        /* Cores das células de prazo */
+        .celula-prazo-seguranca {
+            background-color: #FFF9C4 !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            display: inline-block;
+        }
+        
+        .celula-prazo-fatal {
+            background-color: #FFCDD2 !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            display: inline-block;
+        }
+    </style>
+    <script>
+        function aplicarClasseAtrasado() {
+            setTimeout(function() {
+                const tabelas = document.querySelectorAll('.tabela-prazos tbody');
+                tabelas.forEach(function(tbody) {
+                    const linhas = tbody.querySelectorAll('tr');
+                    linhas.forEach(function(linha) {
+                        const celulas = linha.querySelectorAll('td');
+                        let isAtrasado = false;
+                        celulas.forEach(function(celula) {
+                            if (celula.getAttribute('data-atrasado') === 'true') {
+                                isAtrasado = true;
+                            }
+                        });
+                        if (isAtrasado) {
+                            linha.classList.add('linha-atrasada');
+                        } else {
+                            linha.classList.remove('linha-atrasada');
+                        }
+                    });
+                });
+            }, 100);
+        }
+        
+        // Executa após renderização
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', aplicarClasseAtrasado);
+        } else {
+            aplicarClasseAtrasado();
+        }
+        
+        // Observa mudanças na tabela
+        const observer = new MutationObserver(aplicarClasseAtrasado);
+        setTimeout(function() {
+            const containers = document.querySelectorAll('.tabela-prazos');
+            containers.forEach(function(container) {
+                observer.observe(container, { childList: true, subtree: true });
+            });
+        }, 500);
+    </script>
+    ''')
+
     # Carregar opções EM PARALELO para reduzir tempo de carregamento
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
@@ -478,9 +572,27 @@ def prazos():
                             sucesso = atualizar_prazo(prazo_id, prazo)
 
                             if sucesso:
+                                # Se for recorrente, criar próximo prazo
+                                if prazo.get('recorrente'):
+                                    novo_id = criar_proximo_prazo_recorrente(prazo)
+                                    if novo_id:
+                                        # Calcular nova data para exibir na notificação
+                                        nova_data = calcular_proximo_prazo_fatal(prazo)
+                                        if nova_data:
+                                            ui.notify(
+                                                f'Prazo concluído! Novo prazo criado para {nova_data.strftime("%d/%m/%Y")}',
+                                                type='positive',
+                                                timeout=5000
+                                            )
+                                        else:
+                                            ui.notify('Prazo concluído! Novo prazo criado.', type='positive')
+                                    else:
+                                        ui.notify('Prazo concluído! (Erro ao criar próximo prazo recorrente)', type='warning')
+                                else:
+                                    ui.notify('Prazo concluído com sucesso!', type='positive')
+                                
                                 invalidar_cache_prazos()
                                 atualizar_tabelas()
-                                ui.notify('Prazo concluído com sucesso!', type='positive')
                             else:
                                 ui.notify('Erro ao atualizar status', type='negative')
                         except Exception as e:
@@ -614,9 +726,9 @@ def prazos():
 
             # Preparar linhas
             rows = []
-            for prazo in prazos_lista:
+            for indice, prazo in enumerate(prazos_lista):
                 # Formatações - usando cache local (sem consultas Firebase)
-                titulo = prazo.get('titulo', '-')
+                titulo = formatar_titulo_prazo(prazo)
 
                 responsaveis_ids = prazo.get('responsaveis', [])
                 responsaveis_texto = formatar_responsaveis(responsaveis_ids, usuarios_opcoes)
@@ -637,6 +749,7 @@ def prazos():
 
                 rows.append({
                     'id': prazo.get('_id'),
+                    '_indice': indice,
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
                     'titulo': titulo,
@@ -655,9 +768,25 @@ def prazos():
                 row_key='id'
             ).classes('w-full').props('flat dense')
 
+            # Slot para linha inteira com cores alternadas
+            table.add_slot('body-row', '''
+                <q-tr 
+                    :props="props" 
+                    :style="
+                        props.row.atrasado 
+                            ? 'background-color: #FFCDD2;' 
+                            : (props.row._indice % 2 === 0 
+                                ? 'background-color: #FFFFFF;' 
+                                : 'background-color: #F5F5F5;')
+                    "
+                >
+                    <slot></slot>
+                </q-tr>
+            ''')
+
             # Slot para checkbox de concluído
             table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     <q-checkbox
                         :model-value="props.value"
                         @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
@@ -670,30 +799,30 @@ def prazos():
                 </q-td>
             ''')
 
-            # Slot para Título (com fundo vermelho se atrasado)
+            # Slot para Título
             table.add_slot('body-cell-titulo', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     {{ props.value }}
                 </q-td>
             ''')
 
-            # Slot para Responsáveis (com fundo vermelho se atrasado)
+            # Slot para Responsáveis
             table.add_slot('body-cell-responsaveis', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     {{ props.value }}
                 </q-td>
             ''')
 
-            # Slot para Clientes (com fundo vermelho se atrasado)
+            # Slot para Clientes
             table.add_slot('body-cell-clientes', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     {{ props.value }}
                 </q-td>
             ''')
 
-            # Slot para Prazo de Segurança (amarelo pastel, ou vermelho se atrasado)
+            # Slot para Prazo de Segurança (amarelo pastel sempre)
             table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle; text-align: center;' : 'background-color: #FFF9C4; vertical-align: middle; text-align: center;'">
+                <q-td :props="props" style="background-color: #FFF9C4; vertical-align: middle; text-align: center;">
                     {{ props.value }}
                 </q-td>
             ''')
@@ -705,16 +834,16 @@ def prazos():
                 </q-td>
             ''')
 
-            # Slot para Recorrente (com fundo vermelho se atrasado)
+            # Slot para Recorrente
             table.add_slot('body-cell-recorrente', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle; text-align: center;' : 'vertical-align: middle; text-align: center;'">
+                <q-td :props="props" style="vertical-align: middle; text-align: center;">
                     {{ props.value }}
                 </q-td>
             ''')
 
             # Slot para ações (editar e excluir)
             table.add_slot('body-cell-acoes', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     <q-btn
                         flat
                         round
@@ -805,8 +934,8 @@ def prazos():
 
             # Preparar linhas
             rows = []
-            for prazo in prazos_lista:
-                titulo = prazo.get('titulo', '-')
+            for indice, prazo in enumerate(prazos_lista):
+                titulo = formatar_titulo_prazo(prazo)
 
                 responsaveis_ids = prazo.get('responsaveis', [])
                 responsaveis_texto = formatar_responsaveis(responsaveis_ids, usuarios_opcoes)
@@ -832,6 +961,7 @@ def prazos():
 
                 rows.append({
                     'id': prazo.get('_id'),
+                    '_indice': indice,
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
                     'titulo': titulo,
@@ -850,9 +980,25 @@ def prazos():
                 row_key='id'
             ).classes('w-full').props('flat dense')
 
+            # Slot para linha inteira com cores alternadas
+            table.add_slot('body-row', '''
+                <q-tr 
+                    :props="props" 
+                    :style="
+                        props.row.atrasado 
+                            ? 'background-color: #FFCDD2;' 
+                            : (props.row._indice % 2 === 0 
+                                ? 'background-color: #FFFFFF;' 
+                                : 'background-color: #F5F5F5;')
+                    "
+                >
+                    <slot></slot>
+                </q-tr>
+            ''')
+
             # Slot para checkbox de concluído
             table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     <q-checkbox
                         :model-value="props.value"
                         @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
@@ -867,26 +1013,26 @@ def prazos():
 
             # Slot para Título
             table.add_slot('body-cell-titulo', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     {{ props.value }}
                 </q-td>
             ''')
 
             # Slot para Responsáveis
             table.add_slot('body-cell-responsaveis', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     {{ props.value }}
                 </q-td>
             ''')
 
-            # Slot para Prazo de Segurança
+            # Slot para Prazo de Segurança (amarelo pastel sempre)
             table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle; text-align: center;' : 'background-color: #FFF9C4; vertical-align: middle; text-align: center;'">
+                <q-td :props="props" style="background-color: #FFF9C4; vertical-align: middle; text-align: center;">
                     {{ props.value }}
                 </q-td>
             ''')
 
-            # Slot para Prazo Fatal
+            # Slot para Prazo Fatal (vermelho pastel sempre, mais escuro se atrasado)
             table.add_slot('body-cell-prazo_fatal', '''
                 <q-td :props="props" :style="props.row.atrasado ? 'background-color: #EF9A9A; vertical-align: middle; text-align: center; font-weight: bold;' : 'background-color: #FFCDD2; vertical-align: middle; text-align: center;'">
                     {{ props.value }}
@@ -895,7 +1041,7 @@ def prazos():
 
             # Slot para Status com badge colorido
             table.add_slot('body-cell-status', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle; text-align: center;' : 'vertical-align: middle; text-align: center;'">
+                <q-td :props="props" style="vertical-align: middle; text-align: center;">
                     <q-badge
                         :style="props.row.status_value === 'atrasado' ? 'background-color: #EF5350; color: white;' :
                                 props.row.status_value === 'concluido' ? 'background-color: #4CAF50; color: white;' :
@@ -909,7 +1055,7 @@ def prazos():
 
             # Slot para ações
             table.add_slot('body-cell-acoes', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2; vertical-align: middle;' : 'vertical-align: middle;'">
+                <q-td :props="props" style="vertical-align: middle;">
                     <q-btn
                         flat
                         round

@@ -1961,7 +1961,9 @@ def get_route_for_workspace(base_route: str) -> str:
     if not workspace_info:
         return base_route
 
-    # Se for workspace padrão (area_cliente_schmidmeier), usa rotas normais
+    # Se for workspace do cliente (area_cliente_schmidmeier), usa rotas normais
+    # NOTA: Workspace padrão agora é 'visao_geral_escritorio', mas esta verificação
+    # ainda é necessária para manter compatibilidade com workspace do cliente
     if workspace_id == 'area_cliente_schmidmeier':
         return base_route
 

@@ -6,4 +6,5 @@ slack-sdk
 python-dotenv
 requests
 pytest
+python-dateutil
 

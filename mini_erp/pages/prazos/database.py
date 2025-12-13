@@ -6,6 +6,9 @@ Gerencia busca e cache de prazos do Firestore.
 
 import time
 import threading
+import calendar
+from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta
 from typing import List, Dict, Any, Optional
 from ...firebase_config import get_db, ensure_firebase_initialized, get_auth
 from ...storage import obter_display_name
@@ -481,6 +484,204 @@ def invalidar_cache_selects():
     _cache_clientes_select_ts = None
     _cache_casos_select = None
     _cache_casos_select_ts = None
+
+
+# =============================================================================
+# FUNÇÕES DE CÁLCULO DE RECORRÊNCIA
+# =============================================================================
+
+def converter_para_date(timestamp: Any) -> Optional[date]:
+    """
+    Converte timestamp para objeto date.
+    
+    Args:
+        timestamp: Timestamp (float, int) ou None
+    
+    Returns:
+        Objeto date ou None se inválido
+    """
+    if not timestamp:
+        return None
+    
+    try:
+        if isinstance(timestamp, (int, float)):
+            dt = datetime.fromtimestamp(timestamp)
+            return dt.date()
+        return None
+    except Exception:
+        return None
+
+
+def calcular_dia_semana_do_mes(ano: int, mes: int, semana: str, dia_semana: str) -> date:
+    """
+    Calcula uma data específica como "última quarta-feira de dezembro".
+
+    Args:
+        ano: Ano
+        mes: Mês (1-12)
+        semana: 'primeira', 'segunda', 'terceira', 'quarta', 'ultima'
+        dia_semana: 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'
+
+    Returns:
+        Objeto date com a data calculada
+    """
+    dias_semana = {
+        'segunda': 0, 'terca': 1, 'quarta': 2, 'quinta': 3,
+        'sexta': 4, 'sabado': 5, 'domingo': 6
+    }
+    
+    semanas = {
+        'primeira': 1, 'segunda': 2, 'terceira': 3, 'quarta': 4, 'ultima': -1
+    }
+    
+    dia_alvo = dias_semana.get(dia_semana.lower(), 2)  # padrão: quarta
+    num_semana = semanas.get(semana.lower(), -1)  # padrão: última
+    
+    if num_semana == -1:
+        # Última ocorrência do dia no mês
+        ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
+        data = date(ano, mes, ultimo_dia_mes)
+        while data.weekday() != dia_alvo:
+            data -= timedelta(days=1)
+        return data
+    else:
+        # N-ésima ocorrência do dia no mês
+        primeiro_dia = date(ano, mes, 1)
+        # Encontrar primeiro dia_alvo do mês
+        dias_ate_alvo = (dia_alvo - primeiro_dia.weekday()) % 7
+        primeira_ocorrencia = primeiro_dia + timedelta(days=dias_ate_alvo)
+        # Adicionar semanas
+        return primeira_ocorrencia + timedelta(weeks=num_semana - 1)
+
+
+def calcular_proximo_prazo_fatal(prazo: Dict[str, Any]) -> Optional[date]:
+    """
+    Calcula a próxima data do prazo fatal baseado na configuração de recorrência.
+
+    Tipos de recorrência:
+    - Anual: mesmo dia, próximo ano
+    - Mensal: mesmo dia, próximo mês
+    - Semanal: mesma semana seguinte
+    - Variável: baseado em config específica
+
+    Configurações especiais:
+    - dia_especifico: dia fixo do mês (ex: sempre dia 15)
+    - ultimo_dia_mes: sempre no último dia do mês
+    - dia_semana_especifico: ex: última quarta-feira do mês
+
+    Args:
+        prazo: Dicionário com dados do prazo
+
+    Returns:
+        Objeto date com a próxima data ou None se inválido
+    """
+    config = prazo.get('config_recorrencia', {})
+    tipo = config.get('tipo', 'mensal').lower()
+    
+    # Data do prazo fatal atual
+    prazo_fatal_atual = converter_para_date(prazo.get('prazo_fatal'))
+    if not prazo_fatal_atual:
+        prazo_fatal_atual = date.today()
+    
+    # === RECORRÊNCIA ANUAL ===
+    if tipo == 'anual':
+        return prazo_fatal_atual + relativedelta(years=1)
+    
+    # === RECORRÊNCIA SEMANAL ===
+    elif tipo == 'semanal':
+        return prazo_fatal_atual + timedelta(weeks=1)
+    
+    # === RECORRÊNCIA MENSAL ===
+    elif tipo == 'mensal':
+        proximo_mes = prazo_fatal_atual + relativedelta(months=1)
+        
+        # Dia específico do mês (ex: sempre dia 31)
+        dia_especifico = config.get('dia_especifico')
+        if dia_especifico:
+            # Ajustar se o mês não tem esse dia (ex: fevereiro não tem dia 31)
+            ultimo_dia = calendar.monthrange(proximo_mes.year, proximo_mes.month)[1]
+            dia = min(dia_especifico, ultimo_dia)
+            return proximo_mes.replace(day=dia)
+        
+        # Último dia do mês
+        if config.get('ultimo_dia_mes'):
+            ultimo_dia = calendar.monthrange(proximo_mes.year, proximo_mes.month)[1]
+            return proximo_mes.replace(day=ultimo_dia)
+        
+        # Dia da semana específico (ex: última quarta-feira)
+        dia_semana_config = config.get('dia_semana_especifico', {})
+        if dia_semana_config:
+            semana = dia_semana_config.get('semana', 'ultima')  # primeira, segunda, terceira, quarta, ultima
+            dia_semana = dia_semana_config.get('dia', 'quarta')  # segunda, terca, quarta, etc.
+            return calcular_dia_semana_do_mes(proximo_mes.year, proximo_mes.month, semana, dia_semana)
+        
+        # Padrão: mesmo dia do próximo mês
+        return proximo_mes
+    
+    # === RECORRÊNCIA VARIÁVEL ===
+    elif tipo == 'variavel':
+        # Usar configuração específica ou padrão mensal
+        dias = config.get('intervalo_dias', 30)
+        return prazo_fatal_atual + timedelta(days=dias)
+    
+    # Padrão: próximo mês
+    return prazo_fatal_atual + relativedelta(months=1)
+
+
+def criar_proximo_prazo_recorrente(prazo_concluido: Dict[str, Any]) -> Optional[str]:
+    """
+    Cria o próximo prazo baseado em um prazo recorrente que foi concluído.
+
+    Args:
+        prazo_concluido: Prazo que acabou de ser marcado como concluído
+
+    Returns:
+        ID do novo prazo criado ou None se não for recorrente ou erro
+    """
+    # Verificar se é recorrente
+    if not prazo_concluido.get('recorrente'):
+        return None
+    
+    try:
+        # Calcular nova data do prazo fatal
+        novo_prazo_fatal_date = calcular_proximo_prazo_fatal(prazo_concluido)
+        if not novo_prazo_fatal_date:
+            print("[PRAZOS] Erro: Não foi possível calcular próxima data de recorrência")
+            return None
+        
+        # Converter date para timestamp
+        novo_prazo_fatal_ts = datetime.combine(novo_prazo_fatal_date, datetime.min.time()).timestamp()
+        
+        # Criar cópia do prazo com nova data
+        novo_prazo = {
+            'titulo': prazo_concluido.get('titulo', ''),
+            'responsaveis': prazo_concluido.get('responsaveis', []),
+            'clientes': prazo_concluido.get('clientes', []),
+            'casos': prazo_concluido.get('casos', []),
+            'prazo_fatal': novo_prazo_fatal_ts,
+            'status': 'pendente',
+            'recorrente': True,
+            'config_recorrencia': prazo_concluido.get('config_recorrencia', {}),
+            'observacoes': prazo_concluido.get('observacoes', ''),
+            'prazo_origem_id': prazo_concluido.get('_id'),  # Referência ao prazo original
+        }
+        
+        # Adicionar criado_por se existir no prazo original
+        if 'criado_por' in prazo_concluido:
+            novo_prazo['criado_por'] = prazo_concluido['criado_por']
+        
+        # Salvar no Firestore
+        novo_id = criar_prazo(novo_prazo)
+        
+        print(f"[PRAZOS] Novo prazo recorrente criado: {novo_id} - Fatal: {novo_prazo_fatal_date.strftime('%d/%m/%Y')}")
+        
+        return novo_id
+    
+    except Exception as e:
+        print(f"[PRAZOS] Erro ao criar próximo prazo recorrente: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 # =============================================================================
