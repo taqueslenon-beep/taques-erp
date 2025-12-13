@@ -20,38 +20,38 @@ def acordos():
     if not verificar_e_definir_workspace_automatico():
         return
 
-    # Funções para formulários
-    def abrir_formulario_acordo():
-        """Abre formulário específico para Acordos."""
-        tipo_dialog.close()
-        abrir_dialog_acordo()
-
-    def abrir_formulario_parcelamento():
-        """Abre formulário específico para Parcelamentos."""
-        tipo_dialog.close()
-        ui.notify('Formulário de Parcelamento será implementado', type='info')
-
     # Dialog de seleção de tipo
     with ui.dialog() as tipo_dialog, ui.card().classes('w-full max-w-lg p-6'):
         ui.label('Qual o tipo?').classes('text-xl font-bold mb-2')
         ui.label('Selecione o tipo de registro que deseja criar').classes('text-sm text-gray-600 mb-6')
 
-        with ui.row().classes('w-full gap-4 mb-4'):
+        # Funções de callback para os cards
+        def ao_selecionar_acordo():
+            """Fecha dialog de tipo e abre formulário de acordo."""
+            tipo_dialog.close()
+            abrir_dialog_acordo()
+
+        def ao_selecionar_parcelamento():
+            """Fecha dialog de tipo e mostra notificação."""
+            tipo_dialog.close()
+            ui.notify('Formulário de Parcelamento em desenvolvimento', type='info')
+
+        with ui.row().classes('w-full gap-4 mb-4 justify-center'):
             # Card 1 - Acordo
-            with ui.card().classes('flex-1 p-6 cursor-pointer hover:bg-gray-100 transition-colors').on('click', abrir_formulario_acordo):
+            with ui.card().classes('flex-1 p-6 cursor-pointer hover:bg-gray-100 transition-colors').on('click', ao_selecionar_acordo):
                 with ui.column().classes('w-full items-center gap-3'):
                     ui.icon('handshake', size='48px').style(f'color: {PRIMARY_COLOR}')
                     ui.label('Acordo').classes('text-lg font-bold')
                     ui.label('Acordo judicial ou extrajudicial').classes('text-sm text-gray-600 text-center')
 
             # Card 2 - Parcelamento
-            with ui.card().classes('flex-1 p-6 cursor-pointer hover:bg-gray-100 transition-colors').on('click', abrir_formulario_parcelamento):
+            with ui.card().classes('flex-1 p-6 cursor-pointer hover:bg-gray-100 transition-colors').on('click', ao_selecionar_parcelamento):
                 with ui.column().classes('w-full items-center gap-3'):
                     ui.icon('payments', size='48px').style(f'color: {PRIMARY_COLOR}')
                     ui.label('Parcelamento').classes('text-lg font-bold')
                     ui.label('Parcelamento de débitos ou tributos').classes('text-sm text-gray-600 text-center')
 
-        with ui.row().classes('w-full justify-end'):
+        with ui.row().classes('w-full justify-end mt-4'):
             ui.button('Cancelar', on_click=tipo_dialog.close).props('flat')
 
     with layout('Acordos/parcelamentos', breadcrumbs=[('Visão geral do escritório', '/visao-geral/painel'), ('Acordos/parcelamentos', None)]):
