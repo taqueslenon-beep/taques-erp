@@ -17,6 +17,7 @@ from ..painel.chart_builders import build_bar_chart_config, build_pie_chart_conf
 from ..painel.ui_components import create_empty_chart_state
 from .casos.models import NUCLEO_CORES, STATUS_CORES, obter_cor_nucleo, obter_cor_status
 from ...services.entregavel_service import listar_entregaveis as listar_entregaveis_service
+from ..prazos.database import obter_estatisticas_prazos_mes
 
 
 # =============================================================================
@@ -188,7 +189,22 @@ def painel():
     definir_workspace('visao_geral_escritorio')
 
     # Estado da visualização do painel
-    visualizacao_painel = {'tipo': 'casos'}  # 'casos' ou 'entregaveis'
+    visualizacao_painel = {'tipo': 'casos'}  # 'casos', 'entregaveis' ou 'prazos'
+
+    # =========================================================================
+    # CARREGAR DADOS DE PRAZOS
+    # =========================================================================
+    try:
+        stats_prazos = obter_estatisticas_prazos_mes()
+    except Exception:
+        stats_prazos = {
+            'pendentes': 0,
+            'atrasados': 0,
+            'concluidos': 0,
+            'total_mes': 0,
+            'mes_nome': '',
+            'ano': 0
+        }
 
     # =========================================================================
     # CARREGAR DADOS DE CASOS
@@ -250,6 +266,11 @@ def painel():
 
     def selecionar_entregaveis():
         visualizacao_painel['tipo'] = 'entregaveis'
+        area_cards.refresh()
+        area_estatisticas.refresh()
+
+    def selecionar_prazos():
+        visualizacao_painel['tipo'] = 'prazos'
         area_cards.refresh()
         area_estatisticas.refresh()
 
@@ -326,6 +347,37 @@ def painel():
 
                     entregaveis_card.on('click', selecionar_entregaveis)
 
+                # Card Prazos do Mês (clicável - alterna visualização)
+                card_prazos_ativo = visualizacao_painel['tipo'] == 'prazos'
+                classes_prazos = 'flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                if card_prazos_ativo:
+                    classes_prazos += ' ring-2 ring-amber-500 ring-offset-2 shadow-lg'
+
+                with ui.card().classes(classes_prazos).style('border-left-color: #F59E0B') as prazos_card:
+                    with ui.row().classes('items-center gap-2 mb-2'):
+                        ui.icon('calendar_month', size='24px').classes('text-amber-500')
+                        ui.label('Prazos do Mês').classes('text-sm text-gray-500')
+
+                    # Número principal: pendentes + atrasados (não concluídos)
+                    total_pendentes_atrasados = stats_prazos['pendentes'] + stats_prazos['atrasados']
+                    ui.label(str(total_pendentes_atrasados)).classes('text-3xl font-bold text-amber-600')
+
+                    # Breakdown
+                    if stats_prazos['total_mes'] > 0:
+                        breakdown_prazos = []
+                        if stats_prazos['atrasados'] > 0:
+                            breakdown_prazos.append(f'{stats_prazos["atrasados"]} atrasados')
+                        if stats_prazos['pendentes'] > 0:
+                            breakdown_prazos.append(f'{stats_prazos["pendentes"]} pendentes')
+                        if stats_prazos['concluidos'] > 0:
+                            breakdown_prazos.append(f'{stats_prazos["concluidos"]} concluídos')
+                        subtitulo_prazos = ', '.join(breakdown_prazos) if breakdown_prazos else 'Nenhum prazo'
+                    else:
+                        subtitulo_prazos = f'Nenhum prazo em {stats_prazos["mes_nome"]}'
+                    ui.label(subtitulo_prazos).classes('text-xs text-gray-400 mt-1')
+
+                    prazos_card.on('click', selecionar_prazos)
+
                 # Card Acordos (placeholder)
                 with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 border-gray-300'):
                     with ui.row().classes('items-center gap-2 mb-2'):
@@ -337,14 +389,16 @@ def painel():
         area_cards()
 
         # =====================================================================
-        # ÁREA DE ESTATÍSTICAS (refreshable para alternar entre Casos e Entregáveis)
+        # ÁREA DE ESTATÍSTICAS (refreshable para alternar entre Casos, Entregáveis e Prazos)
         # =====================================================================
         @ui.refreshable
         def area_estatisticas():
             if visualizacao_painel['tipo'] == 'casos':
                 renderizar_estatisticas_casos()
-            else:
+            elif visualizacao_painel['tipo'] == 'entregaveis':
                 renderizar_estatisticas_entregaveis()
+            else:
+                renderizar_estatisticas_prazos()
 
         def renderizar_estatisticas_casos():
             """Renderiza estatísticas de Casos."""
@@ -591,6 +645,94 @@ def painel():
                         ui.icon('task_alt', size='64px').classes('text-green-400 mb-4')
                         ui.label(str(concluidos_mes)).classes('text-6xl font-bold text-green-600')
                         ui.label(f'concluídos em {mes_atual}').classes('text-gray-500 mt-2')
+
+        def renderizar_estatisticas_prazos():
+            """Renderiza estatísticas de Prazos."""
+            ui.label('Estatísticas de Prazos').classes('text-2xl font-bold text-gray-800 mt-8 mb-4')
+
+            # Cores para status de prazos
+            cores_prazos = {
+                'Atrasados': '#EF5350',    # Vermelho
+                'Pendentes': '#FFC107',    # Amarelo
+                'Concluídos': '#4CAF50',   # Verde
+            }
+
+            # Grid de estatísticas
+            with ui.row().classes('w-full gap-4 flex-wrap'):
+                # 1. Cards de resumo de prazos
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label(f'Prazos de {stats_prazos["mes_nome"]} {stats_prazos["ano"]}').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    with ui.row().classes('w-full gap-4 flex-wrap'):
+                        # Card Atrasados
+                        with ui.card().classes('flex-1 min-w-32 p-4').style('background-color: #FFEBEE; border-left: 4px solid #EF5350;'):
+                            ui.label('Atrasados').classes('text-sm text-gray-600')
+                            ui.label(str(stats_prazos['atrasados'])).classes('text-4xl font-bold').style('color: #EF5350;')
+
+                        # Card Pendentes
+                        with ui.card().classes('flex-1 min-w-32 p-4').style('background-color: #FFF8E1; border-left: 4px solid #FFC107;'):
+                            ui.label('Pendentes').classes('text-sm text-gray-600')
+                            ui.label(str(stats_prazos['pendentes'])).classes('text-4xl font-bold').style('color: #FFA000;')
+
+                        # Card Concluídos
+                        with ui.card().classes('flex-1 min-w-32 p-4').style('background-color: #E8F5E9; border-left: 4px solid #4CAF50;'):
+                            ui.label('Concluídos').classes('text-sm text-gray-600')
+                            ui.label(str(stats_prazos['concluidos'])).classes('text-4xl font-bold').style('color: #4CAF50;')
+
+                    # Total do mês
+                    with ui.row().classes('w-full mt-4 items-center justify-center'):
+                        ui.label(f'Total de prazos no mês: {stats_prazos["total_mes"]}').classes('text-gray-500')
+
+                # 2. Gráfico de Pizza - Distribuição de Prazos
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Distribuição de Prazos').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    # Montar dados para o gráfico de pizza
+                    dados_grafico = []
+                    if stats_prazos['atrasados'] > 0:
+                        dados_grafico.append({
+                            'value': stats_prazos['atrasados'],
+                            'name': 'Atrasados',
+                            'itemStyle': {'color': cores_prazos['Atrasados']}
+                        })
+                    if stats_prazos['pendentes'] > 0:
+                        dados_grafico.append({
+                            'value': stats_prazos['pendentes'],
+                            'name': 'Pendentes',
+                            'itemStyle': {'color': cores_prazos['Pendentes']}
+                        })
+                    if stats_prazos['concluidos'] > 0:
+                        dados_grafico.append({
+                            'value': stats_prazos['concluidos'],
+                            'name': 'Concluídos',
+                            'itemStyle': {'color': cores_prazos['Concluídos']}
+                        })
+
+                    if dados_grafico:
+                        config = build_pie_chart_config(data=dados_grafico, series_name='Prazos', donut=True)
+                        ui.echart(config).classes('w-full h-80')
+                    else:
+                        create_empty_chart_state(f'Nenhum prazo em {stats_prazos["mes_nome"]}')
+
+                # 3. Card com link para página de Prazos
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Ações Rápidas').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    with ui.column().classes('w-full items-center justify-center py-4 gap-4'):
+                        ui.icon('calendar_month', size='64px').classes('text-amber-400 mb-2')
+
+                        # Total não concluídos
+                        total_nao_concluidos = stats_prazos['pendentes'] + stats_prazos['atrasados']
+                        if total_nao_concluidos > 0:
+                            ui.label(f'{total_nao_concluidos} prazos precisam de atenção').classes('text-gray-600')
+                        else:
+                            ui.label('Todos os prazos em dia!').classes('text-green-600 font-semibold')
+
+                        ui.button(
+                            'Ver todos os prazos',
+                            icon='arrow_forward',
+                            on_click=lambda: ui.navigate.to('/prazos')
+                        ).classes('bg-amber-500 text-white')
 
         area_estatisticas()
 

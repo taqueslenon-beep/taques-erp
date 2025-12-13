@@ -498,22 +498,22 @@ def entregaveis_page():
                 is_status = visualizacao['tipo'] == 'status'
                 is_categoria = visualizacao['tipo'] == 'categoria'
 
-                # Estilos para botão ativo e inativo
-                estilo_ativo = 'background-color: #2D4A3E; color: white; border: none;'
-                estilo_inativo = 'background-color: white; color: #4B5563; border: 1px solid #D1D5DB;'
+                # Estilos para botão ativo (verde) e inativo (cinza apagado)
+                estilo_ativo = 'background-color: #223631; color: white; border: none; font-weight: 600;'
+                estilo_inativo = 'background-color: #F3F4F6; color: #9CA3AF; border: none; font-weight: 400;'
 
                 with ui.row().classes('items-center gap-0'):
                     # Botão "Por Status"
                     ui.button(
                         'Por Status',
                         on_click=lambda: [visualizacao.update({'tipo': 'status'}), toggle_visualizacao.refresh(), kanban_area.refresh()]
-                    ).style(estilo_ativo if is_status else estilo_inativo).classes('rounded-l-lg rounded-r-none px-4 py-2 text-sm font-medium')
+                    ).style(estilo_ativo if is_status else estilo_inativo).classes('rounded-l-lg rounded-r-none px-4 py-2 text-sm font-medium transition-all duration-200')
 
                     # Botão "Por Categoria"
                     ui.button(
                         'Por Categoria',
                         on_click=lambda: [visualizacao.update({'tipo': 'categoria'}), toggle_visualizacao.refresh(), kanban_area.refresh()]
-                    ).style(estilo_ativo if is_categoria else estilo_inativo).classes('rounded-r-lg rounded-l-none px-4 py-2 text-sm font-medium')
+                    ).style(estilo_ativo if is_categoria else estilo_inativo).classes('rounded-r-lg rounded-l-none px-4 py-2 text-sm font-medium transition-all duration-200')
 
             with ui.row().classes('w-full items-center gap-4 mb-2'):
                 ui.label('Visualização:').classes('text-sm font-medium text-gray-700')
