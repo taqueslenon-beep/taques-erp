@@ -105,19 +105,28 @@ def main():
     os.environ['APP_PORT'] = str(porta)
     
     # Rodar o servidor
-    # Em desenvolvimento, usa dev_server.py para auto-reload
-    # Em produção, usa main.py diretamente
+    # CONFIGURADO: Modo manual (sem auto-reload) - use scripts/reiniciar_servidor.sh para reiniciar
+    # Para habilitar auto-reload, defina ENABLE_AUTO_RELOAD=true ou use dev_server.py diretamente
+    usar_auto_reload = os.environ.get('ENABLE_AUTO_RELOAD', '').lower() == 'true'
     dev_server_path = os.path.join(PASTA_PROJETO, 'dev_server.py')
-    usar_dev_server = os.path.exists(dev_server_path)
     
-    if usar_dev_server:
+    if usar_auto_reload and os.path.exists(dev_server_path):
         print(f'\n🔄 Modo desenvolvimento: Auto-reload habilitado')
         print(f'   Mudanças em arquivos .py serão detectadas automaticamente')
         print(f'   A página recarregará sozinha quando você salvar arquivos\n')
         cmd = [sys.executable, 'dev_server.py']
     else:
-        print(f'\n⚠️  dev_server.py não encontrado. Usando modo sem auto-reload.')
-        cmd = [sys.executable, '-m', 'mini_erp.main']
+        # Modo manual: usa main.py diretamente ou dev_server.py sem watchfiles
+        if os.path.exists(dev_server_path):
+            print(f'\n🔄 Modo manual: Auto-reload desabilitado')
+            print(f'   Use scripts/reiniciar_servidor.sh para reiniciar o servidor')
+            print(f'   Ou defina ENABLE_AUTO_RELOAD=true para habilitar auto-reload\n')
+            # Define flag para desabilitar watchfiles no dev_server.py
+            os.environ['DISABLE_AUTO_RELOAD'] = 'true'
+            cmd = [sys.executable, 'dev_server.py']
+        else:
+            print(f'\n⚠️  dev_server.py não encontrado. Usando modo sem auto-reload.')
+            cmd = [sys.executable, '-m', 'mini_erp.main']
     
     try:
         subprocess.run(cmd, cwd=PASTA_PROJETO)

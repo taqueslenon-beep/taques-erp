@@ -36,6 +36,21 @@ TIPO_ENVOLVIDO_LABELS = {
 TIPO_ENVOLVIDO_PADRAO = 'PF'
 
 # =============================================================================
+# CONSTANTES - TIPOS DE PARCEIRO
+# =============================================================================
+
+# Opções de tipo de parceiro
+TIPOS_PARCEIRO = ['PF', 'PJ']
+
+# Labels para exibição
+TIPO_PARCEIRO_LABELS = {
+    'PF': 'Pessoa Física',
+    'PJ': 'Pessoa Jurídica',
+}
+
+TIPO_PARCEIRO_PADRAO = 'PF'
+
+# =============================================================================
 # CONSTANTES - TIPOS DE FILIAL (para PJ)
 # =============================================================================
 
@@ -110,6 +125,20 @@ class Envolvido(TypedDict, total=False):
     email: str              # Email (opcional)
     telefone: str            # Telefone (opcional)
     tipo_envolvido: str     # 'PF', 'PJ' ou 'Ente Público' (default: 'PF')
+    observacoes: str        # Observações (opcional)
+    created_at: Any         # Data de criação
+    updated_at: Any         # Data de atualização
+
+
+class Parceiro(TypedDict, total=False):
+    """Estrutura de um parceiro no sistema."""
+    _id: str                 # ID do documento (gerado automaticamente)
+    nome_completo: str       # Nome completo / Razão social (opcional)
+    nome_exibicao: str       # Nome de exibição (opcional)
+    cpf_cnpj: str           # CPF ou CNPJ (opcional, apenas dígitos)
+    email: str              # Email (opcional)
+    telefone: str            # Telefone (opcional)
+    tipo_parceiro: str      # 'PF' ou 'PJ' (default: 'PF')
     observacoes: str        # Observações (opcional)
     created_at: Any         # Data de criação
     updated_at: Any         # Data de atualização
@@ -204,6 +233,19 @@ def criar_envolvido_vazio() -> dict:
         'email': '',
         'telefone': '',
         'tipo_envolvido': TIPO_ENVOLVIDO_PADRAO,
+        'observacoes': '',
+    }
+
+
+def criar_parceiro_vazio() -> dict:
+    """Retorna um dicionário com estrutura padrão de parceiro vazio."""
+    return {
+        'nome_completo': '',
+        'nome_exibicao': '',
+        'cpf_cnpj': '',
+        'email': '',
+        'telefone': '',
+        'tipo_parceiro': TIPO_PARCEIRO_PADRAO,
         'observacoes': '',
     }
 

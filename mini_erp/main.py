@@ -179,8 +179,12 @@ def start_server_safe():
     is_dev_server = os.environ.get('DEV_SERVER', '').lower() == 'true'
     logger.debug(f"Modo dev_server: {is_dev_server}")
     
-    # Hot Reload: sempre ativado para recarregamento automático do NiceGUI
-    logger.info("🔥 Hot Reload ATIVADO. Mudanças em arquivos .py recarregarão o servidor automaticamente.")
+    # Hot Reload: desabilitado aqui pois é gerenciado pelo dev_server.py via watchfiles
+    # O dev_server.py faz o reload de forma mais controlada e customizável
+    if is_dev_server:
+        logger.info("🔄 Hot Reload gerenciado pelo dev_server.py (watchfiles)")
+    else:
+        logger.info("⚠️  Hot Reload desabilitado. Use 'python3 iniciar.py' ou 'python3 dev_server.py' para auto-reload.")
     
     # Adiciona middleware para headers anti-cache (corrige problema de cache no navegador)
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -207,7 +211,7 @@ def start_server_safe():
         'favicon': '💼',
         'port': port,
         'host': '0.0.0.0',
-        'reload': True,  # Hot reload sempre ativo
+        'reload': False,  # CORRIGIDO: Desabilitado para evitar conflito com watchfiles (dev_server.py)
         'show': not is_dev_server,
         'show_welcome_message': False,
         'storage_secret': 'taques-erp-secret-key-2024',
@@ -240,9 +244,9 @@ def start_server_safe():
 
 
 # IMPORTANTE:
-# Hot Reload está sempre ATIVO (reload=True).
-# O NiceGUI detecta mudanças em arquivos .py e recarrega automaticamente o servidor.
-# A página do navegador pode precisar de refresh manual (F5) após mudanças de código.
+# Hot Reload está DESABILITADO aqui (reload=False) para evitar conflito com watchfiles.
+# O dev_server.py gerencia o hot reload de forma mais robusta usando watchfiles.
+# Use 'python3 iniciar.py' ou 'python3 dev_server.py' para desenvolvimento com auto-reload.
 if __name__ in {"__main__", "__mp_main__"}:
     logger.info(f"Ponto de entrada (__name__='{__name__}') alcançado. Chamando start_server_safe().")
     start_server_safe()

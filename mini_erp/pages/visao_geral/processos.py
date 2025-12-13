@@ -3,9 +3,9 @@ Módulo de Processos do workspace "Visão geral do escritório".
 Exibe todos os processos de todos os clientes do escritório.
 """
 from nicegui import ui
-from ...core import layout
-from ...auth import is_authenticated
-from ...middlewares.verificar_workspace import verificar_e_definir_workspace_automatico
+from mini_erp.core import layout
+from mini_erp.auth import is_authenticated
+from mini_erp.middlewares.verificar_workspace import verificar_e_definir_workspace_automatico
 
 
 @ui.page('/visao-geral/processos')

@@ -6,13 +6,13 @@ from typing import Dict, List, Any
 from collections import Counter
 from datetime import datetime
 from nicegui import ui, app
-from ...core import layout, PRIMARY_COLOR
-from ...auth import is_authenticated
-from ...gerenciadores.gerenciador_workspace import definir_workspace
-from ...models.prioridade import get_cor_por_prioridade
-from .pessoas.database import listar_pessoas
+from mini_erp.core import layout, PRIMARY_COLOR
+from mini_erp.auth import is_authenticated
+from mini_erp.gerenciadores.gerenciador_workspace import definir_workspace
+from mini_erp.models.prioridade import get_cor_por_prioridade
+from .pessoas.database import listar_pessoas, contar_pessoas, contar_envolvidos, contar_parceiros
 from .casos.database import contar_casos, listar_casos_por_status, listar_casos
-from ...usuarios.database import listar_usuarios
+from mini_erp.usuarios.database import listar_usuarios
 from ..painel.chart_builders import build_bar_chart_config, build_pie_chart_config
 from ..painel.ui_components import create_empty_chart_state
 from .casos.models import NUCLEO_CORES, STATUS_CORES, obter_cor_nucleo, obter_cor_status
@@ -227,17 +227,29 @@ def painel():
         todos_usuarios = []
 
     # =========================================================================
-    # CARREGAR DADOS DE PESSOAS
+    # CARREGAR DADOS DE PESSOAS (Clientes + Outros Envolvidos + Parceiros)
     # =========================================================================
     try:
+        # Conta cada categoria separadamente
+        total_clientes = contar_pessoas()
+        total_envolvidos = contar_envolvidos()
+        total_parceiros = contar_parceiros()
+        
+        # Total geral (soma das três categorias)
+        total_pessoas = total_clientes + total_envolvidos + total_parceiros
+        
+        # Para manter compatibilidade, ainda carrega lista de pessoas para PF/PJ
         todas_pessoas = listar_pessoas()
-        total_pessoas = len(todas_pessoas) if todas_pessoas else 0
         total_pf = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PF')
         total_pj = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PJ')
     except Exception:
+        total_clientes = 0
+        total_envolvidos = 0
+        total_parceiros = 0
         total_pessoas = 0
         total_pf = 0
         total_pj = 0
+        todas_pessoas = []
 
     # =========================================================================
     # CARREGAR DADOS DE ENTREGÁVEIS
@@ -303,13 +315,31 @@ def painel():
 
                     casos_card.on('click', selecionar_casos)
 
-                # Card Pessoas Cadastradas (não clicável)
-                with ui.card().classes('flex-1 min-w-48 p-4 border-l-4').style(f'border-left-color: {PRIMARY_COLOR}'):
+                # Card Pessoas Cadastradas (clicável - redireciona para estatísticas)
+                with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all').style(f'border-left-color: {PRIMARY_COLOR}') as pessoas_card:
                     with ui.row().classes('items-center gap-2 mb-2'):
                         ui.icon('people', size='24px').classes('text-gray-400')
                         ui.label('Pessoas Cadastradas').classes('text-sm text-gray-500')
                     ui.label(str(total_pessoas)).classes('text-3xl font-bold').style(f'color: {PRIMARY_COLOR}')
-                    ui.label(f'{total_pf} PF, {total_pj} PJ').classes('text-xs text-gray-400 mt-1')
+                    # Subtítulo mostra distribuição: clientes, envolvidos, parceiros
+                    subtitulo_partes = []
+                    if total_clientes > 0:
+                        subtitulo_partes.append(f'{total_clientes} cliente{"s" if total_clientes != 1 else ""}')
+                    if total_envolvidos > 0:
+                        subtitulo_partes.append(f'{total_envolvidos} envolvido{"s" if total_envolvidos != 1 else ""}')
+                    if total_parceiros > 0:
+                        subtitulo_partes.append(f'{total_parceiros} parceiro{"s" if total_parceiros != 1 else ""}')
+                    
+                    if subtitulo_partes:
+                        ui.label(', '.join(subtitulo_partes)).classes('text-xs text-gray-400 mt-1')
+                    else:
+                        ui.label('Nenhuma pessoa cadastrada').classes('text-xs text-gray-400 mt-1')
+
+                    # Evento de clique para redirecionar para página de estatísticas
+                    def navegar_para_estatisticas():
+                        ui.navigate.to('/visao-geral/pessoas/estatisticas')
+                    
+                    pessoas_card.on('click', navegar_para_estatisticas)
 
                 # Card Processos Ativos (placeholder)
                 with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 border-gray-300'):

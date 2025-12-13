@@ -9,6 +9,7 @@ from ....firebase_config import get_db
 # Nome da coleção Firebase para este workspace
 COLECAO_PESSOAS = 'vg_pessoas'
 COLECAO_ENVOLVIDOS = 'vg_envolvidos'
+COLECAO_PARCEIROS = 'vg_parceiros'
 
 
 def _converter_timestamps(documento: Dict[str, Any]) -> Dict[str, Any]:
@@ -504,4 +505,191 @@ def contar_envolvidos() -> int:
 
     except Exception as e:
         print(f"Erro ao contar envolvidos: {e}")
+        return 0
+
+
+# =============================================================================
+# FUNÇÕES CRUD PARA PARCEIROS
+# =============================================================================
+
+
+def listar_parceiros() -> List[Dict[str, Any]]:
+    """
+    Retorna todos os parceiros da coleção vg_parceiros.
+
+    Returns:
+        Lista de dicionários com dados dos parceiros
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return []
+
+        docs = db.collection(COLECAO_PARCEIROS).stream()
+        parceiros = []
+
+        for doc in docs:
+            parceiro = doc.to_dict()
+            parceiro['_id'] = doc.id
+            # Converte timestamps para evitar erro de serialização JSON
+            parceiro = _converter_timestamps(parceiro)
+            parceiros.append(parceiro)
+
+        # Ordena por nome de exibição (ou nome completo se não houver)
+        parceiros.sort(key=lambda p: (p.get('nome_exibicao') or p.get('nome_completo') or '').lower())
+
+        return parceiros
+
+    except Exception as e:
+        print(f"Erro ao listar parceiros: {e}")
+        return []
+
+
+def buscar_parceiro(parceiro_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Busca um parceiro específico pelo ID.
+
+    Args:
+        parceiro_id: ID do documento no Firebase
+
+    Returns:
+        Dicionário com dados do parceiro ou None se não encontrado
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return None
+
+        doc = db.collection(COLECAO_PARCEIROS).document(parceiro_id).get()
+
+        if doc.exists:
+            parceiro = doc.to_dict()
+            parceiro['_id'] = doc.id
+            # Converte timestamps para evitar erro de serialização JSON
+            parceiro = _converter_timestamps(parceiro)
+            return parceiro
+
+        return None
+
+    except Exception as e:
+        print(f"Erro ao buscar parceiro {parceiro_id}: {e}")
+        return None
+
+
+def criar_parceiro(dados: Dict[str, Any]) -> Optional[str]:
+    """
+    Cria um novo parceiro na coleção.
+
+    Args:
+        dados: Dicionário com dados do parceiro
+
+    Returns:
+        ID do documento criado ou None em caso de erro
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return None
+
+        # Adiciona timestamps
+        dados['created_at'] = datetime.now()
+        dados['updated_at'] = datetime.now()
+
+        # Garante que tipo_parceiro tenha um valor padrão se não fornecido
+        if 'tipo_parceiro' not in dados or not dados.get('tipo_parceiro'):
+            dados['tipo_parceiro'] = 'PF'
+
+        # Remove _id se existir (será gerado pelo Firebase)
+        dados.pop('_id', None)
+
+        # Cria documento
+        doc_ref = db.collection(COLECAO_PARCEIROS).add(dados)
+
+        # Retorna o ID do documento criado
+        return doc_ref[1].id
+
+    except Exception as e:
+        print(f"Erro ao criar parceiro: {e}")
+        return None
+
+
+def atualizar_parceiro(parceiro_id: str, dados: Dict[str, Any]) -> bool:
+    """
+    Atualiza um parceiro existente.
+
+    Args:
+        parceiro_id: ID do documento no Firebase
+        dados: Dicionário com dados a atualizar
+
+    Returns:
+        True se atualizado com sucesso, False caso contrário
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+
+        # Adiciona timestamp de atualização
+        dados['updated_at'] = datetime.now()
+
+        # Remove _id dos dados (não deve ser atualizado)
+        dados.pop('_id', None)
+
+        # Atualiza documento
+        db.collection(COLECAO_PARCEIROS).document(parceiro_id).update(dados)
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao atualizar parceiro {parceiro_id}: {e}")
+        return False
+
+
+def excluir_parceiro(parceiro_id: str) -> bool:
+    """
+    Remove um parceiro da coleção.
+
+    Args:
+        parceiro_id: ID do documento no Firebase
+
+    Returns:
+        True se removido com sucesso, False caso contrário
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+
+        db.collection(COLECAO_PARCEIROS).document(parceiro_id).delete()
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao excluir parceiro {parceiro_id}: {e}")
+        return False
+
+
+def contar_parceiros() -> int:
+    """
+    Retorna o total de parceiros cadastrados.
+
+    Returns:
+        Número total de parceiros
+    """
+    try:
+        db = get_db()
+        if not db:
+            return 0
+
+        # Conta documentos na coleção
+        docs = db.collection(COLECAO_PARCEIROS).stream()
+        return sum(1 for _ in docs)
+
+    except Exception as e:
+        print(f"Erro ao contar parceiros: {e}")
         return 0

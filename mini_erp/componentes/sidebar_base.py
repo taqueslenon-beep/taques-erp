@@ -355,7 +355,7 @@ def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
         {'icone': 'psychology', 'titulo': 'Inteligência', 'rota': '/inteligencia'},
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/processos'},
-        {'icone': 'handshake', 'titulo': 'Acordos', 'rota': '/acordos'},
+        {'icone': 'handshake', 'titulo': 'Acordos/parcelamentos', 'rota': '/acordos'},
         {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/pessoas'},
         {'icone': 'settings', 'titulo': 'Configurações', 'rota': '/configuracoes'},
     ]
@@ -367,7 +367,7 @@ def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/visao-geral/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/visao-geral/processos'},
         {'icone': 'assignment', 'titulo': 'Entregáveis', 'rota': '/visao-geral/entregaveis'},
-        {'icone': 'handshake', 'titulo': 'Acordos', 'rota': '/visao-geral/acordos'},
+        {'icone': 'handshake', 'titulo': 'Acordos/parcelamentos', 'rota': '/visao-geral/acordos'},
         {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/visao-geral/pessoas'},
         {'icone': 'settings', 'titulo': 'Configurações', 'rota': '/visao-geral/configuracoes'},
     ]
