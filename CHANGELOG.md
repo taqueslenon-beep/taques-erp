@@ -83,3 +83,15 @@
 - Novo modelo: `Entregavel`
 - Integração com Firebase Auth para listar responsáveis
 
+
+## [v1.10.0] - 2025-12-13
+
+### Corrigido
+- **Navegação entre Workspaces**: Restaurado funcionamento da alternância entre "Visão Geral do Escritório" e "Área do Cliente"
+- **Rota Inicial**: A rota `/` agora verifica o workspace atual antes de redirecionar
+- **Dropdown de Workspaces**: Correção do redirecionamento ao selecionar workspace
+
+### Modificado
+- `mini_erp/pages/painel/painel_page.py` - Lógica condicional baseada no workspace
+- `mini_erp/gerenciadores/gerenciador_workspace.py` - Revertido rota_inicial do area_cliente
+- `mini_erp/pages/login.py` - Ajustes no redirecionamento pós-login
