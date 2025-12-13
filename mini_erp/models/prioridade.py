@@ -199,3 +199,5 @@ def normalizar_prioridade(codigo: Optional[str]) -> str:
     
     return PRIORIDADE_PADRAO
 
+
+

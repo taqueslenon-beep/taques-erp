@@ -169,6 +169,11 @@ def configuracoes():
                                         ui.notify('Foto atualizada com sucesso!', type='positive')
                                         print(f"[UPLOAD] Avatar salvo: {url}")
                                         
+                                        # Atualiza cache na sessão do usuário
+                                        from nicegui import app
+                                        app.storage.user['avatar_cache'] = {'url': url, 'uid': user_uid}
+                                        print(f"[UPLOAD] Cache atualizado para UID: {user_uid}")
+                                        
                                         # Atualiza a imagem na página
                                         avatar_img.source = url
                                         
@@ -281,6 +286,11 @@ def configuracoes():
                                     if url:
                                         ui.notify('Foto atualizada com sucesso!', type='positive')
                                         print(f"[UPLOAD] Avatar salvo: {url}")
+                                        
+                                        # Atualiza cache na sessão do usuário
+                                        from nicegui import app
+                                        app.storage.user['avatar_cache'] = {'url': url, 'uid': user_uid}
+                                        print(f"[UPLOAD] Cache atualizado para UID: {user_uid}")
                                         
                                         # Atualiza a imagem na página
                                         avatar_img.source = url

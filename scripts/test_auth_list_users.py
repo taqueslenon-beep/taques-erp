@@ -164,3 +164,5 @@ if __name__ == "__main__":
     print(f"  Teste completo (todos usuários): {'✓ PASSOU' if test2_ok else '✗ FALHOU' if test1_ok else '⏭ PULADO'}")
     print("="*70 + "\n")
 
+
+

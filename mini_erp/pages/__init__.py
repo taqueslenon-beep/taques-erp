@@ -17,8 +17,12 @@ from .acordos import acordos
 from .inteligencia import inteligencia
 
 # Módulo de visão geral do escritório (novo workspace)
+# Nota: Módulo entregaveis agora está dentro de visao_geral
 from . import visao_geral
 
+# Módulo de prazos (placeholder em desenvolvimento)
+from . import prazos
+
 # Módulos desativados temporariamente (em desenvolvimento)
-# from . import prazos, compromissos
+# from . import compromissos
 # from . import governanca

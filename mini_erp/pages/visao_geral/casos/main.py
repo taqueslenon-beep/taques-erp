@@ -240,8 +240,36 @@ def _renderizar_pagina_casos():
             'status': 'Todos',
             'categoria': 'Todos',
             'estado': 'Todos',
-            'prioridade': None,  # None = Todas as prioridades
+            'prioridade': 'Todas',  # 'Todas' = Todas as prioridades
+            'responsavel': 'Todos',
         }
+
+        # Buscar usuários do Firebase para o filtro de responsáveis
+        ensure_firebase_initialized()
+        auth_instance = get_auth()
+        usuarios_firebase = []
+        
+        try:
+            page = auth_instance.list_users()
+            while page:
+                for user in page.users:
+                    usuarios_firebase.append({
+                        '_id': user.uid,
+                        'name': user.display_name or (user.email.split('@')[0] if user.email else 'Sem nome'),
+                        'email': user.email or '',
+                    })
+                try:
+                    page = page.get_next_page()
+                except:
+                    break
+        except Exception as e:
+            print(f"Erro ao buscar usuários para filtro: {e}")
+            usuarios_firebase = []
+
+        # Lista de nomes para o dropdown
+        nomes_responsaveis = sorted(set(
+            u.get('name', 'Sem nome') for u in usuarios_firebase
+        ))
 
         # Referência para o refreshable
         refresh_ref = {'func': None}
@@ -301,12 +329,17 @@ def _renderizar_pagina_casos():
 
                     # Filtro por prioridade
                     prioridade_select = ui.select(
-                        options=[{'label': 'Todas', 'value': None}] + [
-                            {'label': p, 'value': p} for p in PRIORIDADE_OPTIONS
-                        ],
-                        value=None,
+                        options=['Todas'] + PRIORIDADE_OPTIONS,
+                        value='Todas',
                         label='Prioridade'
                     ).classes('w-32').props('dense outlined')
+
+                    # Filtro por responsável
+                    responsavel_select = ui.select(
+                        options=['Todos'] + nomes_responsaveis,
+                        value='Todos',
+                        label='Responsável'
+                    ).classes('w-40').props('dense outlined')
 
                     # Botão limpar filtros
                     def limpar_filtros():
@@ -315,13 +348,15 @@ def _renderizar_pagina_casos():
                         status_select.value = 'Todos'
                         categoria_select.value = 'Todos'
                         estado_select.value = 'Todos'
-                        prioridade_select.value = None
+                        prioridade_select.value = 'Todas'
+                        responsavel_select.value = 'Todos'
                         filtros['busca'] = ''
                         filtros['nucleo'] = 'Todos'
                         filtros['status'] = 'Todos'
                         filtros['categoria'] = 'Todos'
                         filtros['estado'] = 'Todos'
-                        filtros['prioridade'] = None
+                        filtros['prioridade'] = 'Todas'
+                        filtros['responsavel'] = 'Todos'
                         if refresh_ref['func']:
                             refresh_ref['func'].refresh()
 
@@ -335,6 +370,7 @@ def _renderizar_pagina_casos():
                         filtros['categoria'] = categoria_select.value
                         filtros['estado'] = estado_select.value
                         filtros['prioridade'] = prioridade_select.value
+                        filtros['responsavel'] = responsavel_select.value
                         if refresh_ref['func']:
                             refresh_ref['func'].refresh()
 
@@ -344,11 +380,12 @@ def _renderizar_pagina_casos():
                     categoria_select.on('update:model-value', lambda: aplicar_filtros())
                     estado_select.on('update:model-value', lambda: aplicar_filtros())
                     prioridade_select.on('update:model-value', lambda: aplicar_filtros())
+                    responsavel_select.on('update:model-value', lambda: aplicar_filtros())
 
             # Conteúdo principal (grid de cards)
             @ui.refreshable
             def renderizar_conteudo():
-                _renderizar_grid_cards(filtros, refresh_ref)
+                _renderizar_grid_cards(filtros, refresh_ref, usuarios_firebase)
 
             # Guarda referência para uso posterior
             refresh_ref['func'] = renderizar_conteudo
@@ -357,7 +394,7 @@ def _renderizar_pagina_casos():
                 renderizar_conteudo()
 
 
-def _renderizar_grid_cards(filtros: dict, refresh_ref: dict):
+def _renderizar_grid_cards(filtros: dict, refresh_ref: dict, usuarios_firebase: list = None):
     """Renderiza o grid de cards de casos."""
     # Carrega casos
     try:
@@ -371,7 +408,7 @@ def _renderizar_grid_cards(filtros: dict, refresh_ref: dict):
         return
 
     # Aplica filtros
-    casos_filtrados = _aplicar_filtros(todos_casos, filtros)
+    casos_filtrados = _aplicar_filtros(todos_casos, filtros, usuarios_firebase)
 
     # Ordena por prioridade (P1 primeiro, P4 por último)
     # Se mesma prioridade, mantém ordem original (mais recente primeiro já vem do banco)
@@ -392,7 +429,8 @@ def _renderizar_grid_cards(filtros: dict, refresh_ref: dict):
         filtros['status'] != 'Todos' or
         filtros['categoria'] != 'Todos' or
         filtros['estado'] != 'Todos' or
-        filtros['prioridade'] is not None
+        (filtros['prioridade'] and filtros['prioridade'] != 'Todas') or
+        (filtros.get('responsavel') and filtros['responsavel'] != 'Todos')
     )
 
     if tem_filtros:
@@ -487,13 +525,14 @@ def _renderizar_card_caso(caso: dict, refresh_ref: dict):
                 ui.label('Sem clientes vinculados').classes('text-sm text-gray-400 italic mt-2')
 
 
-def _aplicar_filtros(casos: list, filtros: dict) -> list:
+def _aplicar_filtros(casos: list, filtros: dict, usuarios_firebase: list = None) -> list:
     """
     Aplica filtros à lista de casos.
 
     Args:
         casos: Lista completa de casos
         filtros: Dicionário com filtros ativos
+        usuarios_firebase: Lista de usuários do Firebase para fallback no filtro de responsáveis
 
     Returns:
         Lista filtrada de casos
@@ -522,12 +561,41 @@ def _aplicar_filtros(casos: list, filtros: dict) -> list:
 
     # Filtro por prioridade
     prioridade_filtro = filtros.get('prioridade')
-    if prioridade_filtro:
+    if prioridade_filtro and prioridade_filtro != 'Todas':
         # Normaliza prioridade para comparação (garante P4 se não tiver)
         resultado = [
             c for c in resultado
             if (c.get('prioridade') or PRIORIDADE_PADRAO) == prioridade_filtro
         ]
+
+    # Filtro por responsável (com fallback para casos antigos)
+    responsavel_filtro = filtros.get('responsavel')
+    if responsavel_filtro and responsavel_filtro != 'Todos':
+        def match_responsavel(caso):
+            # 1. Primeiro tenta buscar em responsaveis_dados (dados salvos)
+            responsaveis_dados = caso.get('responsaveis_dados', [])
+            for r in responsaveis_dados:
+                nome_salvo = (r.get('nome', '') or '').strip()
+                if nome_salvo == responsavel_filtro:
+                    return True
+            
+            # 2. Fallback: busca pelo ID em 'responsaveis' e compara com nome atual do Firebase
+            responsaveis_ids = caso.get('responsaveis', [])
+            if responsaveis_ids and usuarios_firebase:
+                for resp_id in responsaveis_ids:
+                    # Encontra o usuário na lista de usuários do Firebase
+                    usuario = next(
+                        (u for u in usuarios_firebase if u.get('_id') == resp_id),
+                        None
+                    )
+                    if usuario:
+                        nome_atual = (usuario.get('name', '') or '').strip()
+                        if nome_atual == responsavel_filtro:
+                            return True
+            
+            return False
+        
+        resultado = [c for c in resultado if match_responsavel(c)]
 
     # Filtro por busca textual
     busca = filtros.get('busca', '').strip().lower()

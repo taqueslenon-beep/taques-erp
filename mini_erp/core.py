@@ -2112,9 +2112,33 @@ def layout(page_title: str, breadcrumbs: list = None):
                 
                 ui.icon('notifications').style('font-size: 20px; cursor: pointer;')
                 
+                # Verificar cache do avatar ANTES de renderizar (evita piscar)
+                from .auth import get_current_user
+                avatar_cache = app.storage.user.get('avatar_cache', {})
+                current_user_for_avatar = get_current_user()
+                cached_url = None
+                user_initials = 'U'
+                
+                if current_user_for_avatar:
+                    uid_for_avatar = current_user_for_avatar.get('uid')
+                    email_for_avatar = current_user_for_avatar.get('email', '')
+                    
+                    # Calcula iniciais
+                    user_initials = email_for_avatar[:2].upper() if email_for_avatar else 'U'
+                    
+                    # Verifica se tem cache válido
+                    if avatar_cache.get('uid') == uid_for_avatar and avatar_cache.get('url'):
+                        cached_url = avatar_cache.get('url')
+                
                 with ui.button().props('flat dense').classes('p-0'):
                     with ui.avatar(color='white', text_color='primary').style('width: 40px; height: 40px;').classes('cursor-pointer font-semibold') as avatar_comp:
-                        avatar_label = ui.label('LT').classes('text-sm font-bold')
+                        # Se tem cache válido, renderiza imagem direto (SEM PISCAR)
+                        if cached_url:
+                            ui.image(cached_url).classes('w-full h-full object-cover rounded-full')
+                            avatar_label = None  # Não precisa de label
+                        else:
+                            # Sem cache - mostra iniciais e carrega depois
+                            avatar_label = ui.label(user_initials).classes('text-sm font-bold')
                     
                     with ui.menu():
                         with ui.menu_item(on_click=lambda: ui.navigate.to('/configuracoes')):
@@ -2131,15 +2155,25 @@ def layout(page_title: str, breadcrumbs: list = None):
                     avatar_navbar_loading = {'status': False}
                     
                     async def load_user_avatar():
-                        """Carrega o avatar do usuário na navbar"""
+                        """Carrega o avatar do usuário na navbar com cache"""
                         try:
                             if avatar_navbar_loading['status']:
                                 return  # Evita múltiplas chamadas simultâneas
                             
-                            avatar_navbar_loading['status'] = True
-                            
+                            # Importa get_current_user no início da função para evitar UnboundLocalError
                             from .auth import get_current_user
                             from .storage import obter_url_avatar
+                            
+                            # Se já tem imagem do cache aplicada na renderização inicial, não precisa fazer nada
+                            avatar_cache = app.storage.user.get('avatar_cache', {})
+                            user = get_current_user()
+                            if user:
+                                uid = user.get('uid')
+                                if avatar_cache.get('uid') == uid and avatar_cache.get('url'):
+                                    print("[AVATAR HEADER] Cache já aplicado na renderização inicial")
+                                    return
+                            
+                            avatar_navbar_loading['status'] = True
                             
                             user = get_current_user()
                             if not user:
@@ -2150,46 +2184,50 @@ def layout(page_title: str, breadcrumbs: list = None):
                             email = user.get('email', '')
                             uid = user.get('uid')
                             
-                            # Tenta obter display_name
-                            display_name = None
-                            if uid:
-                                try:
-                                    from .storage import obter_display_name
-                                    display_name = await run.io_bound(obter_display_name, uid)
-                                    # Se retornou "Usuário" (fallback), trata como None
-                                    if display_name == "Usuário":
-                                        display_name = None
-                                except:
-                                    pass
-                            
-                            # Usa display_name para iniciais, senão usa email
-                            if display_name and len(display_name) >= 2:
-                                # Pega primeiras 2 letras do nome
-                                initials = display_name[:2].upper()
-                                # Tooltip com nome completo
-                                avatar_label.tooltip = display_name
-                            else:
-                                # Fallback: usa email
-                                initials = email[:2].upper() if email else 'U'
-                                avatar_label.tooltip = email
-                            
-                            avatar_label.text = initials
+                            # Atualiza iniciais se avatar_label existir (não existe se cache foi usado)
+                            if avatar_label is not None:
+                                # Tenta obter display_name
+                                display_name = None
+                                if uid:
+                                    try:
+                                        from .storage import obter_display_name
+                                        display_name = await run.io_bound(obter_display_name, uid)
+                                        # Se retornou "Usuário" (fallback), trata como None
+                                        if display_name == "Usuário":
+                                            display_name = None
+                                    except:
+                                        pass
+                                
+                                # Usa display_name para iniciais, senão usa email
+                                if display_name and len(display_name) >= 2:
+                                    # Pega primeiras 2 letras do nome
+                                    initials = display_name[:2].upper()
+                                    # Tooltip com nome completo
+                                    avatar_label.tooltip = display_name
+                                else:
+                                    # Fallback: usa email
+                                    initials = email[:2].upper() if email else 'U'
+                                    avatar_label.tooltip = email
+                                
+                                avatar_label.text = initials
                             
                             # Carrega avatar do Storage
-                            uid = user.get('uid')
-                            print(f"[AVATAR HEADER] Carregando para UID: {uid}")
+                            print(f"[AVATAR HEADER] Carregando do Storage para UID: {uid}")
                             
                             if uid:
                                 url = await run.io_bound(obter_url_avatar, uid)
                                 print(f"[AVATAR HEADER] URL obtida: {url}")
                                 
                                 if url:
+                                    # Salva no cache para próximas navegações
+                                    app.storage.user['avatar_cache'] = {'url': url, 'uid': uid}
+                                    
                                     # Limpa o avatar e adiciona a imagem
                                     avatar_comp.clear()
                                     with avatar_comp:
                                         # Adiciona a imagem com estilo circular
                                         ui.image(url).classes('w-full h-full object-cover rounded-full')
-                                    print(f"[AVATAR HEADER] Imagem aplicada com sucesso!")
+                                    print(f"[AVATAR HEADER] Imagem aplicada e cache atualizado!")
                                 else:
                                     print(f"[AVATAR HEADER] Nenhuma URL retornada, mantendo iniciais")
                         except Exception as e:
@@ -2212,53 +2250,17 @@ def layout(page_title: str, breadcrumbs: list = None):
                         });
                     """)
                     
-                    # Escuta evento customizado para atualizar avatar quando alterado
-                    async def on_avatar_updated():
-                        """Atualiza avatar no header quando evento é disparado"""
-                        print("[AVATAR HEADER] Evento 'avatar-updated' recebido, recarregando avatar...")
-                        await load_user_avatar()
-                    
                     # Listener JavaScript para evento avatar-updated
+                    # Quando avatar é atualizado, limpa cache e recarrega
                     ui.run_javascript("""
                         window.addEventListener('avatar-updated', function(event) {
                             console.log('[AVATAR HEADER] Evento avatar-updated recebido', event.detail);
-                            // Força recarregamento do avatar após 500ms
+                            // Limpa cache e força recarregamento do avatar após 500ms
                             setTimeout(function() {
                                 window.location.reload();
                             }, 500);
                         });
                     """)
-                    
-                    # Polling suave para detectar mudanças (backup caso evento não funcione)
-                    async def check_avatar_update():
-                        """Verifica se o avatar foi atualizado e recarrega se necessário"""
-                        try:
-                            from .auth import get_current_user
-                            from .storage import obter_url_avatar
-                            
-                            user = get_current_user()
-                            if not user:
-                                return
-                                
-                            uid = user.get('uid')
-                            if uid:
-                                url = await run.io_bound(obter_url_avatar, uid)
-                                if url:
-                                    # Verifica se a URL mudou (compara sem timestamp)
-                                    current_src = getattr(avatar_comp, '_last_avatar_url', None)
-                                    url_base = url.split('?')[0]  # Remove timestamp
-                                    
-                                    if current_src != url_base:
-                                        print(f"[AVATAR HEADER] Avatar atualizado detectado: {url_base}")
-                                        avatar_comp.clear()
-                                        with avatar_comp:
-                                            ui.image(url).classes('w-full h-full object-cover rounded-full')
-                                        avatar_comp._last_avatar_url = url_base
-                        except Exception as e:
-                            print(f"[AVATAR HEADER] Erro ao verificar atualização de avatar: {e}")
-                    
-                    # Verifica atualizações a cada 5 segundos quando na página (menos frequente)
-                    ui.timer(5.0, check_avatar_update)
 
     # Sidebar - Renderiza baseado no workspace ativo
     from .componentes.sidebar_base import render_sidebar, obter_itens_menu_por_workspace
@@ -2269,7 +2271,7 @@ def layout(page_title: str, breadcrumbs: list = None):
     itens_menu = obter_itens_menu_por_workspace(workspace_atual)
 
     # Obtém rota atual para destacar item ativo
-    from nicegui import app
+    # app já está importado no topo do arquivo
     rota_atual = None
     try:
         # Tenta obter a rota atual da requisição

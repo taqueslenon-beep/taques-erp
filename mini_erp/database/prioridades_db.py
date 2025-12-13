@@ -169,3 +169,5 @@ def obter_ordem_prioridade(codigo: str) -> int:
     # Fallback para P4
     return PRIORIDADES_PADRAO[3]['ordem']
 
+
+

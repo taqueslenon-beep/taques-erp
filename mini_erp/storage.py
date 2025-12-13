@@ -107,9 +107,19 @@ def fazer_upload_avatar(user_uid, image_file):
         traceback.print_exc()
         return None
 
-def obter_url_avatar(user_uid):
-    """Obtém URL do avatar do usuário"""
-    print(f"[BUSCAR AVATAR] Buscando para UID: {user_uid}")
+def obter_url_avatar(user_uid, force_refresh=False):
+    """
+    Obtém URL do avatar do usuário.
+    
+    Args:
+        user_uid: ID do usuário
+        force_refresh: Se True, verifica blob.exists() novamente. 
+                      Se False, assume que o blob existe e retorna URL diretamente.
+    
+    Returns:
+        URL pública do avatar ou None se não encontrado
+    """
+    print(f"[BUSCAR AVATAR] Buscando para UID: {user_uid} (force_refresh={force_refresh})")
     
     if not user_uid:
         print("[BUSCAR AVATAR] ERRO: user_uid não fornecido")
@@ -127,6 +137,23 @@ def obter_url_avatar(user_uid):
         blob_path = f'avatars/{user_uid}.png'
         blob = bucket.blob(blob_path)
         
+        # Se não for force_refresh, assume que o blob existe e retorna URL diretamente
+        # Isso reduz chamadas desnecessárias ao Firebase Storage
+        if not force_refresh:
+            print(f"[BUSCAR AVATAR] Usando cache - retornando URL sem verificar blob.exists()")
+            # Garante que o blob é público (pode já ser, mas garante)
+            try:
+                blob.make_public()
+            except Exception as public_err:
+                # Ignora erro se já for público
+                pass
+            
+            url = blob.public_url
+            final_url = f"{url}?t={int(time.time())}"
+            print(f"[BUSCAR AVATAR] URL (cache): {final_url}")
+            return final_url
+        
+        # Se force_refresh=True, verifica se o blob existe
         print(f"[BUSCAR AVATAR] Verificando se blob existe: {blob_path}")
         blob_exists = blob.exists()
         print(f"[BUSCAR AVATAR] Blob existe: {blob_exists}")

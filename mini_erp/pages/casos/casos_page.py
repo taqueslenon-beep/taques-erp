@@ -8,7 +8,7 @@ Contém as três páginas NiceGUI principais:
 """
 
 from datetime import datetime
-from nicegui import ui
+from nicegui import ui, run
 import asyncio
 
 # Imports do core
@@ -537,7 +537,7 @@ def case_detail(case_slug: str):
             # Salva o caso no Firestore
             try:
                 from ...core import save_case
-                from ....utils.save_logger import SaveLogger
+                from ...utils.save_logger import SaveLogger
                 
                 # Log antes de salvar
                 SaveLogger.log_save_attempt('casos', case.get('slug', 'desconhecido'), {'campos': list(case.keys())})
@@ -547,7 +547,7 @@ def case_detail(case_slug: str):
                 # Log de sucesso
                 SaveLogger.log_save_success('casos', case.get('slug', 'desconhecido'))
             except Exception as e:
-                from ....utils.save_logger import SaveLogger
+                from ...utils.save_logger import SaveLogger
                 SaveLogger.log_save_error('casos', case.get('slug', 'desconhecido'), e)
                 print(f'Erro no auto-save: {e}')
             
@@ -2153,7 +2153,7 @@ def case_detail(case_slug: str):
                         # Botão de salvamento manual
                         async def manual_save_report():
                             """Salva manualmente o relatório no Firestore"""
-                            from ....utils.save_logger import SaveLogger
+                            from ...utils.save_logger import SaveLogger
                             
                             try:
                                 autosave_state['is_saving'] = True
@@ -2245,7 +2245,7 @@ def case_detail(case_slug: str):
                         # Botão de salvamento manual
                         async def manual_save_vistorias():
                             """Salva manualmente as vistorias no Firestore"""
-                            from ....utils.save_logger import SaveLogger
+                            from ...utils.save_logger import SaveLogger
                             
                             try:
                                 autosave_state['is_saving'] = True
@@ -2505,7 +2505,7 @@ def case_detail(case_slug: str):
                         ).classes('w-full mb-4').props('outlined')
                         
                         def save_thesis():
-                            from ....utils.save_logger import SaveLogger
+                            from ...utils.save_logger import SaveLogger
                             
                             if not thesis_name.value:
                                 ui.notify('O nome da tese é obrigatório!', type='warning')

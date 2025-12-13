@@ -231,5 +231,68 @@ def set_current_workspace(workspace_id: str):
     definir_workspace(workspace_id)
 
 
+def identificar_tipo_usuario(uid: str) -> str:
+    """
+    Identifica o tipo de usuário (administrador ou cliente) baseado em:
+    1. Coleção usuarios_sistema (campo workspaces)
+    2. Custom claims do Firebase Auth (admin, role, perfil)
+    
+    Args:
+        uid: UID do Firebase Auth do usuário
+    
+    Returns:
+        'admin' se for administrador, 'cliente' se for cliente, 'desconhecido' se não conseguir identificar
+    """
+    if not uid:
+        return 'desconhecido'
+    
+    # 1. Tenta buscar na coleção usuarios_sistema primeiro
+    try:
+        from .firebase_config import get_db
+        db = get_db()
+        
+        # Busca usuário pelo firebase_uid
+        query = db.collection('usuarios_sistema').where('firebase_uid', '==', uid).limit(1)
+        docs = list(query.stream())
+        
+        if docs:
+            usuario = docs[0].to_dict()
+            workspaces_colecao = usuario.get('workspaces', [])
+            
+            # Se tem acesso a visao_geral, é admin
+            if 'visao_geral' in workspaces_colecao:
+                return 'admin'
+            # Se só tem schmidmeier, é cliente
+            elif 'schmidmeier' in workspaces_colecao:
+                return 'cliente'
+    except Exception as e:
+        print(f"Erro ao buscar usuário na coleção usuarios_sistema: {e}")
+    
+    # 2. Fallback: verifica custom_claims do Firebase Auth
+    try:
+        firebase_user = admin_auth.get_user(uid)
+        custom_claims = firebase_user.custom_claims or {}
+        
+        # Verifica se é admin
+        if custom_claims.get('admin') or custom_claims.get('role') == 'admin':
+            return 'admin'
+        
+        # Verifica perfil
+        perfil = custom_claims.get('perfil') or custom_claims.get('role') or custom_claims.get('profile')
+        if perfil:
+            perfil = perfil.lower()
+            # Admin: interno, internal, admin, df_projetos
+            if perfil in ['interno', 'internal', 'admin', 'df_projetos', 'df-projetos', 'projetos']:
+                return 'admin'
+            # Cliente: cliente, client
+            elif perfil in ['cliente', 'client']:
+                return 'cliente'
+    except Exception as e:
+        print(f"Erro ao obter custom_claims do usuário: {e}")
+    
+    # 3. Se não conseguiu identificar, retorna desconhecido
+    return 'desconhecido'
+
+
 
 

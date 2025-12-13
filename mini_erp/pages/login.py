@@ -65,13 +65,36 @@ def login_page():
                     # Salva usuário na sessão
                     app.storage.user['user'] = result['user']
                     
-                    # Carrega workspace persistido do localStorage ou usa padrão
-                    from ..gerenciadores.gerenciador_workspace import carregar_workspace_persistido, definir_workspace
-                    workspace_id = carregar_workspace_persistido()
-                    definir_workspace(workspace_id)
+                    # Identifica tipo de usuário e define workspace padrão
+                    from ..auth import identificar_tipo_usuario
+                    from ..gerenciadores.gerenciador_workspace import definir_workspace, obter_info_workspace
+                    
+                    user_uid = result['user'].get('uid')
+                    tipo_usuario = identificar_tipo_usuario(user_uid)
+                    
+                    # Define workspace padrão baseado no tipo de usuário
+                    if tipo_usuario == 'admin':
+                        # Administrador → Visão Geral do Escritório
+                        workspace_id = 'visao_geral_escritorio'
+                        definir_workspace(workspace_id)
+                        workspace_info = obter_info_workspace(workspace_id)
+                        rota_redirecionamento = workspace_info.get('rota_inicial', '/visao-geral/painel')
+                    elif tipo_usuario == 'cliente':
+                        # Cliente → Área do Cliente
+                        workspace_id = 'area_cliente_schmidmeier'
+                        definir_workspace(workspace_id)
+                        workspace_info = obter_info_workspace(workspace_id)
+                        rota_redirecionamento = workspace_info.get('rota_inicial', '/')
+                    else:
+                        # Tipo desconhecido: usa comportamento padrão (workspace persistido)
+                        from ..gerenciadores.gerenciador_workspace import carregar_workspace_persistido
+                        workspace_id = carregar_workspace_persistido()
+                        definir_workspace(workspace_id)
+                        workspace_info = obter_info_workspace(workspace_id)
+                        rota_redirecionamento = workspace_info.get('rota_inicial', '/') if workspace_info else '/'
                     
                     ui.notify('Login realizado com sucesso!', type='positive')
-                    ui.navigate.to('/')
+                    ui.navigate.to(rota_redirecionamento)
                 else:
                     error_label.text = result['message']
                     error_label.classes(remove='hidden')

@@ -99,7 +99,7 @@ def build_pie_chart_config(
     data: List[Dict[str, Any]],
     series_name: str = 'Dados',
     show_legend: bool = True,
-    legend_position: str = 'left',
+    legend_position: str = 'bottom',
     donut: bool = True,
     center: List[str] = None,
     label_font_size: int = 13,
@@ -118,8 +118,15 @@ def build_pie_chart_config(
         label_font_size: Tamanho da fonte do label
         show_percentage: Mostrar percentual no label
     """
+    # Se legenda está abaixo ou acima, centraliza o gráfico verticalmente mais alto
+    # Se legenda está lateral, ajusta horizontalmente
     if center is None:
-        center = ['65%', '50%'] if show_legend else ['50%', '50%']
+        if show_legend and legend_position in ['bottom', 'top']:
+            center = ['50%', '45%']  # Centralizado horizontalmente, um pouco acima do centro
+        elif show_legend and legend_position in ['left', 'right']:
+            center = ['65%', '50%'] if legend_position == 'left' else ['35%', '50%']
+        else:
+            center = ['50%', '50%']
     
     formatter = '{b}\n{c} ({d}%)' if show_percentage else '{b}: {c}'
     
@@ -131,9 +138,10 @@ def build_pie_chart_config(
         'series': [{
             'name': series_name,
             'type': 'pie',
-            'radius': ['40%', '70%'] if donut else '70%',
+            # Reduzir radius para dar mais espaço aos labels externos
+            'radius': ['35%', '60%'] if donut else '60%',
             'center': center,
-            'avoidLabelOverlap': False,
+            'avoidLabelOverlap': True,  # Evitar sobreposição de labels
             'itemStyle': {
                 'borderRadius': 10,
                 'borderColor': '#fff',
@@ -144,20 +152,59 @@ def build_pie_chart_config(
                 'position': 'outside',
                 'fontSize': label_font_size,
                 'fontWeight': 'bold',
-                'formatter': formatter
+                'formatter': formatter,
+                'distanceToLabelLine': 5,
+                'rich': {
+                    'name': {
+                        'fontSize': label_font_size,
+                        'fontWeight': 'bold',
+                        'lineHeight': 20
+                    },
+                    'value': {
+                        'fontSize': label_font_size - 1,
+                        'fontWeight': 'normal'
+                    }
+                }
             },
-            'labelLine': {'show': True},
+            'labelLine': {
+                'show': True,
+                'length': 15,
+                'length2': 10,
+                'smooth': 0.2
+            },
+            'emphasis': {
+                'label': {
+                    'show': True,
+                    'fontSize': label_font_size + 2,
+                    'fontWeight': 'bold'
+                }
+            },
             'data': data
         }]
     }
     
     if show_legend:
-        config['legend'] = {
-            'orient': 'vertical',
-            'left': legend_position,
-            'top': 'center',
-            'fontSize': 13
-        }
+        if legend_position in ['bottom', 'top']:
+            # Legenda horizontal abaixo ou acima
+            config['legend'] = {
+                'orient': 'horizontal',
+                'left': 'center',
+                'bottom': '5%' if legend_position == 'bottom' else None,
+                'top': '5%' if legend_position == 'top' else None,
+                'fontSize': 12,
+                'itemGap': 20,
+                'itemWidth': 14,
+                'itemHeight': 14
+            }
+        else:
+            # Legenda vertical lateral
+            config['legend'] = {
+                'orient': 'vertical',
+                'left': legend_position,
+                'top': 'center',
+                'fontSize': 13,
+                'itemGap': 12
+            }
     
     return config
 
