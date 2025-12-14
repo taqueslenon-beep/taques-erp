@@ -455,3 +455,4 @@ if nucleo_filtro and nucleo_filtro != 'Todos':
 4. **Validação obrigatória** - Núcleo deve estar em `NUCLEO_OPTIONS`
 5. **Reutilização possível** - Se os núcleos forem os mesmos, pode importar de `casos.models`
 
+

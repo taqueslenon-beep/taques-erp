@@ -5,6 +5,7 @@ from typing import Optional, Callable
 from nicegui import ui
 
 from .database import criar_pessoa, atualizar_pessoa, listar_pessoas
+from .database_grupo import listar_grupos
 from .models import (
     TIPO_PESSOA_OPTIONS,
     TIPO_PESSOA_PADRAO,
@@ -117,6 +118,18 @@ def abrir_dialog_pessoa(
                     placeholder='(00) 00000-0000'
                 ).classes('flex-1').props('dense outlined')
 
+            # Grupo de Relacionamento
+            grupos = listar_grupos(apenas_ativos=True)
+            opcoes_grupos = {'': 'Sem Grupo'}
+            for grupo in grupos:
+                opcoes_grupos[grupo._id] = f"{grupo.icone or '📦'} {grupo.nome}"
+            
+            grupo_select = ui.select(
+                options=opcoes_grupos,
+                value=dados.get('grupo_id', ''),
+                label='Grupo de Relacionamento'
+            ).classes('w-full').props('dense outlined')
+
             # Observações
             observacoes_input = ui.textarea(
                 label='Observações',
@@ -143,6 +156,23 @@ def abrir_dialog_pessoa(
                     'telefone': telefone_input.value.strip(),
                     'observacoes': observacoes_input.value.strip(),
                 }
+                
+                # Adiciona grupo de relacionamento
+                grupo_id_selecionado = grupo_select.value or ''
+                novos_dados['grupo_id'] = grupo_id_selecionado
+                
+                # Busca nome do grupo se selecionado
+                if grupo_id_selecionado:
+                    grupo_selecionado = next((g for g in grupos if g._id == grupo_id_selecionado), None)
+                    if grupo_selecionado:
+                        novos_dados['grupo_nome'] = grupo_selecionado.nome
+                    else:
+                        novos_dados['grupo_nome'] = ''
+                else:
+                    novos_dados['grupo_nome'] = ''
+                
+                # Garante categoria
+                novos_dados['categoria'] = 'cliente'
 
                 # Adiciona CPF ou CNPJ baseado no tipo
                 if tipo == 'PF' and cpf_input:

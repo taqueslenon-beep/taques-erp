@@ -24,13 +24,15 @@ TIPO_PESSOA_PADRAO = 'PF'
 # =============================================================================
 
 # Opções de tipo de envolvido
-TIPOS_ENVOLVIDO = ['PF', 'PJ', 'Ente Público']
+TIPOS_ENVOLVIDO = ['PF', 'PJ', 'Ente Público', 'Advogado', 'Técnico']
 
 # Labels para exibição
 TIPO_ENVOLVIDO_LABELS = {
     'PF': 'Pessoa Física',
     'PJ': 'Pessoa Jurídica',
     'Ente Público': 'Ente Público',
+    'Advogado': 'Advogado',
+    'Técnico': 'Técnico',
 }
 
 TIPO_ENVOLVIDO_PADRAO = 'PF'
@@ -110,6 +112,13 @@ class Pessoa(TypedDict, total=False):
     # Vínculos com outras pessoas
     vinculos: List[Vinculo]
 
+    # Grupo de relacionamento
+    grupo_id: str         # ID do grupo de relacionamento (opcional)
+    grupo_nome: str      # Nome do grupo para exibição rápida (opcional)
+
+    # Categoria (para filtrar por aba)
+    categoria: str       # "cliente", "envolvido", "parceiro", "lead"
+
     # Metadata
     observacoes: str
     created_at: Any
@@ -124,7 +133,7 @@ class Envolvido(TypedDict, total=False):
     cpf_cnpj: str           # CPF ou CNPJ (opcional, apenas dígitos)
     email: str              # Email (opcional)
     telefone: str            # Telefone (opcional)
-    tipo_envolvido: str     # 'PF', 'PJ' ou 'Ente Público' (default: 'PF')
+    tipo_envolvido: str     # 'PF', 'PJ', 'Ente Público', 'Advogado' ou 'Técnico' (default: 'PF')
     observacoes: str        # Observações (opcional)
     created_at: Any         # Data de criação
     updated_at: Any         # Data de atualização
@@ -220,6 +229,9 @@ def criar_pessoa_vazia() -> dict:
         'tipo_filial': 'Matriz',
         'socios': [],
         'vinculos': [],
+        'grupo_id': '',      # Campo opcional para grupo de relacionamento
+        'grupo_nome': '',    # Campo opcional para nome do grupo
+        'categoria': 'cliente',  # Categoria padrão: cliente
         'observacoes': '',
     }
 

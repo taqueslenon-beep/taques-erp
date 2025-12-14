@@ -240,3 +240,4 @@ def _renderizar_pagina_estatisticas():
                 else:
                     create_empty_chart_state('Nenhum parceiro cadastrado.')
 
+

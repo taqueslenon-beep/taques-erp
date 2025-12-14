@@ -299,13 +299,16 @@ def create_new_case_dict(
         'legal_considerations': '',
         'technical_considerations': '',
         'theses': [],
-        'swot_s': [''] * 10,
-        'swot_w': [''] * 10,
-        'swot_o': [''] * 10,
-        'swot_t': [''] * 10,
+        # Campos SWOT removidos (não são mais usados)
+        'swot_s': [],
+        'swot_w': [],
+        'swot_o': [],
+        'swot_t': [],
         'strategy_observations': '',
         'next_actions': '',
+        # Campos de mapas e cálculos removidos (não são mais usados)
         'maps': [],
-        'map_notes': ''
+        'map_notes': '',
+        'calculations': []
     }
 

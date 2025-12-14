@@ -252,7 +252,8 @@ def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/processos'},
         {'icone': 'handshake', 'titulo': 'Acordos/parcelamentos', 'rota': '/acordos'},
-        {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/pessoas'},
+        # REMOVIDO: Item "Pessoas" removido do menu após migração para Visão Geral
+        # {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/pessoas'},
         {'icone': 'settings', 'titulo': 'Configurações', 'rota': '/configuracoes'},
     ]
 

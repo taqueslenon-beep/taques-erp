@@ -2,11 +2,12 @@
 Módulo de modelos e constantes para Casos do workspace Visão Geral.
 Define tipos de dados, constantes e estruturas usadas no módulo.
 
-Campos simplificados:
-- titulo, nucleo, status, categoria, estado, clientes, descricao, prioridade
-- REMOVIDOS: ano, mes, parte_contraria
+Campos expandidos para compatibilidade com módulo Schmidmeier:
+- Campos básicos: titulo, nucleo, status, categoria, estado, clientes, descricao, prioridade
+- Campos estratégicos: objetivos, proximas_acoes, consideracoes_legais, teses, SWOT, etc.
+- Campos de relacionamento: grupo_id, processos_ids, responsaveis, parte_contraria
 """
-from typing import TypedDict, List, Any
+from typing import TypedDict, List, Any, Dict
 
 # Imports de prioridades
 from ....models.prioridade import (
@@ -82,12 +83,22 @@ ESTADO_ABREVIACOES = {
 PRIORIDADE_OPTIONS = CODIGOS_PRIORIDADE  # ['P1', 'P2', 'P3', 'P4']
 
 # =============================================================================
+# CONSTANTES - PARTES CONTRÁRIAS
+# =============================================================================
+
+PARTES_CONTRARIAS = [
+    'MP', 'OAB', 'Defesa', 'Autor', 'União', 
+    'Estado', 'Município', 'INSS', 'Receita Federal', 'Outro', '-'
+]
+
+# =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
 # =============================================================================
 
 
 class Caso(TypedDict, total=False):
-    """Estrutura de um caso no sistema (simplificada)."""
+    """Estrutura de um caso no sistema (expandida para compatibilidade com Schmidmeier)."""
+    # Campos básicos
     _id: str
     titulo: str                  # Título/Nome do caso (obrigatório)
     nucleo: str                  # Ambiental, Cobranças, Generalista (obrigatório)
@@ -100,6 +111,46 @@ class Caso(TypedDict, total=False):
     descricao: str               # Descrição/observações do caso
     created_at: Any
     updated_at: Any
+    
+    # Campos de grupo (vincular ao grupo de relacionamento)
+    grupo_id: str                # ID do grupo (ex: Schmidmeier)
+    grupo_nome: str               # Nome do grupo para exibição
+    
+    # Campos de referência
+    slug_original: str            # Slug original do caso (ex: "1-1-contagem-2008")
+    
+    # Campos estratégicos
+    objetivos: str                # Objetivos do caso
+    proximas_acoes: str           # Próximas ações planejadas
+    consideracoes_legais: str     # Considerações legais
+    consideracoes_tecnicas: str   # Considerações técnicas
+    observacoes_estrategia: str   # Observações estratégicas
+    teses: List[str]              # Lista de teses jurídicas
+    
+    # Campos de responsáveis
+    responsaveis: List[Dict[str, Any]]  # Array de {usuario_id, nome, email, data_atribuicao}
+    
+    # Campos de parte contrária
+    parte_contraria: str          # Código (MP, OAB, Defesa, etc.)
+    parte_contraria_nome: str     # Nome completo
+    
+    # Campos SWOT (Matriz de análise estratégica)
+    swot_forcas: List[str]        # Forças (até 10 itens)
+    swot_fraquezas: List[str]    # Fraquezas (até 10 itens)
+    swot_oportunidades: List[str]  # Oportunidades (até 10 itens)
+    swot_ameacas: List[str]      # Ameaças (até 10 itens)
+    
+    # Campos de mapas e cálculos
+    mapas: List[Dict[str, Any]]  # Array de mapas {titulo, url, tipo}
+    notas_mapas: str             # Notas sobre mapas
+    calculos: List[Dict[str, Any]]  # Cálculos (ex: área total)
+    
+    # Campos de links
+    links: List[Dict[str, Any]]  # Links úteis {titulo, url, tipo}
+    
+    # Campos de processos (referência)
+    processos_ids: List[str]     # IDs dos processos vinculados
+    processos_titulos: List[str]  # Títulos para exibição rápida
 
 
 # =============================================================================
@@ -140,8 +191,9 @@ def obter_cor_prioridade(codigo: str) -> str:
 
 
 def criar_caso_vazio() -> dict:
-    """Retorna um dicionário com estrutura padrão de caso vazio."""
+    """Retorna um dicionário com estrutura padrão de caso vazio (com todos os campos estratégicos)."""
     return {
+        # Campos básicos
         'titulo': '',
         'nucleo': 'Generalista',
         'status': 'Em andamento',
@@ -151,6 +203,46 @@ def criar_caso_vazio() -> dict:
         'clientes': [],
         'clientes_nomes': [],
         'descricao': '',
+        
+        # Campos de grupo
+        'grupo_id': '',
+        'grupo_nome': '',
+        
+        # Campos de referência
+        'slug_original': '',
+        
+        # Campos estratégicos
+        'objetivos': '',
+        'proximas_acoes': '',
+        'consideracoes_legais': '',
+        'consideracoes_tecnicas': '',
+        'observacoes_estrategia': '',
+        'teses': [],
+        
+        # Campos de responsáveis
+        'responsaveis': [],
+        
+        # Campos de parte contrária
+        'parte_contraria': '',
+        'parte_contraria_nome': '',
+        
+        # Campos SWOT
+        'swot_forcas': [],
+        'swot_fraquezas': [],
+        'swot_oportunidades': [],
+        'swot_ameacas': [],
+        
+        # Campos de mapas e cálculos
+        'mapas': [],
+        'notas_mapas': '',
+        'calculos': [],
+        
+        # Campos de links
+        'links': [],
+        
+        # Campos de processos
+        'processos_ids': [],
+        'processos_titulos': [],
     }
 
 

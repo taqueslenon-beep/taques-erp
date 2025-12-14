@@ -21,3 +21,4 @@ STATUS_ACORDO_OPTIONS = [
     'Cancelado'
 ]
 
+

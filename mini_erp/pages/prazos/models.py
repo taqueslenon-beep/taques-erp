@@ -94,3 +94,4 @@ class Prazo(TypedDict, total=False):
     atualizado_em: float  # Timestamp
     criado_por: str  # user_id
 
+

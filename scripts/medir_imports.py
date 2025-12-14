@@ -24,3 +24,4 @@ medir("prazos", lambda: __import__('mini_erp.pages.prazos'))
 
 print("=" * 50)
 
+

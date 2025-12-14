@@ -114,3 +114,4 @@ def painel_redirect():
     Rota alternativa que redireciona para a Central de Comando.
     """
     ui.navigate.to('/parceria-df-taques/central-comando')
+

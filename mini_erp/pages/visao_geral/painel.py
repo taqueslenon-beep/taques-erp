@@ -339,18 +339,29 @@ def painel():
         # =====================================================================
         @ui.refreshable
         def area_cards():
+            # Cor padrão do sistema: verde (#223631)
+            COR_VERDE_SISTEMA = '#223631'
+            COR_CINZA_ESCURO = '#333333'
+            COR_CINZA_MEDIO = '#666666'
+            COR_CINZA_CLARO = '#E0E0E0'
+            
             with ui.row().classes('w-full gap-4 flex-nowrap overflow-x-auto mb-6'):
                 # Card Oportunidades Ativas (clicável - alterna visualização)
                 card_oportunidades_ativo = visualizacao_painel['tipo'] == 'oportunidades'
-                classes_oportunidades = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_oportunidades = 'flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white'
                 if card_oportunidades_ativo:
-                    classes_oportunidades += ' ring-2 ring-offset-2 shadow-lg'
+                    classes_oportunidades += ' border-2'
+                else:
+                    classes_oportunidades += ' border'
                 
-                with ui.card().classes(classes_oportunidades).style(f'border-left-color: #10B981; {"ring-color: #10B981;" if card_oportunidades_ativo else ""}') as oportunidades_card:
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('trending_up', size='24px').style('color: #10B981;')
-                        ui.label('Oportunidades Ativas').classes('text-sm text-gray-500')
-                    ui.label(str(total_oportunidades_ativas)).classes('text-3xl font-bold').style('color: #10B981;')
+                estilo_oportunidades = f'border-color: {COR_CINZA_CLARO if not card_oportunidades_ativo else COR_VERDE_SISTEMA};'
+                
+                with ui.card().classes(classes_oportunidades).style(estilo_oportunidades) as oportunidades_card:
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('trending_up', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Oportunidades Ativas').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label(str(total_oportunidades_ativas)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
                     
                     # Breakdown por coluna (exceto "Concluído")
                     breakdown_parts = []
@@ -364,41 +375,51 @@ def painel():
                         breakdown_parts.append(f'{oportunidades_monitorando} monitorando')
                     
                     if breakdown_parts:
-                        ui.label(', '.join(breakdown_parts)).classes('text-xs text-gray-400 mt-1')
+                        ui.label(', '.join(breakdown_parts)).classes('text-xs mt-1').style('color: #999999;')
                     else:
-                        ui.label('Nenhuma oportunidade ativa').classes('text-xs text-gray-400 mt-1')
+                        ui.label('Nenhuma oportunidade ativa').classes('text-xs mt-1').style('color: #999999;')
                     
                     oportunidades_card.on('click', selecionar_oportunidades)
                 
                 # Card Casos (clicável - alterna visualização)
                 card_casos_ativo = visualizacao_painel['tipo'] == 'casos'
-                classes_casos = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_casos = 'flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white'
                 if card_casos_ativo:
-                    classes_casos += ' ring-2 ring-offset-2 shadow-lg'
+                    classes_casos += ' border-2'
+                else:
+                    classes_casos += ' border'
 
-                with ui.card().classes(classes_casos).style(f'border-left-color: {PRIMARY_COLOR}; {"ring-color: " + PRIMARY_COLOR + ";" if card_casos_ativo else ""}') as casos_card:
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('folder', size='24px').classes('text-gray-400' if not card_casos_ativo else '').style(f'color: {PRIMARY_COLOR}' if card_casos_ativo else '')
-                        ui.label('Casos').classes('text-sm text-gray-500')
-                    ui.label(str(total_casos)).classes('text-3xl font-bold').style(f'color: {PRIMARY_COLOR}')
+                estilo_casos = f'border-color: {COR_CINZA_CLARO if not card_casos_ativo else COR_VERDE_SISTEMA};'
+
+                with ui.card().classes(classes_casos).style(estilo_casos) as casos_card:
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('folder', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Casos').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label(str(total_casos)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
                     subtitulo = f'{casos_andamento} em andamento'
                     if casos_concluidos > 0:
                         subtitulo += f', {casos_concluidos} concluídos'
-                    ui.label(subtitulo).classes('text-xs text-gray-400 mt-1')
+                    ui.label(subtitulo).classes('text-xs mt-1').style('color: #999999;')
 
                     casos_card.on('click', selecionar_casos)
 
                 # Card Pessoas Cadastradas (clicável - alterna visualização)
                 card_pessoas_ativo = visualizacao_painel['tipo'] == 'pessoas'
-                classes_pessoas = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_pessoas = 'flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white'
                 if card_pessoas_ativo:
-                    classes_pessoas += ' ring-2 ring-offset-2 shadow-lg'
+                    classes_pessoas += ' border-2'
+                else:
+                    classes_pessoas += ' border'
 
-                with ui.card().classes(classes_pessoas).style(f'border-left-color: {PRIMARY_COLOR}; {"ring-color: " + PRIMARY_COLOR + ";" if card_pessoas_ativo else ""}') as pessoas_card:
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('people', size='24px').classes('text-gray-400' if not card_pessoas_ativo else '').style(f'color: {PRIMARY_COLOR}' if card_pessoas_ativo else '')
-                        ui.label('Pessoas Cadastradas').classes('text-sm text-gray-500')
-                    ui.label(str(total_pessoas)).classes('text-3xl font-bold').style(f'color: {PRIMARY_COLOR}')
+                estilo_pessoas = f'border-color: {COR_CINZA_CLARO if not card_pessoas_ativo else COR_VERDE_SISTEMA};'
+
+                with ui.card().classes(classes_pessoas).style(estilo_pessoas) as pessoas_card:
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('people', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Pessoas Cadastradas').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label(str(total_pessoas)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
                     # Subtítulo mostra distribuição: clientes, envolvidos, parceiros
                     subtitulo_partes = []
                     if total_clientes > 0:
@@ -409,31 +430,37 @@ def painel():
                         subtitulo_partes.append(f'{total_parceiros} parceiro{"s" if total_parceiros != 1 else ""}')
                     
                     if subtitulo_partes:
-                        ui.label(', '.join(subtitulo_partes)).classes('text-xs text-gray-400 mt-1')
+                        ui.label(', '.join(subtitulo_partes)).classes('text-xs mt-1').style('color: #999999;')
                     else:
-                        ui.label('Nenhuma pessoa cadastrada').classes('text-xs text-gray-400 mt-1')
+                        ui.label('Nenhuma pessoa cadastrada').classes('text-xs mt-1').style('color: #999999;')
 
                     pessoas_card.on('click', selecionar_pessoas)
 
                 # Card Processos Ativos (placeholder)
-                with ui.card().classes('flex-1 min-w-0 p-4 border-l-4 border-gray-300'):
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('gavel', size='24px').classes('text-gray-300')
-                        ui.label('Processos Ativos').classes('text-sm text-gray-500')
-                    ui.label('-').classes('text-3xl font-bold text-gray-300')
-                    ui.label('Funcionalidade em desenvolvimento').classes('text-xs text-gray-400 mt-1')
+                with ui.card().classes('flex-1 min-w-0 p-4 border bg-white').style(f'border-color: {COR_CINZA_CLARO};'):
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('gavel', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Processos Ativos').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label('-').classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
+                    ui.label('Funcionalidade em desenvolvimento').classes('text-xs mt-1').style('color: #999999;')
 
                 # Card Entregáveis Pendentes (clicável - alterna visualização)
                 card_entregaveis_ativo = visualizacao_painel['tipo'] == 'entregaveis'
-                classes_entregaveis = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_entregaveis = 'flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white'
                 if card_entregaveis_ativo:
-                    classes_entregaveis += ' ring-2 ring-orange-500 ring-offset-2 shadow-lg'
+                    classes_entregaveis += ' border-2'
+                else:
+                    classes_entregaveis += ' border'
 
-                with ui.card().classes(classes_entregaveis).style('border-left-color: #F97316') as entregaveis_card:
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('assignment_late', size='24px').classes('text-orange-400')
-                        ui.label('Entregáveis Pendentes').classes('text-sm text-gray-500')
-                    ui.label(str(total_entregaveis_pendentes)).classes('text-3xl font-bold text-orange-600')
+                estilo_entregaveis = f'border-color: {COR_CINZA_CLARO if not card_entregaveis_ativo else COR_VERDE_SISTEMA};'
+
+                with ui.card().classes(classes_entregaveis).style(estilo_entregaveis) as entregaveis_card:
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('assignment_late', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Entregáveis Pendentes').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label(str(total_entregaveis_pendentes)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
 
                     # Breakdown por status
                     if total_entregaveis_pendentes > 0:
@@ -447,24 +474,29 @@ def painel():
                         subtitulo_entregaveis = ', '.join(breakdown_parts) if breakdown_parts else 'Nenhum pendente'
                     else:
                         subtitulo_entregaveis = 'Todos concluídos'
-                    ui.label(subtitulo_entregaveis).classes('text-xs text-gray-400 mt-1')
+                    ui.label(subtitulo_entregaveis).classes('text-xs mt-1').style('color: #999999;')
 
                     entregaveis_card.on('click', selecionar_entregaveis)
 
                 # Card Prazos do Mês (clicável - alterna visualização)
                 card_prazos_ativo = visualizacao_painel['tipo'] == 'prazos'
-                classes_prazos = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_prazos = 'flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white'
                 if card_prazos_ativo:
-                    classes_prazos += ' ring-2 ring-amber-500 ring-offset-2 shadow-lg'
+                    classes_prazos += ' border-2'
+                else:
+                    classes_prazos += ' border'
 
-                with ui.card().classes(classes_prazos).style('border-left-color: #F59E0B') as prazos_card:
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('calendar_month', size='24px').classes('text-amber-500')
-                        ui.label('Prazos do Mês').classes('text-sm text-gray-500')
+                estilo_prazos = f'border-color: {COR_CINZA_CLARO if not card_prazos_ativo else COR_VERDE_SISTEMA};'
+
+                with ui.card().classes(classes_prazos).style(estilo_prazos) as prazos_card:
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('calendar_month', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Prazos do Mês').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
 
                     # Número principal: pendentes + atrasados (não concluídos)
                     total_pendentes_atrasados = stats_prazos['pendentes'] + stats_prazos['atrasados']
-                    ui.label(str(total_pendentes_atrasados)).classes('text-3xl font-bold text-amber-600')
+                    ui.label(str(total_pendentes_atrasados)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
 
                     # Breakdown
                     if stats_prazos['total_mes'] > 0:
@@ -478,17 +510,18 @@ def painel():
                         subtitulo_prazos = ', '.join(breakdown_prazos) if breakdown_prazos else 'Nenhum prazo'
                     else:
                         subtitulo_prazos = f'Nenhum prazo em {stats_prazos["mes_nome"]}'
-                    ui.label(subtitulo_prazos).classes('text-xs text-gray-400 mt-1')
+                    ui.label(subtitulo_prazos).classes('text-xs mt-1').style('color: #999999;')
 
                     prazos_card.on('click', selecionar_prazos)
 
                 # Card Acordos (placeholder)
-                with ui.card().classes('flex-1 min-w-0 p-4 border-l-4 border-gray-300'):
-                    with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('handshake', size='24px').classes('text-gray-300')
-                        ui.label('Acordos').classes('text-sm text-gray-500')
-                    ui.label('-').classes('text-3xl font-bold text-gray-300')
-                    ui.label('Funcionalidade em desenvolvimento').classes('text-xs text-gray-400 mt-1')
+                with ui.card().classes('flex-1 min-w-0 p-4 border bg-white').style(f'border-color: {COR_CINZA_CLARO};'):
+                    # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
+                    with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
+                        ui.icon('handshake', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
+                        ui.label('Acordos').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label('-').classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
+                    ui.label('Funcionalidade em desenvolvimento').classes('text-xs mt-1').style('color: #999999;')
 
         area_cards()
 

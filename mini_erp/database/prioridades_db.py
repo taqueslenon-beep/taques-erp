@@ -171,3 +171,4 @@ def obter_ordem_prioridade(codigo: str) -> int:
 
 
 
+

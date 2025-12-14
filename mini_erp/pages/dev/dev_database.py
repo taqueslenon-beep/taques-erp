@@ -257,3 +257,4 @@ def obter_todos_usuarios() -> List[Dict[str, Any]]:
         traceback.print_exc()
     
     return usuarios
+

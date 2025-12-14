@@ -12,7 +12,10 @@ from .database import (
     listar_envolvidos, criar_envolvido, atualizar_envolvido, excluir_envolvido, contar_envolvidos,
     listar_parceiros, criar_parceiro, atualizar_parceiro, excluir_parceiro, contar_parceiros
 )
+from .database_grupo import listar_grupos, obter_grupo
 from .pessoa_dialog import abrir_dialog_pessoa, confirmar_exclusao
+from .grupos_page import renderizar_pagina_grupos
+from .grupo_dialog import abrir_dialog_grupo
 from .models import (
     formatar_documento,
     formatar_telefone,
@@ -165,8 +168,8 @@ def _renderizar_tabela_envolvidos(filtros: dict, refresh_callback):
     tabela.add_slot('body-cell-tipo_envolvido', '''
         <q-td :props="props">
             <q-badge
-                :color="props.row.tipo_envolvido === 'PJ' ? 'green-3' : (props.row.tipo_envolvido === 'Ente Público' ? 'purple-3' : 'blue-2')"
-                :text-color="props.row.tipo_envolvido === 'PJ' ? 'green-10' : (props.row.tipo_envolvido === 'Ente Público' ? 'purple-10' : 'blue-10')"
+                :color="props.row.tipo_envolvido === 'PJ' ? 'green-3' : (props.row.tipo_envolvido === 'Ente Público' ? 'purple-3' : (props.row.tipo_envolvido === 'Advogado' ? 'indigo-3' : (props.row.tipo_envolvido === 'Técnico' ? 'orange-3' : 'blue-2')))"
+                :text-color="props.row.tipo_envolvido === 'PJ' ? 'green-10' : (props.row.tipo_envolvido === 'Ente Público' ? 'purple-10' : (props.row.tipo_envolvido === 'Advogado' ? 'indigo-10' : (props.row.tipo_envolvido === 'Técnico' ? 'orange-10' : 'blue-10')))"
                 class="text-weight-medium q-px-sm"
             >
                 {{ props.row.tipo_envolvido }}
@@ -443,6 +446,7 @@ def _renderizar_pagina_pessoas():
                 outros_envolvidos_tab = ui.tab('Outros Envolvidos')
                 parceiros_tab = ui.tab('Parceiros')
                 leads_tab = ui.tab('Leads')
+                grupos_tab = ui.tab('Grupos')
 
             # Painel de conteúdo das abas
             with ui.tab_panels(main_tabs, value=clientes_tab).classes('w-full bg-white p-4 rounded shadow-sm'):
@@ -749,12 +753,18 @@ def _renderizar_pagina_pessoas():
                         with ui.element('div').classes('w-full p-4').style('width: 100%; overflow-x: auto'):
                             renderizar_conteudo_leads()
 
+                # ========== ABA: GRUPOS ==========
+                with ui.tab_panel(grupos_tab):
+                    renderizar_pagina_grupos()
+
 
 def _renderizar_tabela(filtros: dict, refresh_callback):
-    """Renderiza a tabela de pessoas com filtros aplicados."""
-    # Carrega pessoas
+    """Renderiza pessoas agrupadas por grupos de relacionamento."""
+    # Carrega pessoas (apenas clientes - categoria='cliente')
     try:
         todas_pessoas = listar_pessoas()
+        # Filtra apenas clientes
+        todas_pessoas = [p for p in todas_pessoas if p.get('categoria', 'cliente') == 'cliente']
     except Exception as e:
         print(f"Erro ao carregar pessoas: {e}")
         with ui.column().classes('w-full items-center py-8'):
@@ -763,116 +773,58 @@ def _renderizar_tabela(filtros: dict, refresh_callback):
             ui.label('Tente recarregar a página.').classes('text-sm text-gray-400')
         return
 
-    # Aplica filtros
-    pessoas_filtradas = _aplicar_filtros(todas_pessoas, filtros)
-
-    # Contador de resultados
-    total = len(pessoas_filtradas)
+    # Agrupa pessoas por grupo
+    agrupamento = agrupar_pessoas_por_grupo(todas_pessoas)
+    
+    # Conta total de pessoas (após filtros serão aplicados nos cards)
     total_geral = len(todas_pessoas)
-
-    if filtros['busca'] or filtros['tipo'] != 'Todos':
-        ui.label(f'{total} de {total_geral} pessoas encontradas').classes('contador-resultados mb-3')
-    else:
-        ui.label(f'{total} pessoa(s) cadastrada(s)').classes('contador-resultados mb-3')
-
+    
     # Estado vazio
-    if not pessoas_filtradas:
+    if not todas_pessoas:
         with ui.column().classes('w-full items-center py-12'):
-            if todas_pessoas:
-                # Tem pessoas, mas filtro não encontrou
-                ui.icon('search_off', size='64px').classes('text-gray-300')
-                ui.label('Nenhuma pessoa encontrada').classes('text-lg text-gray-500 mt-4')
-                ui.label('Tente ajustar os filtros de busca.').classes('text-sm text-gray-400')
-            else:
-                # Não tem nenhuma pessoa cadastrada
-                ui.icon('people_outline', size='64px').classes('text-gray-300')
-                ui.label('Nenhuma pessoa cadastrada').classes('text-lg text-gray-500 mt-4')
-                ui.label('Clique em "Nova Pessoa" para começar.').classes('text-sm text-gray-400')
+            ui.icon('people_outline', size='64px').classes('text-gray-300')
+            ui.label('Nenhuma pessoa cadastrada').classes('text-lg text-gray-500 mt-4')
+            ui.label('Clique em "Nova Pessoa" para começar.').classes('text-sm text-gray-400')
         return
-
-    # Prepara dados para a tabela (sem campos de timestamp para evitar erro de serialização)
-    dados_tabela = []
-    for pessoa in pessoas_filtradas:
-        # Cria cópia dos dados sem timestamps para serialização segura
-        dados_seguros = {
-            k: v for k, v in pessoa.items()
-            if k not in ['created_at', 'updated_at', 'data_criacao', 'data_atualizacao']
-        }
-        dados_tabela.append({
-            '_id': pessoa.get('_id', ''),
-            'nome_exibicao': pessoa.get('nome_exibicao') or pessoa.get('full_name', 'Sem nome'),
-            'tipo_pessoa': pessoa.get('tipo_pessoa', 'PF'),
-            'cpf_cnpj_formatado': formatar_documento(pessoa),
-            'email': pessoa.get('email', '') or '-',
-            'telefone': formatar_telefone(pessoa.get('telefone', '')) or '-',
-            '_dados_completos': dados_seguros,
-        })
-
-    # Colunas da tabela - apenas Nome, Tipo e Ações
-    colunas = [
-        {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left', 'sortable': True, 'style': 'width: 70%'},
-        {'name': 'tipo_pessoa', 'label': 'Tipo', 'field': 'tipo_pessoa', 'align': 'center', 'style': 'width: 15%'},
-        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 15%'},
-    ]
-
-    # Cria tabela com largura total
-    tabela = ui.table(
-        columns=colunas,
-        rows=dados_tabela,
-        row_key='_id',
-        pagination={'rowsPerPage': 15},
-    ).classes('w-full tabela-pessoas').style('width: 100%')
-
-    # Slot para coluna de tipo (badge colorido)
-    tabela.add_slot('body-cell-tipo_pessoa', '''
-        <q-td :props="props">
-            <q-badge
-                :color="props.row.tipo_pessoa === 'PJ' ? 'amber-3' : 'blue-2'"
-                :text-color="props.row.tipo_pessoa === 'PJ' ? 'amber-10' : 'blue-10'"
-                class="text-weight-medium q-px-sm"
-            >
-                {{ props.row.tipo_pessoa }}
-            </q-badge>
-        </q-td>
-    ''')
-
-    # Slot para coluna de ações
-    tabela.add_slot('body-cell-actions', '''
-        <q-td :props="props">
-            <div class="q-gutter-xs">
-                <q-btn flat dense icon="edit" color="primary" @click="$parent.$emit('editar', props.row)">
-                    <q-tooltip>Editar</q-tooltip>
-                </q-btn>
-                <q-btn flat dense icon="delete" color="negative" @click="$parent.$emit('excluir', props.row)">
-                    <q-tooltip>Excluir</q-tooltip>
-                </q-btn>
-            </div>
-        </q-td>
-    ''')
-
-    # Handlers de eventos
-    def ao_editar(evento):
-        linha = evento.args
-        pessoa_completa = linha.get('_dados_completos', {})
-        abrir_dialog_pessoa(pessoa=pessoa_completa, on_save=lambda: refresh_callback.refresh())
-
-    def ao_excluir(evento):
-        linha = evento.args
-        pessoa_completa = linha.get('_dados_completos', {})
-
-        def executar_exclusao():
-            pessoa_id = pessoa_completa.get('_id')
-            nome = pessoa_completa.get('nome_exibicao', 'Pessoa')
-            if excluir_pessoa(pessoa_id):
-                ui.notify(f'"{nome}" excluída com sucesso!', type='positive')
-                refresh_callback.refresh()
-            else:
-                ui.notify('Erro ao excluir. Tente novamente.', type='negative')
-
-        confirmar_exclusao(pessoa_completa, on_confirm=executar_exclusao)
-
-    tabela.on('editar', ao_editar)
-    tabela.on('excluir', ao_excluir)
+    
+    # Renderiza cards de grupos
+    grupos_com_pessoas = 0
+    total_pessoas_filtradas = 0
+    
+    for grupo_id, dados_grupo in agrupamento.items():
+        pessoas_grupo = dados_grupo['pessoas']
+        grupo_info = dados_grupo['info']
+        
+        # Aplica filtros para contar
+        pessoas_filtradas_temp = _aplicar_filtros(pessoas_grupo, filtros)
+        
+        if pessoas_filtradas_temp:
+            grupos_com_pessoas += 1
+            total_pessoas_filtradas += len(pessoas_filtradas_temp)
+            
+            # Renderiza card do grupo
+            _renderizar_card_grupo(
+                grupo_id=grupo_id,
+                grupo_info=grupo_info,
+                pessoas_grupo=pessoas_grupo,
+                filtros=filtros,
+                refresh_callback=refresh_callback
+            )
+    
+    # Contador de resultados
+    if filtros['busca'] or filtros['tipo'] != 'Todos':
+        ui.label(
+            f'{total_pessoas_filtradas} de {total_geral} pessoa(s) encontrada(s) em {grupos_com_pessoas} grupo(s)'
+        ).classes('contador-resultados mt-4')
+    else:
+        ui.label(f'{total_geral} pessoa(s) em {len(agrupamento)} grupo(s)').classes('contador-resultados mt-4')
+    
+    # Mensagem se filtro não encontrou nada
+    if total_pessoas_filtradas == 0 and (filtros['busca'] or filtros['tipo'] != 'Todos'):
+        with ui.column().classes('w-full items-center py-8'):
+            ui.icon('search_off', size='64px').classes('text-gray-300')
+            ui.label('Nenhuma pessoa encontrada').classes('text-lg text-gray-500 mt-4')
+            ui.label('Tente ajustar os filtros de busca.').classes('text-sm text-gray-400')
 
 
 def abrir_dialog_envolvido(
@@ -1578,3 +1530,225 @@ def _aplicar_filtros(pessoas: list, filtros: dict) -> list:
         resultado = [p for p in resultado if match_busca(p)]
 
     return resultado
+
+
+def agrupar_pessoas_por_grupo(pessoas: list) -> dict:
+    """
+    Agrupa pessoas por grupo de relacionamento.
+
+    Args:
+        pessoas: Lista de pessoas
+
+    Returns:
+        Dicionário com estrutura:
+        {
+            'grupo_id': {
+                'info': GrupoRelacionamento,
+                'pessoas': [lista de pessoas]
+            },
+            'sem_grupo': {
+                'pessoas': [lista de pessoas sem grupo]
+            }
+        }
+    """
+    # Carrega grupos
+    grupos = listar_grupos(apenas_ativos=True)
+    grupos_dict = {g._id: g for g in grupos}
+    
+    # Estrutura de agrupamento
+    agrupamento = {}
+    sem_grupo = []
+    
+    # Agrupa pessoas
+    for pessoa in pessoas:
+        grupo_id = pessoa.get('grupo_id', '').strip()
+        
+        if grupo_id and grupo_id in grupos_dict:
+            # Pessoa tem grupo válido
+            if grupo_id not in agrupamento:
+                agrupamento[grupo_id] = {
+                    'info': grupos_dict[grupo_id],
+                    'pessoas': []
+                }
+            agrupamento[grupo_id]['pessoas'].append(pessoa)
+        else:
+            # Pessoa sem grupo
+            sem_grupo.append(pessoa)
+    
+    # Ordena grupos por nome
+    grupos_ordenados = sorted(
+        agrupamento.items(),
+        key=lambda x: x[1]['info'].nome.lower()
+    )
+    
+    # Converte para dicionário ordenado
+    resultado = {k: v for k, v in grupos_ordenados}
+    
+    # Adiciona "Sem Grupo" no final
+    if sem_grupo:
+        resultado['sem_grupo'] = {
+            'info': None,
+            'pessoas': sem_grupo
+        }
+    
+    return resultado
+
+
+def _renderizar_card_grupo(
+    grupo_id: str,
+    grupo_info: Optional[object],
+    pessoas_grupo: list,
+    filtros: dict,
+    refresh_callback: Callable
+):
+    """
+    Renderiza um card de grupo com suas pessoas.
+
+    Args:
+        grupo_id: ID do grupo ('sem_grupo' para pessoas sem grupo)
+        grupo_info: Instância de GrupoRelacionamento ou None
+        pessoas_grupo: Lista de pessoas do grupo
+        filtros: Filtros ativos
+        refresh_callback: Função para atualizar a lista
+    """
+    # Aplica filtros às pessoas do grupo
+    pessoas_filtradas = _aplicar_filtros(pessoas_grupo, filtros)
+    
+    # Se não há pessoas após filtro, não exibe o card
+    if not pessoas_filtradas:
+        return
+    
+    # Informações do grupo
+    if grupo_id == 'sem_grupo':
+        nome_grupo = 'Sem Grupo'
+        descricao_grupo = 'Pessoas não vinculadas a nenhum grupo'
+        icone_grupo = '📦'
+        cor_grupo = '#9E9E9E'  # Cinza
+        tem_grupo = False
+    else:
+        nome_grupo = grupo_info.nome
+        descricao_grupo = grupo_info.descricao or ''
+        icone_grupo = grupo_info.icone or '📦'
+        cor_grupo = grupo_info.cor or '#4CAF50'
+        tem_grupo = True
+    
+    # Card do grupo
+    with ui.card().classes('w-full mb-4 hover:shadow-lg transition-shadow'):
+        # Header do card com cor de destaque
+        with ui.row().classes('w-full items-center gap-3 p-4').style(
+            f'background-color: {cor_grupo}15; border-left: 4px solid {cor_grupo};'
+        ):
+            # Ícone do grupo
+            ui.label(icone_grupo).classes('text-3xl')
+            
+            # Nome e descrição
+            with ui.column().classes('flex-1 gap-1'):
+                ui.label(nome_grupo).classes('text-lg font-bold text-gray-800')
+                if descricao_grupo:
+                    ui.label(descricao_grupo).classes('text-sm text-gray-600')
+        
+        # Conteúdo do card (tabela de pessoas)
+        with ui.column().classes('w-full p-4 gap-3'):
+            # Prepara dados para a tabela
+            dados_tabela = []
+            for pessoa in pessoas_filtradas:
+                dados_seguros = {
+                    k: v for k, v in pessoa.items()
+                    if k not in ['created_at', 'updated_at', 'data_criacao', 'data_atualizacao']
+                }
+                dados_tabela.append({
+                    '_id': pessoa.get('_id', ''),
+                    'nome_exibicao': pessoa.get('nome_exibicao') or pessoa.get('full_name', 'Sem nome'),
+                    'tipo_pessoa': pessoa.get('tipo_pessoa', 'PF'),
+                    'cpf_cnpj_formatado': formatar_documento(pessoa),
+                    'email': pessoa.get('email', '') or '-',
+                    'telefone': formatar_telefone(pessoa.get('telefone', '')) or '-',
+                    '_dados_completos': dados_seguros,
+                })
+            
+            # Tabela de pessoas
+            if dados_tabela:
+                colunas = [
+                    {'name': 'nome_exibicao', 'label': 'Nome', 'field': 'nome_exibicao', 'align': 'left', 'sortable': True},
+                    {'name': 'tipo_pessoa', 'label': 'Tipo', 'field': 'tipo_pessoa', 'align': 'center'},
+                    {'name': 'cpf_cnpj_formatado', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj_formatado', 'align': 'left'},
+                    {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center'},
+                ]
+                
+                tabela = ui.table(
+                    columns=colunas,
+                    rows=dados_tabela,
+                    row_key='_id',
+                    pagination={'rowsPerPage': 10},
+                ).classes('w-full').style('width: 100%')
+                
+                # Slot para coluna de tipo
+                tabela.add_slot('body-cell-tipo_pessoa', '''
+                    <q-td :props="props">
+                        <q-badge
+                            :color="props.row.tipo_pessoa === 'PJ' ? 'amber-3' : 'blue-2'"
+                            :text-color="props.row.tipo_pessoa === 'PJ' ? 'amber-10' : 'blue-10'"
+                            class="text-weight-medium q-px-sm"
+                        >
+                            {{ props.row.tipo_pessoa }}
+                        </q-badge>
+                    </q-td>
+                ''')
+                
+                # Slot para coluna de ações
+                tabela.add_slot('body-cell-actions', '''
+                    <q-td :props="props">
+                        <div class="q-gutter-xs">
+                            <q-btn flat dense icon="edit" color="primary" @click="$parent.$emit('editar', props.row)">
+                                <q-tooltip>Editar</q-tooltip>
+                            </q-btn>
+                            <q-btn flat dense icon="delete" color="negative" @click="$parent.$emit('excluir', props.row)">
+                                <q-tooltip>Excluir</q-tooltip>
+                            </q-btn>
+                        </div>
+                    </q-td>
+                ''')
+                
+                # Handlers de eventos
+                def ao_editar(evento):
+                    linha = evento.args
+                    pessoa_completa = linha.get('_dados_completos', {})
+                    abrir_dialog_pessoa(
+                        pessoa=pessoa_completa,
+                        on_save=lambda: refresh_callback.refresh()
+                    )
+                
+                def ao_excluir(evento):
+                    linha = evento.args
+                    pessoa_completa = linha.get('_dados_completos', {})
+                    
+                    def executar_exclusao():
+                        pessoa_id = pessoa_completa.get('_id')
+                        nome = pessoa_completa.get('nome_exibicao', 'Pessoa')
+                        if excluir_pessoa(pessoa_id):
+                            ui.notify(f'"{nome}" excluída com sucesso!', type='positive')
+                            refresh_callback.refresh()
+                        else:
+                            ui.notify('Erro ao excluir. Tente novamente.', type='negative')
+                    
+                    confirmar_exclusao(pessoa_completa, on_confirm=executar_exclusao)
+                
+                tabela.on('editar', ao_editar)
+                tabela.on('excluir', ao_excluir)
+            else:
+                ui.label('Nenhuma pessoa encontrada neste grupo.').classes('text-gray-500 text-center py-4')
+        
+        # Footer do card
+        with ui.row().classes('w-full items-center justify-between px-4 pb-4'):
+            ui.label(f'{len(pessoas_filtradas)} pessoa(s)').classes('text-sm text-gray-600')
+            
+            # Botão "Editar Grupo" (apenas se não for "Sem Grupo")
+            if tem_grupo and grupo_info:
+                ui.button(
+                    'Editar Grupo',
+                    icon='edit',
+                    on_click=lambda g=grupo_info: abrir_dialog_grupo(
+                        grupo=g,
+                        on_save=lambda: refresh_callback.refresh()
+                    )
+                ).props('flat dense color=primary')

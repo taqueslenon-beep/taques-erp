@@ -114,3 +114,4 @@ def vincular_firebase_uid(usuario_id: str, firebase_uid: str) -> bool:
 
 
 
+
