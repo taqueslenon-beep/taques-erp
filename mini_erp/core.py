@@ -2276,14 +2276,14 @@ def layout(page_title: str, breadcrumbs: list = None):
             # DIREITA - Elementos alinhados
             with ui.row().style('align-items: center; gap: 16px; color: white;'):
                 # Botão /dev - Apenas para desenvolvedores
-                # Verificação direta do email do usuário logado
                 user_data = app.storage.user.get('user', {})
                 user_email = user_data.get('email', '').lower() if user_data else ''
                 if user_email == 'taqueslenon@gmail.com':
                     ui.button(icon='code', on_click=lambda: ui.navigate.to('/dev')) \
-                        .props('flat dense') \
+                        .props('flat dense round') \
+                        .classes('q-mr-sm') \
                         .tooltip('Painel do Desenvolvedor') \
-                        .style('color: white; opacity: 0.8; margin-right: 8px;')
+                        .style('color: white; background-color: rgba(255,255,255,0.15); min-width: 40px; min-height: 40px;')
                 
                 # Workspace - Dropdown de seleção
                 from .componentes.dropdown_workspace import render_workspace_dropdown

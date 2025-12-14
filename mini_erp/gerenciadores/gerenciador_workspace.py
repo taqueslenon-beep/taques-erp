@@ -12,19 +12,29 @@ from ..auth import get_current_user
 # =============================================================================
 
 WORKSPACES = {
-    'area_cliente_schmidmeier': {
-        'id': 'area_cliente_schmidmeier',
-        'nome': 'Área do cliente: Schmidmeier 🇩🇪',
-        'prefixo_colecoes': 'schmidmeier_',
-        'rota_inicial': '/',  # CORRIGIDO: Voltou para '/' que agora renderiza baseado no workspace
-        'icon': 'folder_open'
-    },
     'visao_geral_escritorio': {
         'id': 'visao_geral_escritorio',
         'nome': 'Visão geral do escritório',
         'prefixo_colecoes': 'visao_geral_',
         'rota_inicial': '/visao-geral/painel',
-        'icon': 'business'
+        'icon': 'business',
+        'ordem': 1
+    },
+    'parceria_df_taques': {
+        'id': 'parceria_df_taques',
+        'nome': 'Parceria - DF/Taques 🤝',
+        'prefixo_colecoes': 'df_taques_',
+        'rota_inicial': '/parceria-df-taques/central-comando',
+        'icon': 'handshake',
+        'ordem': 2
+    },
+    'area_cliente_schmidmeier': {
+        'id': 'area_cliente_schmidmeier',
+        'nome': 'Área do cliente: Schmidmeier 🇩🇪',
+        'prefixo_colecoes': 'schmidmeier_',
+        'rota_inicial': '/',  # CORRIGIDO: Voltou para '/' que agora renderiza baseado no workspace
+        'icon': 'folder_open',
+        'ordem': 3
     }
 }
 
@@ -110,6 +120,7 @@ def obter_workspaces_usuario(usuario_id: Optional[str] = None) -> List[str]:
     MAPEAMENTO_WORKSPACES = {
         'schmidmeier': 'area_cliente_schmidmeier',
         'visao_geral': 'visao_geral_escritorio',
+        'df_taques': 'parceria_df_taques',
     }
     
     # Tenta buscar na coleção usuarios_sistema primeiro
@@ -258,4 +269,36 @@ def alternar_workspace(workspace_id: str, verificar_permissao: bool = True) -> b
     
     # Define novo workspace
     return definir_workspace(workspace_id)
+
+
+def obter_workspaces_ordenados(workspace_ids: Optional[List[str]] = None) -> List[str]:
+    """
+    Retorna lista de workspaces ordenados pelo campo 'ordem'.
+    
+    Se workspace_ids for fornecido, retorna apenas esses workspaces ordenados.
+    Se None, retorna todos os workspaces ordenados.
+    
+    Args:
+        workspace_ids: Lista de IDs de workspaces a ordenar (opcional)
+    
+    Returns:
+        Lista de IDs de workspaces ordenados pelo campo 'ordem'
+    """
+    if workspace_ids is None:
+        # Retorna todos os workspaces ordenados
+        workspaces_com_ordem = [
+            (ws_id, ws_info.get('ordem', 999))  # Fallback 999 se ordem não existir
+            for ws_id, ws_info in WORKSPACES.items()
+        ]
+    else:
+        # Retorna apenas os workspaces fornecidos, ordenados
+        workspaces_com_ordem = [
+            (ws_id, WORKSPACES[ws_id].get('ordem', 999))
+            for ws_id in workspace_ids
+            if ws_id in WORKSPACES
+        ]
+    
+    # Ordena por campo 'ordem' e retorna apenas os IDs
+    workspaces_com_ordem.sort(key=lambda x: x[1])
+    return [ws_id for ws_id, _ in workspaces_com_ordem]
 

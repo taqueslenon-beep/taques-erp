@@ -9,7 +9,8 @@ from ..gerenciadores.gerenciador_workspace import (
     obter_workspaces_usuario,
     obter_info_workspace,
     alternar_workspace,
-    verificar_acesso_workspace
+    verificar_acesso_workspace,
+    obter_workspaces_ordenados
 )
 
 # Cache de permissões para otimização (evita consultas repetidas ao Firebase)
@@ -51,7 +52,9 @@ def render_workspace_dropdown():
     
     # Obtém workspaces disponíveis para o usuário (com cache)
     if 'available_workspaces' not in _permissions_cache:
-        _permissions_cache['available_workspaces'] = obter_workspaces_usuario()
+        workspaces_usuario = obter_workspaces_usuario()
+        # Ordena os workspaces pelo campo 'ordem'
+        _permissions_cache['available_workspaces'] = obter_workspaces_ordenados(workspaces_usuario)
     
     available_workspaces = _permissions_cache['available_workspaces']
     current_workspace_id = obter_workspace_atual()

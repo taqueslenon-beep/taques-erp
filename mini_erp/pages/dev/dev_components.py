@@ -60,6 +60,8 @@ def card_usuarios(usuarios: List[Dict[str, Any]]) -> None:
             columns = [
                 {'name': 'nome', 'label': 'Nome', 'field': 'nome', 'align': 'left', 'sortable': True},
                 {'name': 'email', 'label': 'Email', 'field': 'email', 'align': 'left', 'sortable': True},
+                {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True},
+                {'name': 'vinculado', 'label': 'Vinculado', 'field': 'vinculado', 'align': 'center', 'sortable': True},
                 {'name': 'nivel_acesso', 'label': 'Nível de Acesso', 'field': 'nivel_acesso', 'align': 'center', 'sortable': True},
                 {'name': 'ultimo_login', 'label': 'Último Login', 'field': 'ultimo_login', 'align': 'center', 'sortable': True},
                 {'name': 'workspaces', 'label': 'Workspaces', 'field': 'workspaces', 'align': 'left'},
@@ -74,9 +76,12 @@ def card_usuarios(usuarios: List[Dict[str, Any]]) -> None:
                 rows.append({
                     'nome': usuario.get('nome_completo', '-'),
                     'email': usuario.get('email', '-'),
+                    'status': usuario.get('status', '-'),
+                    'vinculado': usuario.get('vinculado', False),
                     'nivel_acesso': usuario.get('nivel_acesso', '-'),
                     'ultimo_login': usuario.get('ultimo_login', '-'),
                     'workspaces': workspaces_str,
+                    'sem_firebase': usuario.get('sem_firebase', False),  # Para destacar visualmente
                 })
             
             # Cria tabela
@@ -86,13 +91,76 @@ def card_usuarios(usuarios: List[Dict[str, Any]]) -> None:
                 row_key='nome'
             ).classes('w-full').props('flat dense')
             
-            # Adiciona slot customizado para nível de acesso (badge colorido)
-            table.add_slot('body-cell-nivel_acesso', '''
+            # Slot customizado para status (badge colorido)
+            table.add_slot('body-cell-status', '''
                 <q-td :props="props">
                     <q-badge 
-                        :color="props.value === 'Administrador' ? 'primary' : 'grey-6'"
+                        :color="props.value === 'Ativo' ? 'green' : props.value === 'Desativado' ? 'red' : 'orange'"
                         :label="props.value"
                         class="q-mt-xs"
                     />
                 </q-td>
             ''')
+            
+            # Slot customizado para vinculado (ícone ✓ ou ✗)
+            table.add_slot('body-cell-vinculado', '''
+                <q-td :props="props">
+                    <q-icon 
+                        :name="props.value ? 'check_circle' : 'cancel'"
+                        :color="props.value ? 'green' : 'red'"
+                        size="sm"
+                    />
+                </q-td>
+            ''')
+            
+            # Slot customizado para nível de acesso (badge colorido)
+            table.add_slot('body-cell-nivel_acesso', '''
+                <q-td :props="props">
+                    <q-badge 
+                        :color="props.value === 'Desenvolvedor' ? 'amber' : 
+                                props.value === 'Usuário Interno' ? 'green' : 
+                                props.value === 'Usuário Externo' ? 'blue' : 
+                                'grey-6'"
+                        :label="props.value"
+                        class="q-mt-xs"
+                    />
+                </q-td>
+            ''')
+            
+            # Adiciona estilo CSS para destacar usuários sem Firebase
+            ui.add_head_html('''
+                <style>
+                    .usuario-sem-firebase {
+                        background-color: #fef3c7 !important; /* amarelo claro */
+                    }
+                    .usuario-sem-firebase:hover {
+                        background-color: #fde68a !important; /* amarelo médio */
+                    }
+                </style>
+            ''')
+            
+            # Aplica classe condicional via JavaScript após renderização da tabela
+            # Identifica índices dos usuários sem Firebase
+            indices_sem_firebase = [i for i, u in enumerate(usuarios) if u.get('sem_firebase', False)]
+            
+            if indices_sem_firebase:
+                def aplicar_destaque_usuarios_sem_firebase():
+                    """Aplica classe CSS para destacar usuários sem Firebase Auth"""
+                    ui.run_javascript(f'''
+                        setTimeout(function() {{
+                            const rows = document.querySelectorAll('.q-table tbody tr');
+                            const indices = {indices_sem_firebase};
+                            indices.forEach(function(index) {{
+                                if (rows[index]) {{
+                                    rows[index].classList.add('usuario-sem-firebase');
+                                }}
+                            }});
+                        }}, 200);
+                    ''')
+                
+                ui.timer(0.2, aplicar_destaque_usuarios_sem_firebase, once=True)
+            
+            # Tooltip explicativo para usuários não vinculados
+            with ui.row().classes('w-full mt-2 items-center gap-1'):
+                ui.icon('info', size='xs').classes('text-blue-500')
+                ui.label('💡 Usuários em amarelo não têm login no Firebase Auth (apenas em usuarios_sistema)').classes('text-xs text-gray-500 italic')

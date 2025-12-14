@@ -269,10 +269,16 @@ def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
         {'icone': 'settings', 'titulo': 'Configurações', 'rota': '/visao-geral/configuracoes'},
     ]
 
+    # Menu do workspace "Parceria - DF/Taques"
+    MENU_PARCERIA_DF_TAQUES = [
+        {'icone': 'hub', 'titulo': 'Central de Comando', 'rota': '/parceria-df-taques/central-comando'},
+    ]
+
     # Mapeamento de workspace para menu
     MENUS_POR_WORKSPACE = {
         'area_cliente_schmidmeier': MENU_AREA_CLIENTE,
         'visao_geral_escritorio': MENU_VISAO_GERAL,
+        'parceria_df_taques': MENU_PARCERIA_DF_TAQUES,
     }
 
     return MENUS_POR_WORKSPACE.get(workspace_id, MENU_AREA_CLIENTE)

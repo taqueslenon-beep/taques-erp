@@ -26,6 +26,9 @@ from . import prazos
 # Módulo de desenvolvedor (painel de ferramentas)
 from .dev import dev
 
+# Módulo de parceria DF/Taques (novo workspace)
+from . import parceria_df_taques
+
 # Módulos desativados temporariamente (em desenvolvimento)
 # from . import compromissos
 # from . import governanca
