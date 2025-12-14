@@ -76,22 +76,45 @@ def converter_timestamp_para_json(obj: Any) -> Any:
     Returns:
         Objeto convertido para formato JSON
     """
-    from google.cloud.firestore_v1 import Timestamp
+    # Verifica se é datetime primeiro
+    if isinstance(obj, datetime):
+        return obj.isoformat()
     
-    if isinstance(obj, Timestamp):
-        return obj.isoformat()
-    elif isinstance(obj, datetime):
-        return obj.isoformat()
-    elif isinstance(obj, dict):
+    # Verifica se é dicionário (recursivo)
+    if isinstance(obj, dict):
         return {k: converter_timestamp_para_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    
+    # Verifica se é lista (recursivo)
+    if isinstance(obj, list):
         return [converter_timestamp_para_json(item) for item in obj]
-    elif hasattr(obj, 'isoformat'):
-        return obj.isoformat()
-    elif hasattr(obj, 'timestamp'):
-        return obj.timestamp()
-    else:
-        return obj
+    
+    # Verifica se tem método isoformat (Timestamp do Firestore, datetime, etc)
+    if hasattr(obj, 'isoformat'):
+        try:
+            return obj.isoformat()
+        except Exception:
+            pass
+    
+    # Verifica se é Timestamp do Firestore pelo nome da classe
+    tipo_nome = type(obj).__name__
+    if tipo_nome == 'Timestamp':
+        try:
+            return obj.isoformat()
+        except Exception:
+            try:
+                return obj.timestamp()
+            except Exception:
+                pass
+    
+    # Verifica se tem método timestamp (para converter para float)
+    if hasattr(obj, 'timestamp'):
+        try:
+            return obj.timestamp()
+        except Exception:
+            pass
+    
+    # Retorna objeto original se não for nenhum tipo conhecido
+    return obj
 
 
 def exportar_colecao(db, nome_colecao: str) -> List[Dict[str, Any]]:
