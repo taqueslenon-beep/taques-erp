@@ -11,6 +11,9 @@ from ...core import (
     save_opposing_party as core_save_opposing_party,
     delete_opposing_party as core_delete_opposing_party,
     invalidate_cache as core_invalidate_cache,
+    get_leads_list as core_get_leads_list,
+    save_lead as core_save_lead,
+    delete_lead as core_delete_lead,
 )
 
 
@@ -82,6 +85,9 @@ def invalidate_cache(collection_name: Optional[str] = None) -> None:
         collection_name: Nome da coleção a invalidar (None para todas)
     """
     core_invalidate_cache(collection_name)
+    # Se invalidar 'pessoas', também invalida cache de leads
+    if collection_name == 'pessoas' or collection_name is None:
+        core_invalidate_cache('pessoas_leads')
 
 
 def get_client_by_index(index: int) -> Optional[Dict[str, Any]]:
@@ -150,4 +156,38 @@ def get_opposing_party_by_name(full_name: str) -> Optional[Dict[str, Any]]:
         if opposing_full_name == full_name:
             return opposing
     return None
+
+
+# =============================================================================
+# FUNÇÕES DE LEADS
+# =============================================================================
+
+def get_leads_list() -> List[Dict[str, Any]]:
+    """
+    Obtém lista de leads do Firestore.
+    
+    Returns:
+        Lista de leads
+    """
+    return core_get_leads_list()
+
+
+def save_lead(lead: Dict[str, Any]) -> None:
+    """
+    Salva um lead no Firestore.
+    
+    Args:
+        lead: Dicionário com dados do lead
+    """
+    core_save_lead(lead)
+
+
+def delete_lead(lead: Dict[str, Any]) -> None:
+    """
+    Remove um lead do Firestore.
+    
+    Args:
+        lead: Dicionário com dados do lead a remover
+    """
+    core_delete_lead(lead)
 

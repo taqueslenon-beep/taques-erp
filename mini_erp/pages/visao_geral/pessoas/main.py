@@ -4,7 +4,7 @@ Rota: /visao-geral/pessoas
 """
 from typing import Optional, Callable
 from nicegui import ui
-from ....core import layout
+from ....core import layout, get_leads_list, save_lead, delete_lead, invalidate_cache as core_invalidate_cache
 from ....auth import is_authenticated
 from ....gerenciadores.gerenciador_workspace import definir_workspace
 from .database import (
@@ -442,6 +442,7 @@ def _renderizar_pagina_pessoas():
                 clientes_tab = ui.tab('Clientes')
                 outros_envolvidos_tab = ui.tab('Outros Envolvidos')
                 parceiros_tab = ui.tab('Parceiros')
+                leads_tab = ui.tab('Leads')
 
             # Painel de conteúdo das abas
             with ui.tab_panels(main_tabs, value=clientes_tab).classes('w-full bg-white p-4 rounded shadow-sm'):
@@ -669,6 +670,84 @@ def _renderizar_pagina_pessoas():
 
                         with ui.element('div').classes('w-full p-4').style('width: 100%; overflow-x: auto'):
                             renderizar_conteudo_parceiros()
+
+                # ========== ABA: LEADS ==========
+                with ui.tab_panel(leads_tab):
+                    # Estado dos filtros para leads
+                    filtros_leads = {
+                        'busca': '',
+                        'origem': 'Todos',
+                    }
+
+                    # Referência para o refreshable (será definida depois)
+                    refresh_ref_leads = {'func': None}
+
+                    # Container principal com card
+                    with ui.card().classes('w-full'):
+                        # Header
+                        with ui.row().classes('w-full justify-between items-center p-4'):
+                            with ui.column().classes('gap-0'):
+                                ui.label('Leads').classes('text-xl font-bold text-gray-800')
+                                ui.label('Gerenciamento de leads do escritório').classes('text-sm text-gray-500')
+
+                            # Botão Novo Lead
+                            def novo_lead():
+                                if refresh_ref_leads['func']:
+                                    abrir_dialog_lead(on_save=lambda: refresh_ref_leads['func'].refresh())
+                                else:
+                                    abrir_dialog_lead()
+
+                            ui.button('+ Novo Lead', icon='add', on_click=novo_lead).props('color=primary')
+
+                        ui.separator()
+
+                        # Container dos filtros
+                        with ui.element('div').classes('filtros-container mx-4 mt-4'):
+                            with ui.row().classes('w-full items-end gap-4'):
+                                # Campo de busca
+                                busca_input_leads = ui.input(
+                                    label='Buscar',
+                                    placeholder='Nome, email ou telefone...'
+                                ).classes('flex-1').props('dense outlined clearable')
+
+                                # Filtro por origem
+                                origem_select_leads = ui.select(
+                                    options=['Todos', 'Indicação', 'Site', 'Telefone', 'Evento', 'Redes Sociais', 'Outro'],
+                                    value='Todos',
+                                    label='Origem'
+                                ).classes('w-40').props('dense outlined')
+
+                                # Botão limpar filtros
+                                def limpar_filtros_leads():
+                                    busca_input_leads.value = ''
+                                    origem_select_leads.value = 'Todos'
+                                    filtros_leads['busca'] = ''
+                                    filtros_leads['origem'] = 'Todos'
+                                    if refresh_ref_leads['func']:
+                                        refresh_ref_leads['func'].refresh()
+
+                                ui.button('Limpar', icon='clear', on_click=limpar_filtros_leads).props('flat dense')
+
+                                # Eventos de filtro
+                                def aplicar_filtros_leads():
+                                    filtros_leads['busca'] = busca_input_leads.value or ''
+                                    filtros_leads['origem'] = origem_select_leads.value
+                                    if refresh_ref_leads['func']:
+                                        refresh_ref_leads['func'].refresh()
+
+                                busca_input_leads.on('update:model-value', lambda: aplicar_filtros_leads())
+                                origem_select_leads.on('update:model-value', lambda: aplicar_filtros_leads())
+
+                        # Conteúdo principal (tabela)
+                        @ui.refreshable
+                        def renderizar_conteudo_leads():
+                            _renderizar_tabela_leads(filtros_leads, renderizar_conteudo_leads)
+
+                        # Guarda referência para uso posterior
+                        refresh_ref_leads['func'] = renderizar_conteudo_leads
+
+                        with ui.element('div').classes('w-full p-4').style('width: 100%; overflow-x: auto'):
+                            renderizar_conteudo_leads()
 
 
 def _renderizar_tabela(filtros: dict, refresh_callback):
@@ -1090,6 +1169,350 @@ def confirmar_exclusao_parceiro(parceiro: dict, on_confirm: Optional[Callable] =
         on_confirm: Callback chamado após confirmar exclusão
     """
     nome = parceiro.get('nome_exibicao') or parceiro.get('nome_completo', 'este parceiro')
+
+    with ui.dialog() as dialog, ui.card().classes('w-96'):
+        with ui.column().classes('w-full gap-4'):
+            # Header com ícone de alerta
+            with ui.row().classes('w-full items-center gap-3'):
+                ui.icon('warning', color='negative', size='md')
+                ui.label('Confirmar exclusão').classes('text-lg font-bold text-gray-800')
+
+            # Mensagem
+            ui.label(f'Deseja realmente excluir "{nome}"?').classes('text-gray-600')
+            ui.label('Esta ação não pode ser desfeita.').classes('text-sm text-gray-400')
+
+            # Botões
+            with ui.row().classes('w-full justify-end gap-2 mt-4'):
+                ui.button('Cancelar', on_click=dialog.close).props('flat color=grey')
+
+                def confirmar():
+                    dialog.close()
+                    if on_confirm:
+                        on_confirm()
+
+                ui.button('Excluir', on_click=confirmar, icon='delete').props('color=negative')
+
+    dialog.open()
+
+
+def _aplicar_filtros_leads(leads: list, filtros: dict) -> list:
+    """
+    Aplica filtros à lista de leads.
+
+    Args:
+        leads: Lista completa de leads
+        filtros: Dicionário com filtros ativos
+
+    Returns:
+        Lista filtrada de leads
+    """
+    resultado = leads
+
+    # Filtro por origem
+    origem_filtro = filtros.get('origem', 'Todos')
+    if origem_filtro and origem_filtro != 'Todos':
+        resultado = [l for l in resultado if l.get('origem') == origem_filtro]
+
+    # Filtro por busca textual
+    busca = filtros.get('busca', '').strip().lower()
+    if busca:
+        def match_busca(lead):
+            nome = (lead.get('nome') or lead.get('full_name') or '').lower()
+            nome_exibicao = (lead.get('nome_exibicao') or '').lower()
+            email = (lead.get('email') or '').lower()
+            telefone = (lead.get('telefone') or '').lower()
+            return (
+                busca in nome or
+                busca in nome_exibicao or
+                busca in email or
+                busca in telefone
+            )
+
+        resultado = [l for l in resultado if match_busca(l)]
+
+    return resultado
+
+
+def _renderizar_tabela_leads(filtros: dict, refresh_callback):
+    """Renderiza a tabela de leads com filtros aplicados."""
+    # Carrega leads
+    try:
+        todos_leads = get_leads_list()
+    except Exception as e:
+        print(f"Erro ao carregar leads: {e}")
+        with ui.column().classes('w-full items-center py-8'):
+            ui.icon('error', size='48px', color='negative')
+            ui.label('Erro ao carregar leads').classes('text-lg text-gray-600 mt-2')
+            ui.label('Tente recarregar a página.').classes('text-sm text-gray-400')
+        return
+
+    # Aplica filtros
+    leads_filtrados = _aplicar_filtros_leads(todos_leads, filtros)
+
+    # Contador de resultados
+    total = len(leads_filtrados)
+    total_geral = len(todos_leads)
+
+    if filtros['busca'] or filtros['origem'] != 'Todos':
+        ui.label(f'{total} de {total_geral} leads encontrados').classes('contador-resultados mb-3')
+    else:
+        ui.label(f'{total} lead(s) cadastrado(s)').classes('contador-resultados mb-3')
+
+    # Estado vazio
+    if not leads_filtrados:
+        with ui.column().classes('w-full items-center py-12'):
+            if todos_leads:
+                # Tem leads, mas filtro não encontrou
+                ui.icon('search_off', size='64px').classes('text-gray-300')
+                ui.label('Nenhum lead encontrado').classes('text-lg text-gray-500 mt-4')
+                ui.label('Tente ajustar os filtros de busca.').classes('text-sm text-gray-400')
+            else:
+                # Não tem nenhum lead cadastrado
+                ui.icon('person_add', size='64px').classes('text-gray-300')
+                ui.label('Nenhum lead cadastrado').classes('text-lg text-gray-500 mt-4')
+                ui.label('Clique em "+ Novo Lead" para começar.').classes('text-sm text-gray-400')
+        return
+
+    # Prepara dados para a tabela (sem campos de timestamp para evitar erro de serialização)
+    dados_tabela = []
+    for lead in leads_filtrados:
+        # Cria cópia dos dados sem timestamps para serialização segura
+        dados_seguros = {
+            k: v for k, v in lead.items()
+            if k not in ['created_at', 'updated_at', 'data_cadastro', 'data_criacao', 'data_atualizacao']
+        }
+        dados_tabela.append({
+            '_id': lead.get('_id', ''),
+            'nome': lead.get('nome') or lead.get('full_name', 'Sem nome'),
+            'nome_exibicao': lead.get('nome_exibicao', '') or '-',
+            'email': lead.get('email', '') or '-',
+            'telefone': lead.get('telefone', '') or '-',
+            'origem': lead.get('origem', '') or '-',
+            'cpf_cnpj': lead.get('cpf_cnpj', '') or '-',
+            '_dados_completos': dados_seguros,
+        })
+
+    # Colunas da tabela
+    colunas = [
+        {'name': 'nome', 'label': 'Nome', 'field': 'nome', 'align': 'left', 'sortable': True, 'style': 'width: 25%'},
+        {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left', 'style': 'width: 20%'},
+        {'name': 'email', 'label': 'Email', 'field': 'email', 'align': 'left', 'style': 'width: 15%'},
+        {'name': 'telefone', 'label': 'Telefone', 'field': 'telefone', 'align': 'left', 'style': 'width: 12%'},
+        {'name': 'origem', 'label': 'Origem', 'field': 'origem', 'align': 'center', 'style': 'width: 12%'},
+        {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left', 'style': 'width: 10%'},
+        {'name': 'actions', 'label': 'Ações', 'field': 'actions', 'align': 'center', 'style': 'width: 6%'},
+    ]
+
+    # Cria tabela com largura total
+    tabela = ui.table(
+        columns=colunas,
+        rows=dados_tabela,
+        row_key='_id',
+        pagination={'rowsPerPage': 15},
+    ).classes('w-full tabela-pessoas').style('width: 100%')
+
+    # Slot para coluna de ações
+    tabela.add_slot('body-cell-actions', '''
+        <q-td :props="props">
+            <div class="q-gutter-xs">
+                <q-btn flat dense icon="edit" color="primary" @click="$parent.$emit('editar', props.row)">
+                    <q-tooltip>Editar</q-tooltip>
+                </q-btn>
+                <q-btn flat dense icon="delete" color="negative" @click="$parent.$emit('excluir', props.row)">
+                    <q-tooltip>Excluir</q-tooltip>
+                </q-btn>
+            </div>
+        </q-td>
+    ''')
+
+    # Handlers de eventos
+    def ao_editar_lead(evento):
+        linha = evento.args
+        lead_completo = linha.get('_dados_completos', {})
+        abrir_dialog_lead(lead=lead_completo, on_save=lambda: refresh_callback.refresh())
+
+    def ao_excluir_lead(evento):
+        linha = evento.args
+        lead_completo = linha.get('_dados_completos', {})
+
+        def executar_exclusao():
+            lead_id = lead_completo.get('_id')
+            nome = lead_completo.get('nome') or lead_completo.get('full_name', 'Lead')
+            try:
+                delete_lead(lead_completo)
+                core_invalidate_cache('pessoas_leads')
+                ui.notify(f'"{nome}" excluído com sucesso!', type='positive')
+                refresh_callback.refresh()
+            except Exception as e:
+                print(f"Erro ao excluir lead: {e}")
+                ui.notify('Erro ao excluir. Tente novamente.', type='negative')
+
+        confirmar_exclusao_lead(lead_completo, on_confirm=executar_exclusao)
+
+    tabela.on('editar', ao_editar_lead)
+    tabela.on('excluir', ao_excluir_lead)
+
+
+def abrir_dialog_lead(
+    lead: Optional[dict] = None,
+    on_save: Optional[Callable] = None
+):
+    """
+    Abre dialog para criar ou editar um lead.
+
+    Args:
+        lead: Dados do lead para edição (None para criar novo)
+        on_save: Callback chamado após salvar com sucesso
+    """
+    is_edicao = lead is not None
+    titulo = 'Editar Lead' if is_edicao else 'Novo Lead'
+
+    # Dados iniciais
+    dados = lead.copy() if lead else {}
+
+    with ui.dialog() as dialog, ui.card().classes('w-full max-w-lg'):
+        # Header
+        with ui.row().classes('w-full items-center justify-between mb-4'):
+            ui.label(titulo).classes('text-xl font-bold text-gray-800')
+            ui.button(icon='close', on_click=dialog.close).props('flat dense round')
+
+        ui.separator().classes('mb-4')
+
+        # Container do formulário
+        with ui.column().classes('w-full gap-4'):
+            # Nome e Nome de Exibição (na mesma linha)
+            with ui.row().classes('w-full gap-4'):
+                nome_input = ui.input(
+                    label='Nome *',
+                    value=dados.get('nome') or dados.get('full_name', ''),
+                    placeholder='Digite o nome'
+                ).classes('flex-1').props('dense outlined')
+
+                nome_exibicao_input = ui.input(
+                    label='Nome de Exibição',
+                    value=dados.get('nome_exibicao', ''),
+                    placeholder='Nome para exibição'
+                ).classes('flex-1').props('dense outlined')
+
+            # Email e Telefone (na mesma linha)
+            with ui.row().classes('w-full gap-4'):
+                email_input = ui.input(
+                    label='Email',
+                    value=dados.get('email', ''),
+                    placeholder='email@exemplo.com'
+                ).classes('flex-1').props('dense outlined type=email')
+
+                telefone_input = ui.input(
+                    label='Telefone',
+                    value=dados.get('telefone', ''),
+                    placeholder='(00) 00000-0000'
+                ).classes('flex-1').props('dense outlined')
+
+            # Endereço, Cidade, Estado, CEP (em linhas)
+            endereco_input = ui.input(
+                label='Endereço',
+                value=dados.get('endereco', ''),
+                placeholder='Rua, número, complemento...'
+            ).classes('w-full').props('dense outlined')
+
+            with ui.row().classes('w-full gap-4'):
+                cidade_input = ui.input(
+                    label='Cidade',
+                    value=dados.get('cidade', ''),
+                    placeholder='Cidade'
+                ).classes('flex-1').props('dense outlined')
+
+                estado_input = ui.input(
+                    label='Estado',
+                    value=dados.get('estado', ''),
+                    placeholder='UF'
+                ).classes('w-24').props('dense outlined')
+
+                cep_input = ui.input(
+                    label='CEP',
+                    value=dados.get('cep', ''),
+                    placeholder='00000-000'
+                ).classes('w-32').props('dense outlined')
+
+            # CPF/CNPJ e Origem
+            with ui.row().classes('w-full gap-4'):
+                cpf_cnpj_input = ui.input(
+                    label='CPF/CNPJ',
+                    value=dados.get('cpf_cnpj', ''),
+                    placeholder='000.000.000-00 ou 00.000.000/0000-00'
+                ).classes('flex-1').props('dense outlined')
+
+                origem_select = ui.select(
+                    options=['', 'Indicação', 'Site', 'Telefone', 'Evento', 'Redes Sociais', 'Outro'],
+                    value=dados.get('origem', ''),
+                    label='Origem'
+                ).classes('flex-1').props('dense outlined')
+
+            # Observações
+            observacoes_input = ui.textarea(
+                label='Observações',
+                value=dados.get('observacoes', ''),
+                placeholder='Observações adicionais...'
+            ).classes('w-full').props('dense outlined rows=3')
+
+        ui.separator().classes('my-4')
+
+        # Botões de ação
+        with ui.row().classes('w-full justify-end gap-2'):
+            ui.button('Cancelar', on_click=dialog.close).props('flat color=grey')
+
+            def salvar():
+                """Valida e salva os dados do lead."""
+                # Validação
+                if not nome_input.value.strip():
+                    ui.notify('Nome é obrigatório!', type='warning')
+                    return
+
+                # Coleta dados do formulário
+                novos_dados = {
+                    'nome': nome_input.value.strip(),
+                    'nome_exibicao': nome_exibicao_input.value.strip(),
+                    'email': email_input.value.strip(),
+                    'telefone': telefone_input.value.strip(),
+                    'endereco': endereco_input.value.strip(),
+                    'cidade': cidade_input.value.strip(),
+                    'estado': estado_input.value.strip(),
+                    'cep': cep_input.value.strip(),
+                    'cpf_cnpj': cpf_cnpj_input.value.strip(),
+                    'observacoes': observacoes_input.value.strip(),
+                    'origem': origem_select.value or '',
+                }
+
+                # Preserva _id se for edição
+                if is_edicao and '_id' in dados:
+                    novos_dados['_id'] = dados['_id']
+
+                # Salva no Firebase
+                try:
+                    save_lead(novos_dados)
+                    core_invalidate_cache('pessoas_leads')
+                    ui.notify('Lead salvo com sucesso!', type='positive')
+                    dialog.close()
+                    if on_save:
+                        on_save()
+                except Exception as e:
+                    print(f"Erro ao salvar lead: {e}")
+                    ui.notify('Erro ao salvar. Verifique os dados.', type='negative')
+
+            ui.button('Salvar', on_click=salvar, icon='save').props('color=primary')
+
+    dialog.open()
+
+
+def confirmar_exclusao_lead(lead: dict, on_confirm: Optional[Callable] = None):
+    """
+    Exibe dialog de confirmação para exclusão de lead.
+
+    Args:
+        lead: Dados do lead a excluir
+        on_confirm: Callback chamado após confirmar exclusão
+    """
+    nome = lead.get('nome') or lead.get('full_name', 'este lead')
 
     with ui.dialog() as dialog, ui.card().classes('w-96'):
         with ui.column().classes('w-full gap-4'):

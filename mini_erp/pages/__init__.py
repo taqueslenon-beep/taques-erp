@@ -23,6 +23,9 @@ from . import visao_geral
 # Módulo de prazos (placeholder em desenvolvimento)
 from . import prazos
 
+# Módulo de desenvolvedor (painel de ferramentas)
+from .dev import dev
+
 # Módulos desativados temporariamente (em desenvolvimento)
 # from . import compromissos
 # from . import governanca

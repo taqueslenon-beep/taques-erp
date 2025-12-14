@@ -279,8 +279,8 @@ def _renderizar_pagina_casos():
             # Header
             with ui.row().classes('w-full justify-between items-center p-4'):
                 with ui.column().classes('gap-0'):
-                    ui.label('Casos').classes('text-xl font-bold text-gray-800')
-                    ui.label('Gerenciamento de casos do escritório').classes('text-sm text-gray-500')
+                    # Título removido - já vem do layout()
+                    ui.label('Gerenciamento de casos do escritório').classes('text-sm text-gray-500 -mt-2 mb-2')
 
                 # Botão Novo Caso
                 def novo_caso():

@@ -10,6 +10,7 @@ Contém as três páginas NiceGUI principais:
 from datetime import datetime
 from nicegui import ui, run
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Imports do core
 from ...core import (
@@ -86,30 +87,58 @@ def casos():
     # ==========================================================================
     # OTIMIZAÇÃO: Carrega todos os dados UMA ÚNICA VEZ no início
     # ==========================================================================
-    _cases = deduplicate_cases_by_title(get_cases_list())
-    _clients = get_clients_list()
-    _opposing = get_opposing_parties_list()
     
-    # Função auxiliar para obter sigla/apelido
-    def get_short_name(full_name: str, source_list: list) -> str:
-        return get_short_name_helper(full_name, source_list)
-    
-    # Resetar filtros ao entrar na página
-    filter_state['search'] = ''
-    filter_state['status'] = None
-    filter_state['client'] = None
-    filter_state['state'] = None
-    filter_state['category'] = None
-    filter_state['case_type'] = 'old'
-    
-    # REMOVIDO: renumber_all_cases() chamado automaticamente
-    # Isso estava causando salvamentos desnecessários e possíveis duplicatas
-    # A renumeração agora só acontece quando:
-    # 1. Um novo caso é criado
-    # 2. Um caso é editado (tipo, ano, mês mudam)
-    # 3. Explicitamente chamado pelo usuário
-
     with layout('Casos', breadcrumbs=[('Casos', None)]):
+        # === Indicador de Loading ===
+        loading_container = ui.column().classes('w-full items-center justify-center py-16')
+        with loading_container:
+            ui.spinner('dots', size='xl', color='primary')
+            ui.label('Carregando casos...').classes('text-gray-500 mt-4')
+        
+        # Carregamento PARALELO para reduzir tempo de espera
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(get_cases_list): 'cases',
+                executor.submit(get_clients_list): 'clients',
+                executor.submit(get_opposing_parties_list): 'opposing',
+            }
+            
+            _data = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    _data[key] = future.result()
+                except Exception as e:
+                    print(f"[CASOS] Erro ao carregar {key}: {e}")
+                    _data[key] = []
+        
+        # Extrai dados carregados
+        _cases = deduplicate_cases_by_title(_data.get('cases', []))
+        _clients = _data.get('clients', [])
+        _opposing = _data.get('opposing', [])
+        
+        # Esconde loading após carregar
+        loading_container.set_visibility(False)
+        # === Fim Loading ===
+        
+        # Função auxiliar para obter sigla/apelido
+        def get_short_name(full_name: str, source_list: list) -> str:
+            return get_short_name_helper(full_name, source_list)
+        
+        # Resetar filtros ao entrar na página
+        filter_state['search'] = ''
+        filter_state['status'] = None
+        filter_state['client'] = None
+        filter_state['state'] = None
+        filter_state['category'] = None
+        filter_state['case_type'] = 'old'
+        
+        # REMOVIDO: renumber_all_cases() chamado automaticamente
+        # Isso estava causando salvamentos desnecessários e possíveis duplicatas
+        # A renumeração agora só acontece quando:
+        # 1. Um novo caso é criado
+        # 2. Um caso é editado (tipo, ano, mês mudam)
+        # 3. Explicitamente chamado pelo usuário
         # --- New Case Dialog ---
         with ui.dialog() as new_case_dialog, ui.card().classes('w-full max-w-lg p-6'):
             ui.label('Novo Caso').classes('text-xl font-bold mb-4 text-primary')
@@ -3079,13 +3108,34 @@ def case_swot(case_slug: str):
                 return;
             }
             try {
-                observer = new MutationObserver(function() {
+                const swotObserver = new MutationObserver(function() {
                     initSwotShortcuts();
                 });
-                observer.observe(document.body, { 
-                    childList: true, 
-                    subtree: true 
-                });
+                
+                function setupSwotObserver() {
+                    try {
+                        // Tripla verificação: existe, é Node, está no DOM
+                        if (document.body && 
+                            document.body instanceof Node && 
+                            document.contains(document.body)) {
+                            swotObserver.observe(document.body, { 
+                                childList: true, 
+                                subtree: true 
+                            });
+                        }
+                    } catch (e) {
+                        console.log('Observer error (swot):', e.message);
+                    }
+                }
+                
+                // Executar apenas quando DOM estiver pronto
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', setupSwotObserver);
+                } else {
+                    setupSwotObserver();
+                }
+                
+                observer = swotObserver;
             } catch (err) {
                 console.error('Erro ao iniciar observer:', err);
             }

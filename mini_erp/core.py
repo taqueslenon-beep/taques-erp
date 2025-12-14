@@ -20,7 +20,9 @@ PRIMARY_COLOR = '#223631'
 _cache = {}
 _cache_timestamp = {}
 _cache_lock = threading.Lock()  # Lock para evitar chamadas concorrentes
-CACHE_DURATION = 300  # segundos (5 minutos) - reduz consultas ao Firestore
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+CACHE_DURATION = 900  # 15 minutos em segundos
 
 
 def digits_only(value: Optional[str]) -> str:
@@ -432,7 +434,9 @@ def get_all_people_for_opposing_parties() -> List[Dict[str, Any]]:
 # Cache para nomes de exibição (thread-safe)
 _display_name_cache = {}
 _display_name_cache_timestamp = {}
-DISPLAY_NAME_CACHE_DURATION = 300  # 5 minutos
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+DISPLAY_NAME_CACHE_DURATION = 900  # 15 minutos em segundos
 
 def get_display_name_by_id(person_id: str, person_type: str = None) -> str:
     """
@@ -1692,6 +1696,160 @@ def delete_opposing_party(opposing: Dict[str, Any]):
 
 
 # =============================================================================
+# FUNÇÕES DE LEADS
+# =============================================================================
+
+def get_leads_list() -> List[Dict[str, Any]]:
+    """
+    Obtém lista de leads do Firestore.
+    Filtra pela coleção 'pessoas' onde tipo_pessoa == 'lead'.
+    Usa cache para otimizar performance.
+    """
+    import time
+    
+    cache_key = 'pessoas_leads'
+    now = time.time()
+    
+    # Verifica cache sem lock (leitura rápida)
+    if cache_key in _cache and cache_key in _cache_timestamp:
+        if now - _cache_timestamp[cache_key] < CACHE_DURATION:
+            return _cache[cache_key]
+    
+    # Usa lock para evitar múltiplas consultas simultâneas ao Firestore
+    with _cache_lock:
+        # Verifica novamente dentro do lock
+        if cache_key in _cache and cache_key in _cache_timestamp:
+            if now - _cache_timestamp[cache_key] < CACHE_DURATION:
+                return _cache[cache_key]
+        
+        try:
+            db = get_db()
+            query = db.collection('pessoas').where('tipo_pessoa', '==', 'lead')
+            docs = query.stream()
+            leads = []
+            for doc in docs:
+                lead = doc.to_dict()
+                lead['_id'] = doc.id
+                leads.append(lead)
+            
+            # Atualiza cache
+            _cache[cache_key] = leads
+            _cache_timestamp[cache_key] = time.time()
+            
+            return leads
+        except Exception as e:
+            print(f"Erro ao buscar leads: {e}")
+            # Retorna cache antigo se houver erro
+            return _cache.get(cache_key, [])
+
+
+def save_lead(lead: Dict[str, Any] = None, *, full_name: str = None, email: str = None,
+              telefone: str = None, endereco: str = None, cidade: str = None,
+              estado: str = None, cep: str = None, cpf_cnpj: str = None,
+              observacoes: str = None, origem: str = None):
+    """
+    Salva um lead no Firestore na coleção 'pessoas'.
+    
+    Pode ser chamada de duas formas:
+    1. save_lead(dict_lead) - compatibilidade com código existente
+    2. save_lead(full_name="...", email="...", ...) - nova API
+    
+    Schema:
+    - full_name: string (obrigatório)
+    - email: string (opcional)
+    - telefone: string (opcional)
+    - endereco: string (opcional)
+    - cidade: string (opcional)
+    - estado: string (opcional)
+    - cep: string (opcional)
+    - cpf_cnpj: string (opcional)
+    - observacoes: string (opcional)
+    - origem: string (opcional) - "Indicação", "Site", "Telefone", "Evento", "Redes Sociais", "Outro"
+    - tipo_pessoa: string (fixo "lead")
+    - status_lead: string (fixo "lead")
+    - data_cadastro: SERVER_TIMESTAMP
+    - created_at: SERVER_TIMESTAMP
+    - updated_at: SERVER_TIMESTAMP
+    """
+    from google.cloud.firestore import SERVER_TIMESTAMP
+    
+    # Suporte para nova API com parâmetros nomeados (mantido para compatibilidade)
+    if lead is None:
+        if not full_name:
+            raise ValueError("full_name é obrigatório")
+        lead = {
+            'nome': full_name,  # Usa 'nome' como campo principal
+            'full_name': full_name,  # Mantém 'full_name' para compatibilidade
+            'email': email or '',
+            'telefone': telefone or '',
+            'endereco': endereco or '',
+            'cidade': cidade or '',
+            'estado': estado or '',
+            'cep': cep or '',
+            'cpf_cnpj': cpf_cnpj or '',
+            'observacoes': observacoes or '',
+            'origem': origem or '',
+        }
+    
+    # Normaliza campos de nome (suporta tanto 'nome' quanto 'full_name' para compatibilidade)
+    if 'nome' in lead and not lead.get('full_name'):
+        lead['full_name'] = lead['nome']
+    elif 'full_name' in lead and not lead.get('nome'):
+        lead['nome'] = lead['full_name']
+    
+    # Garante campos obrigatórios
+    if not lead.get('nome') and not lead.get('full_name'):
+        raise ValueError("nome é obrigatório")
+    
+    # Garante que ambos os campos estejam preenchidos
+    if not lead.get('nome'):
+        lead['nome'] = lead.get('full_name', '')
+    if not lead.get('full_name'):
+        lead['full_name'] = lead.get('nome', '')
+    
+    # Garante nome_exibicao (usa nome de exibição se fornecido, senão usa nome)
+    if not lead.get('nome_exibicao', '').strip():
+        lead['nome_exibicao'] = lead.get('nome', lead.get('full_name', '')).strip() or 'Sem nome'
+    if not lead.get('display_name', '').strip():
+        lead['display_name'] = lead['nome_exibicao']
+    
+    # Define campos fixos para leads
+    lead['tipo_pessoa'] = 'lead'
+    lead['status_lead'] = 'lead'
+    
+    # Timestamps usando SERVER_TIMESTAMP do Firestore
+    if 'data_cadastro' not in lead or lead.get('data_cadastro') is None:
+        lead['data_cadastro'] = SERVER_TIMESTAMP
+    if 'created_at' not in lead or lead.get('created_at') is None:
+        lead['created_at'] = SERVER_TIMESTAMP
+    lead['updated_at'] = SERVER_TIMESTAMP
+    
+    # Usa _id se existir, senão gera do nome
+    doc_id = lead.get('_id') or lead.get('nome', lead.get('full_name', '')).replace('/', '-').replace(' ', '-').lower()[:100]
+    _save_to_collection('pessoas', lead, doc_id)
+    
+    # Invalida cache de leads
+    _cache.pop('pessoas_leads', None)
+    _cache_timestamp.pop('pessoas_leads', None)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
+
+
+def delete_lead(lead: Dict[str, Any]):
+    """Remove um lead do Firestore."""
+    doc_id = lead.get('_id') or lead.get('full_name', '').replace('/', '-').replace(' ', '-').lower()[:100]
+    _delete_from_collection('pessoas', doc_id)
+    
+    # Invalida cache de leads
+    _cache.pop('pessoas_leads', None)
+    _cache_timestamp.pop('pessoas_leads', None)
+    
+    # Invalida cache de nome de exibição
+    invalidate_display_name_cache(doc_id)
+
+
+# =============================================================================
 # FUNÇÕES DE PROTOCOLOS INDEPENDENTES
 # =============================================================================
 
@@ -2016,9 +2174,10 @@ def layout(page_title: str, breadcrumbs: list = None):
             * {
                 -webkit-tap-highlight-color: transparent;
             }
-            .q-page, .q-drawer, .q-header {
+            .q-page, .q-header {
                 transition: none !important;
             }
+            /* Drawer mantém transição própria definida em sidebar_base.py */
             .q-tab__indicator {
                 transition: none !important;
             }
@@ -2034,63 +2193,74 @@ def layout(page_title: str, breadcrumbs: list = None):
             }
         </style>
         <script>
-            // Reconexão otimizada - mais conservador para evitar loops
-            document.addEventListener('DOMContentLoaded', function() {
-                let reconnectAttempts = 0;
-                const MAX_RECONNECT_ATTEMPTS = 3;
-                const RECONNECT_DELAY = 5000; // 5 segundos
+            // Evita re-execução em navegações SPA (Single Page Application)
+            // O JavaScript de reconexão deve executar apenas UMA VEZ para evitar:
+            // - MutationObserver e setInterval duplicados
+            // - Event listeners acumulados (memory leak)
+            // - Reprocessamento desnecessário
+            if (window._taques_erp_layout_initialized) {
+                // Layout já inicializado, pula re-inicialização
+            } else {
+                window._taques_erp_layout_initialized = true;
                 
-                function hideConnectionDialog() {
-                    try {
-                        const dialogs = document.querySelectorAll('.q-dialog, .q-banner');
-                        dialogs.forEach(function(dialog) {
-                            if (dialog && dialog.textContent) {
-                                if (dialog.textContent.includes('Connection lost') || dialog.textContent.includes('Trying to reconnect')) {
-                                    dialog.style.display = 'none';
-                                    
-                                    // Só tenta reconectar se não excedeu o limite
-                                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                                        reconnectAttempts++;
-                                        console.log('Tentativa de reconexão ' + reconnectAttempts + '/' + MAX_RECONNECT_ATTEMPTS);
-                                        setTimeout(function() { 
-                                            window.location.reload(); 
-                                        }, RECONNECT_DELAY);
-                                    } else {
-                                        console.log('Limite de reconexões atingido. Recarregue manualmente.');
+                // Reconexão otimizada - mais conservador para evitar loops
+                document.addEventListener('DOMContentLoaded', function() {
+                    let reconnectAttempts = 0;
+                    const MAX_RECONNECT_ATTEMPTS = 3;
+                    const RECONNECT_DELAY = 5000; // 5 segundos
+                    
+                    function hideConnectionDialog() {
+                        try {
+                            const dialogs = document.querySelectorAll('.q-dialog, .q-banner');
+                            dialogs.forEach(function(dialog) {
+                                if (dialog && dialog.textContent) {
+                                    if (dialog.textContent.includes('Connection lost') || dialog.textContent.includes('Trying to reconnect')) {
+                                        dialog.style.display = 'none';
+                                        
+                                        // Só tenta reconectar se não excedeu o limite
+                                        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                                            reconnectAttempts++;
+                                            console.log('Tentativa de reconexão ' + reconnectAttempts + '/' + MAX_RECONNECT_ATTEMPTS);
+                                            setTimeout(function() { 
+                                                window.location.reload(); 
+                                            }, RECONNECT_DELAY);
+                                        } else {
+                                            console.log('Limite de reconexões atingido. Recarregue manualmente.');
+                                        }
                                     }
                                 }
-                            }
-                        });
+                            });
+                        } catch (e) {
+                            console.log('Reconnect check error:', e);
+                        }
+                    }
+                    
+                    // Verificação menos frequente (a cada 3 segundos)
+                    setInterval(hideConnectionDialog, 3000);
+                    
+                    // Reconexão ao voltar online (reseta contador)
+                    window.addEventListener('online', function() {
+                        reconnectAttempts = 0;
+                        window.location.reload();
+                    });
+                    
+                    // Reseta contador quando página carrega com sucesso
+                    window.addEventListener('load', function() {
+                        reconnectAttempts = 0;
+                    });
+                    
+                    // Carrega workspace do localStorage ao carregar página (se não estiver na sessão)
+                    try {
+                        const savedWorkspace = localStorage.getItem('taques_erp_workspace');
+                        if (savedWorkspace) {
+                            // Sincroniza com sessão NiceGUI se necessário
+                            // A sessão será atualizada pelo Python quando necessário
+                        }
                     } catch (e) {
-                        console.log('Reconnect check error:', e);
+                        console.log('Erro ao carregar workspace do localStorage:', e);
                     }
-                }
-                
-                // Verificação menos frequente (a cada 3 segundos)
-                setInterval(hideConnectionDialog, 3000);
-                
-                // Reconexão ao voltar online (reseta contador)
-                window.addEventListener('online', function() {
-                    reconnectAttempts = 0;
-                    window.location.reload();
                 });
-                
-                // Reseta contador quando página carrega com sucesso
-                window.addEventListener('load', function() {
-                    reconnectAttempts = 0;
-                });
-                
-                // Carrega workspace do localStorage ao carregar página (se não estiver na sessão)
-                try {
-                    const savedWorkspace = localStorage.getItem('taques_erp_workspace');
-                    if (savedWorkspace) {
-                        // Sincroniza com sessão NiceGUI se necessário
-                        // A sessão será atualizada pelo Python quando necessário
-                    }
-                } catch (e) {
-                    console.log('Erro ao carregar workspace do localStorage:', e);
-                }
-            });
+            }
         </script>
     ''')
     
@@ -2105,6 +2275,16 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             # DIREITA - Elementos alinhados
             with ui.row().style('align-items: center; gap: 16px; color: white;'):
+                # Botão /dev - Apenas para desenvolvedores
+                # Verificação direta do email do usuário logado
+                user_data = app.storage.user.get('user', {})
+                user_email = user_data.get('email', '').lower() if user_data else ''
+                if user_email == 'taqueslenon@gmail.com':
+                    ui.button(icon='code', on_click=lambda: ui.navigate.to('/dev')) \
+                        .props('flat dense') \
+                        .tooltip('Painel do Desenvolvedor') \
+                        .style('color: white; opacity: 0.8; margin-right: 8px;')
+                
                 # Workspace - Dropdown de seleção
                 from .componentes.dropdown_workspace import render_workspace_dropdown
                 render_workspace_dropdown()
@@ -2284,7 +2464,9 @@ def layout(page_title: str, breadcrumbs: list = None):
     # Renderiza sidebar com itens do workspace
     render_sidebar(itens_menu, rota_atual=rota_atual)
 
-    with ui.column().classes('w-full min-h-screen p-6 bg-gray-50'):
+    # CORREÇÃO: Container de conteúdo - NiceGUI behavior=push já empurra o conteúdo
+    # Padding apenas top/right/bottom (pl-0 para evitar duplicação com CSS)
+    with ui.column().classes('w-full min-h-screen pt-4 pr-4 pb-4 pl-0 bg-gray-50 taques-content-container'):
         if breadcrumbs:
             with ui.row().classes('items-center gap-2 mb-4'):
                 for i, crumb in enumerate(breadcrumbs):

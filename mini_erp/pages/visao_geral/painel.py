@@ -5,19 +5,26 @@ Exibe o painel com visão consolidada de todos os casos e processos do escritór
 from typing import Dict, List, Any
 from collections import Counter
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 from nicegui import ui, app
 from mini_erp.core import layout, PRIMARY_COLOR
 from mini_erp.auth import is_authenticated
 from mini_erp.gerenciadores.gerenciador_workspace import definir_workspace
 from mini_erp.models.prioridade import get_cor_por_prioridade
-from .pessoas.database import listar_pessoas, contar_pessoas, contar_envolvidos, contar_parceiros
+from .pessoas.database import (
+    listar_pessoas, contar_pessoas,
+    listar_envolvidos, contar_envolvidos,
+    listar_parceiros, contar_parceiros
+)
 from .casos.database import contar_casos, listar_casos_por_status, listar_casos
 from mini_erp.usuarios.database import listar_usuarios
-from ..painel.chart_builders import build_bar_chart_config, build_pie_chart_config
+from ..painel.chart_builders import build_bar_chart_config, build_pie_chart_config, build_line_chart_config, build_stacked_bar_chart_config
 from ..painel.ui_components import create_empty_chart_state
 from .casos.models import NUCLEO_CORES, STATUS_CORES, obter_cor_nucleo, obter_cor_status
 from ...services.entregavel_service import listar_entregaveis as listar_entregaveis_service
 from ..prazos.database import obter_estatisticas_prazos_mes
+from ..novos_negocios.novos_negocios_services import get_oportunidades, obter_estatisticas_detalhadas
 
 
 # =============================================================================
@@ -189,60 +196,90 @@ def painel():
     definir_workspace('visao_geral_escritorio')
 
     # Estado da visualização do painel
-    visualizacao_painel = {'tipo': 'casos'}  # 'casos', 'entregaveis' ou 'prazos'
+    visualizacao_painel = {'tipo': 'oportunidades'}  # 'oportunidades', 'casos', 'entregaveis', 'prazos', 'pessoas'
 
     # =========================================================================
-    # CARREGAR DADOS DE PRAZOS
+    # CARREGAMENTO PARALELO DE DADOS - OTIMIZADO
     # =========================================================================
+    _inicio_carregamento = time.time()
     try:
-        stats_prazos = obter_estatisticas_prazos_mes()
-    except Exception:
-        stats_prazos = {
-            'pendentes': 0,
-            'atrasados': 0,
-            'concluidos': 0,
-            'total_mes': 0,
-            'mes_nome': '',
-            'ano': 0
-        }
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(obter_estatisticas_prazos_mes): 'stats_prazos',
+                executor.submit(listar_casos): 'todos_casos',
+                executor.submit(listar_usuarios): 'todos_usuarios',
+                executor.submit(contar_pessoas): 'total_clientes',
+                executor.submit(contar_envolvidos): 'total_envolvidos',
+                executor.submit(contar_parceiros): 'total_parceiros',
+                executor.submit(listar_pessoas): 'todas_pessoas',
+                executor.submit(listar_envolvidos): 'todos_envolvidos',
+                executor.submit(listar_parceiros): 'todos_parceiros',
+                executor.submit(listar_entregaveis_service): 'todos_entregaveis',
+                executor.submit(get_oportunidades): 'todas_oportunidades',
+            }
+            
+            results = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    results[key] = future.result()
+                except Exception as e:
+                    print(f"[PAINEL] Erro ao carregar {key}: {e}")
+                    if key == 'stats_prazos':
+                        results[key] = {'pendentes': 0, 'atrasados': 0, 'concluidos': 0, 'total_mes': 0, 'mes_nome': '', 'ano': 0}
+                    elif key.startswith('total_'):
+                        results[key] = 0
+                    else:
+                        results[key] = []
+            
+            # Extrair resultados
+            stats_prazos = results.get('stats_prazos', {'pendentes': 0, 'atrasados': 0, 'concluidos': 0, 'total_mes': 0, 'mes_nome': '', 'ano': 0})
+            todos_casos = results.get('todos_casos', [])
+            todos_usuarios = results.get('todos_usuarios', [])
+            total_clientes = results.get('total_clientes', 0)
+            total_envolvidos = results.get('total_envolvidos', 0)
+            total_parceiros = results.get('total_parceiros', 0)
+            todas_pessoas = results.get('todas_pessoas', [])
+            todos_envolvidos = results.get('todos_envolvidos', [])
+            todos_parceiros = results.get('todos_parceiros', [])
+            todos_entregaveis = results.get('todos_entregaveis', [])
+            todas_oportunidades = results.get('todas_oportunidades', [])
+            
+            # Calcular estatísticas derivadas
+            total_casos = len(todos_casos)
+            casos_andamento = sum(1 for c in todos_casos if c.get('status') == 'Em andamento')
+            casos_concluidos = sum(1 for c in todos_casos if c.get('status') == 'Concluído')
+            total_pessoas = total_clientes + total_envolvidos + total_parceiros
+            total_pf = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PF')
+            total_pj = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PJ')
+            entregaveis_pendentes = [e for e in todos_entregaveis if e.get('status') != 'Concluído']
+            total_entregaveis_pendentes = len(entregaveis_pendentes)
+            entregaveis_em_espera = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Em espera')
+            entregaveis_status_pendente = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Pendente')
+            entregaveis_em_andamento = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Em andamento')
+            
+            # Calcular estatísticas de oportunidades ativas
+            oportunidades_ativas = [op for op in todas_oportunidades if op.get('status') != 'concluido']
+            total_oportunidades_ativas = len(oportunidades_ativas)
+            oportunidades_agir = sum(1 for op in oportunidades_ativas if op.get('status') == 'agir')
+            oportunidades_em_andamento = sum(1 for op in oportunidades_ativas if op.get('status') == 'em_andamento')
+            oportunidades_aguardando = sum(1 for op in oportunidades_ativas if op.get('status') == 'aguardando')
+            oportunidades_monitorando = sum(1 for op in oportunidades_ativas if op.get('status') == 'monitorando')
+            
+            tempo_carregamento = time.time() - _inicio_carregamento
+            print(f"[PAINEL] ✅ Dados carregados em paralelo com sucesso. Tempo: {tempo_carregamento:.2f}s")
 
-    # =========================================================================
-    # CARREGAR DADOS DE CASOS
-    # =========================================================================
-    try:
-        todos_casos = listar_casos()
-        total_casos = len(todos_casos)
-        casos_andamento = sum(1 for c in todos_casos if c.get('status') == 'Em andamento')
-        casos_concluidos = sum(1 for c in todos_casos if c.get('status') == 'Concluído')
-    except Exception:
+    except Exception as e:
+        print(f"[PAINEL] ❌ Erro no carregamento paralelo: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback com valores padrão
+        stats_prazos = {'pendentes': 0, 'atrasados': 0, 'concluidos': 0, 'total_mes': 0, 'mes_nome': '', 'ano': 0}
         todos_casos = []
         total_casos = 0
         casos_andamento = 0
         casos_concluidos = 0
-
-    # Carregar usuários para gráfico de responsáveis
-    try:
-        todos_usuarios = listar_usuarios()
-    except Exception:
         todos_usuarios = []
-
-    # =========================================================================
-    # CARREGAR DADOS DE PESSOAS (Clientes + Outros Envolvidos + Parceiros)
-    # =========================================================================
-    try:
-        # Conta cada categoria separadamente
-        total_clientes = contar_pessoas()
-        total_envolvidos = contar_envolvidos()
-        total_parceiros = contar_parceiros()
-        
-        # Total geral (soma das três categorias)
-        total_pessoas = total_clientes + total_envolvidos + total_parceiros
-        
-        # Para manter compatibilidade, ainda carrega lista de pessoas para PF/PJ
-        todas_pessoas = listar_pessoas()
-        total_pf = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PF')
-        total_pj = sum(1 for p in todas_pessoas if p.get('tipo_pessoa') == 'PJ')
-    except Exception:
         total_clientes = 0
         total_envolvidos = 0
         total_parceiros = 0
@@ -250,23 +287,19 @@ def painel():
         total_pf = 0
         total_pj = 0
         todas_pessoas = []
-
-    # =========================================================================
-    # CARREGAR DADOS DE ENTREGÁVEIS
-    # =========================================================================
-    try:
-        todos_entregaveis = listar_entregaveis_service()
-        entregaveis_pendentes = [e for e in todos_entregaveis if e.get('status') != 'Concluído']
-        total_entregaveis_pendentes = len(entregaveis_pendentes)
-        entregaveis_em_espera = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Em espera')
-        entregaveis_status_pendente = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Pendente')
-        entregaveis_em_andamento = sum(1 for e in entregaveis_pendentes if e.get('status') == 'Em andamento')
-    except Exception:
+        todos_envolvidos = []
+        todos_parceiros = []
         todos_entregaveis = []
         total_entregaveis_pendentes = 0
         entregaveis_em_espera = 0
         entregaveis_status_pendente = 0
         entregaveis_em_andamento = 0
+        todas_oportunidades = []
+        total_oportunidades_ativas = 0
+        oportunidades_agir = 0
+        oportunidades_em_andamento = 0
+        oportunidades_aguardando = 0
+        oportunidades_monitorando = 0
 
     # =========================================================================
     # FUNÇÕES DE ALTERNÂNCIA DE VISUALIZAÇÃO
@@ -286,6 +319,16 @@ def painel():
         area_cards.refresh()
         area_estatisticas.refresh()
 
+    def selecionar_pessoas():
+        visualizacao_painel['tipo'] = 'pessoas'
+        area_cards.refresh()
+        area_estatisticas.refresh()
+    
+    def selecionar_oportunidades():
+        visualizacao_painel['tipo'] = 'oportunidades'
+        area_cards.refresh()
+        area_estatisticas.refresh()
+
     # =========================================================================
     # LAYOUT DA PÁGINA
     # =========================================================================
@@ -296,10 +339,40 @@ def painel():
         # =====================================================================
         @ui.refreshable
         def area_cards():
-            with ui.row().classes('w-full gap-4 flex-wrap mb-6'):
+            with ui.row().classes('w-full gap-4 flex-nowrap overflow-x-auto mb-6'):
+                # Card Oportunidades Ativas (clicável - alterna visualização)
+                card_oportunidades_ativo = visualizacao_painel['tipo'] == 'oportunidades'
+                classes_oportunidades = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                if card_oportunidades_ativo:
+                    classes_oportunidades += ' ring-2 ring-offset-2 shadow-lg'
+                
+                with ui.card().classes(classes_oportunidades).style(f'border-left-color: #10B981; {"ring-color: #10B981;" if card_oportunidades_ativo else ""}') as oportunidades_card:
+                    with ui.row().classes('items-center gap-2 mb-2'):
+                        ui.icon('trending_up', size='24px').style('color: #10B981;')
+                        ui.label('Oportunidades Ativas').classes('text-sm text-gray-500')
+                    ui.label(str(total_oportunidades_ativas)).classes('text-3xl font-bold').style('color: #10B981;')
+                    
+                    # Breakdown por coluna (exceto "Concluído")
+                    breakdown_parts = []
+                    if oportunidades_agir > 0:
+                        breakdown_parts.append(f'{oportunidades_agir} agir')
+                    if oportunidades_em_andamento > 0:
+                        breakdown_parts.append(f'{oportunidades_em_andamento} em andamento')
+                    if oportunidades_aguardando > 0:
+                        breakdown_parts.append(f'{oportunidades_aguardando} aguardando')
+                    if oportunidades_monitorando > 0:
+                        breakdown_parts.append(f'{oportunidades_monitorando} monitorando')
+                    
+                    if breakdown_parts:
+                        ui.label(', '.join(breakdown_parts)).classes('text-xs text-gray-400 mt-1')
+                    else:
+                        ui.label('Nenhuma oportunidade ativa').classes('text-xs text-gray-400 mt-1')
+                    
+                    oportunidades_card.on('click', selecionar_oportunidades)
+                
                 # Card Casos (clicável - alterna visualização)
                 card_casos_ativo = visualizacao_painel['tipo'] == 'casos'
-                classes_casos = 'flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_casos = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
                 if card_casos_ativo:
                     classes_casos += ' ring-2 ring-offset-2 shadow-lg'
 
@@ -315,10 +388,15 @@ def painel():
 
                     casos_card.on('click', selecionar_casos)
 
-                # Card Pessoas Cadastradas (clicável - redireciona para estatísticas)
-                with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all').style(f'border-left-color: {PRIMARY_COLOR}') as pessoas_card:
+                # Card Pessoas Cadastradas (clicável - alterna visualização)
+                card_pessoas_ativo = visualizacao_painel['tipo'] == 'pessoas'
+                classes_pessoas = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                if card_pessoas_ativo:
+                    classes_pessoas += ' ring-2 ring-offset-2 shadow-lg'
+
+                with ui.card().classes(classes_pessoas).style(f'border-left-color: {PRIMARY_COLOR}; {"ring-color: " + PRIMARY_COLOR + ";" if card_pessoas_ativo else ""}') as pessoas_card:
                     with ui.row().classes('items-center gap-2 mb-2'):
-                        ui.icon('people', size='24px').classes('text-gray-400')
+                        ui.icon('people', size='24px').classes('text-gray-400' if not card_pessoas_ativo else '').style(f'color: {PRIMARY_COLOR}' if card_pessoas_ativo else '')
                         ui.label('Pessoas Cadastradas').classes('text-sm text-gray-500')
                     ui.label(str(total_pessoas)).classes('text-3xl font-bold').style(f'color: {PRIMARY_COLOR}')
                     # Subtítulo mostra distribuição: clientes, envolvidos, parceiros
@@ -335,14 +413,10 @@ def painel():
                     else:
                         ui.label('Nenhuma pessoa cadastrada').classes('text-xs text-gray-400 mt-1')
 
-                    # Evento de clique para redirecionar para página de estatísticas
-                    def navegar_para_estatisticas():
-                        ui.navigate.to('/visao-geral/pessoas/estatisticas')
-                    
-                    pessoas_card.on('click', navegar_para_estatisticas)
+                    pessoas_card.on('click', selecionar_pessoas)
 
                 # Card Processos Ativos (placeholder)
-                with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 border-gray-300'):
+                with ui.card().classes('flex-1 min-w-0 p-4 border-l-4 border-gray-300'):
                     with ui.row().classes('items-center gap-2 mb-2'):
                         ui.icon('gavel', size='24px').classes('text-gray-300')
                         ui.label('Processos Ativos').classes('text-sm text-gray-500')
@@ -351,7 +425,7 @@ def painel():
 
                 # Card Entregáveis Pendentes (clicável - alterna visualização)
                 card_entregaveis_ativo = visualizacao_painel['tipo'] == 'entregaveis'
-                classes_entregaveis = 'flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_entregaveis = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
                 if card_entregaveis_ativo:
                     classes_entregaveis += ' ring-2 ring-orange-500 ring-offset-2 shadow-lg'
 
@@ -379,7 +453,7 @@ def painel():
 
                 # Card Prazos do Mês (clicável - alterna visualização)
                 card_prazos_ativo = visualizacao_painel['tipo'] == 'prazos'
-                classes_prazos = 'flex-1 min-w-48 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
+                classes_prazos = 'flex-1 min-w-0 p-4 border-l-4 cursor-pointer hover:shadow-lg transition-all'
                 if card_prazos_ativo:
                     classes_prazos += ' ring-2 ring-amber-500 ring-offset-2 shadow-lg'
 
@@ -409,7 +483,7 @@ def painel():
                     prazos_card.on('click', selecionar_prazos)
 
                 # Card Acordos (placeholder)
-                with ui.card().classes('flex-1 min-w-48 p-4 border-l-4 border-gray-300'):
+                with ui.card().classes('flex-1 min-w-0 p-4 border-l-4 border-gray-300'):
                     with ui.row().classes('items-center gap-2 mb-2'):
                         ui.icon('handshake', size='24px').classes('text-gray-300')
                         ui.label('Acordos').classes('text-sm text-gray-500')
@@ -419,14 +493,305 @@ def painel():
         area_cards()
 
         # =====================================================================
-        # ÁREA DE ESTATÍSTICAS (refreshable para alternar entre Casos, Entregáveis e Prazos)
+        # ÁREA DE ESTATÍSTICAS (refreshable para alternar entre todas as opções)
         # =====================================================================
+        def renderizar_estatisticas_oportunidades():
+            """Renderiza estatísticas de Oportunidades Ativas."""
+            stats = obter_estatisticas_detalhadas()
+            
+            ui.label('Estatísticas de Oportunidades').classes('text-2xl font-bold text-gray-800 mt-8 mb-4')
+            
+            # Cores dos status do Kanban
+            STATUS_CORES_OP = {
+                'agir': '#EF4444',
+                'em_andamento': '#EAB308',
+                'aguardando': '#FDE047',
+                'monitorando': '#F97316',
+            }
+            STATUS_NOMES_OP = {
+                'agir': 'Agir',
+                'em_andamento': 'Em Andamento',
+                'aguardando': 'Aguardando',
+                'monitorando': 'Monitorando',
+            }
+            
+            # Grid de gráficos (responsivo) - Primeira linha
+            with ui.row().classes('w-full gap-6 flex-wrap mb-6'):
+                # 1. Gráfico de Oportunidades por Status (Pizza)
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    ui.label('Oportunidades por Status').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    if stats['total'] > 0:
+                        pie_data = []
+                        for status in ['agir', 'em_andamento', 'aguardando', 'monitorando']:
+                            quantidade = stats['por_status'].get(status, 0)
+                            if quantidade > 0:
+                                pie_data.append({
+                                    'value': quantidade,
+                                    'name': STATUS_NOMES_OP[status],
+                                    'itemStyle': {'color': STATUS_CORES_OP[status]}
+                                })
+                        
+                        if pie_data:
+                            config = build_pie_chart_config(
+                                data=pie_data,
+                                series_name='Oportunidades',
+                                donut=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhuma oportunidade ativa.')
+                    else:
+                        create_empty_chart_state('Nenhuma oportunidade ativa.')
+                
+                # 2. Gráfico de Oportunidades por Núcleo
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    ui.label('Oportunidades por Núcleo').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    if stats['por_nucleo']:
+                        nucleos_ordenados = sorted(
+                            stats['por_nucleo'].items(),
+                            key=lambda x: x[1],
+                            reverse=True
+                        )
+                        categories = [nucleo for nucleo, _ in nucleos_ordenados]
+                        values = [qtd for _, qtd in nucleos_ordenados]
+                        colors = [obter_cor_nucleo(nucleo) for nucleo in categories]
+                        
+                        config = build_bar_chart_config(
+                            categories=categories,
+                            values=values,
+                            colors=colors,
+                            series_name='Oportunidades',
+                            horizontal=True,
+                            show_percentage=True
+                        )
+                        ui.echart(config).classes('w-full h-80')
+                    else:
+                        create_empty_chart_state('Nenhuma oportunidade por núcleo.')
+                
+                # 3. Gráfico de Oportunidades por Origem
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    ui.label('Oportunidades por Origem').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    if stats['por_origem']:
+                        origens_ordenadas = sorted(
+                            stats['por_origem'].items(),
+                            key=lambda x: x[1],
+                            reverse=True
+                        )
+                        categories = [origem for origem, _ in origens_ordenadas]
+                        values = [qtd for _, qtd in origens_ordenadas]
+                        
+                        # Cores alternadas para origem
+                        cores_origem = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                        colors = [cores_origem[i % len(cores_origem)] for i in range(len(categories))]
+                        
+                        config = build_bar_chart_config(
+                            categories=categories,
+                            values=values,
+                            colors=colors,
+                            series_name='Oportunidades',
+                            horizontal=True,
+                            show_percentage=True
+                        )
+                        ui.echart(config).classes('w-full h-80')
+                    else:
+                        create_empty_chart_state('Nenhuma oportunidade por origem.')
+            
+            # Segunda linha de gráficos
+            with ui.row().classes('w-full gap-6 flex-wrap'):
+                # 4. Gráfico de Evolução Mensal (Barras Horizontais Simples)
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    ui.label('Evolução Mensal').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    por_mes = stats.get('por_mes', {})
+                    if por_mes:
+                        # Ordena meses por data (mais antigo primeiro)
+                        meses_ordenados = sorted(por_mes.items(), key=lambda x: (
+                            int(x[0].split('/')[1]),  # Ano primeiro
+                            int(x[0].split('/')[0])   # Mês depois
+                        ))
+                        
+                        # Limita aos últimos 6 meses
+                        if len(meses_ordenados) > 6:
+                            meses_ordenados = meses_ordenados[-6:]
+                        
+                        # Formata meses para exibição (MM/AAAA -> "Jan/24")
+                        meses_labels = []
+                        valores = []
+                        meses_nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                                       'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+                        
+                        for mes_ano, quantidade in meses_ordenados:
+                            try:
+                                mes, ano = mes_ano.split('/')
+                                mes_int = int(mes)
+                                if 1 <= mes_int <= 12:
+                                    mes_nome = meses_nomes[mes_int - 1]
+                                    meses_labels.append(f'{mes_nome}/{ano[-2:]}')
+                                    valores.append(quantidade)
+                            except:
+                                # Se formato inválido, pula
+                                continue
+                        
+                        if meses_labels and valores:
+                            # Barras horizontais simples (uma cor azul)
+                            config = build_bar_chart_config(
+                                categories=meses_labels,
+                                values=valores,
+                                colors=['#3B82F6'],  # Cor azul única
+                                series_name='Oportunidades',
+                                horizontal=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Formato de datas inválido.')
+                    else:
+                        create_empty_chart_state('Nenhum dado mensal disponível.')
+                
+                # 5. Gráfico de Oportunidades por Responsável
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    ui.label('Oportunidades por Responsável').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    por_responsavel = stats.get('por_responsavel', {})
+                    if por_responsavel:
+                        # Ordena por quantidade (maior primeiro)
+                        responsaveis_ordenados = sorted(
+                            por_responsavel.items(),
+                            key=lambda x: x[1],
+                            reverse=True
+                        )
+                        
+                        # Limita aos 10 primeiros para não ficar muito grande
+                        responsaveis_limite = responsaveis_ordenados[:10]
+                        
+                        categories = [resp for resp, _ in responsaveis_limite]
+                        values = [qtd for _, qtd in responsaveis_limite]
+                        
+                        # Cores alternadas
+                        cores_responsavel = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                        colors = [cores_responsavel[i % len(cores_responsavel)] for i in range(len(categories))]
+                        
+                        config = build_bar_chart_config(
+                            categories=categories,
+                            values=values,
+                            colors=colors,
+                            series_name='Oportunidades',
+                            horizontal=True,
+                            show_percentage=True
+                        )
+                        
+                        # Ajusta altura do gráfico baseado no número de responsáveis
+                        chart_height = max(300, len(categories) * 40)
+                        ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+                    else:
+                        create_empty_chart_state('Nenhuma oportunidade com responsável.')
+                
+                # 6. Gráfico de Valor por Etapa
+                with ui.card().classes('flex-1 min-w-96 p-6'):
+                    valores_por_status = stats.get('valores_por_status', {})
+                    total_pipeline = sum(valores_por_status.values())
+                    
+                    # Título com total do pipeline
+                    if total_pipeline > 0:
+                        # Formata total do pipeline
+                        total_formatado = f"R$ {total_pipeline:,.0f}".replace(',', 'X').replace('.', ',').replace('X', '.') if total_pipeline >= 1000 else f"R$ {total_pipeline:.0f}"
+                        ui.label(f'Valor por Etapa (Total: {total_formatado})').classes('text-lg font-semibold text-gray-700 mb-4')
+                    else:
+                        ui.label('Valor por Etapa').classes('text-lg font-semibold text-gray-700 mb-4')
+                    
+                    if valores_por_status and total_pipeline > 0:
+                        # Ordem das etapas (mesma ordem do Kanban)
+                        etapas = [
+                            ('agir', 'Agir', '#EF4444'),
+                            ('em_andamento', 'Em Andamento', '#EAB308'),
+                            ('aguardando', 'Aguardando', '#FDE047'),
+                            ('monitorando', 'Monitorando', '#F97316')
+                        ]
+                        
+                        categories = []
+                        values = []
+                        colors = []
+                        
+                        for status_id, nome, cor in etapas:
+                            valor = valores_por_status.get(status_id, 0.0)
+                            if valor > 0:
+                                categories.append(nome)
+                                values.append(valor)
+                                colors.append(cor)
+                        
+                        if categories and values:
+                            # Formata valores monetários para exibição
+                            def formatar_reais(valor: float) -> str:
+                                """Formata valor para moeda brasileira."""
+                                if valor >= 1000:
+                                    return f"R$ {valor:,.0f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                return f"R$ {valor:.0f}"
+                            
+                            # Prepara dados simples sem formatação complexa nos labels individuais
+                            formatted_data = []
+                            for valor, cor in zip(values, colors):
+                                formatted_data.append({
+                                    'value': valor,
+                                    'itemStyle': {'color': cor}
+                                })
+                            
+                            # Configuração customizada para valores monetários
+                            config = {
+                                'tooltip': {
+                                    'trigger': 'axis',
+                                    'axisPointer': {'type': 'shadow'}
+                                },
+                                'grid': {
+                                    'left': '3%',
+                                    'right': '15%',  # Mais espaço para labels monetários
+                                    'bottom': '3%',
+                                    'top': '3%',
+                                    'containLabel': True
+                                },
+                                'xAxis': {
+                                    'type': 'value'
+                                    # Sem formatter customizado - valores numéricos simples
+                                },
+                                'yAxis': {
+                                    'type': 'category',
+                                    'data': list(reversed(categories)),
+                                    'axisLabel': {'fontSize': 11}
+                                },
+                                'series': [{
+                                    'name': 'Valor',
+                                    'type': 'bar',
+                                    'data': list(reversed(formatted_data)),
+                                    'barWidth': '60%',
+                                    'label': {
+                                        'show': True,
+                                        'position': 'right',
+                                        'fontWeight': 'bold',
+                                        'fontSize': 12,
+                                        'formatter': 'R$ {c}'  # Template simples: R$ + valor numérico
+                                    }
+                                }]
+                            }
+                            
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum valor encontrado.')
+                    else:
+                        create_empty_chart_state('Nenhum valor no pipeline.')
+            
         @ui.refreshable
         def area_estatisticas():
-            if visualizacao_painel['tipo'] == 'casos':
+            if visualizacao_painel['tipo'] == 'oportunidades':
+                renderizar_estatisticas_oportunidades()
+            elif visualizacao_painel['tipo'] == 'casos':
                 renderizar_estatisticas_casos()
             elif visualizacao_painel['tipo'] == 'entregaveis':
                 renderizar_estatisticas_entregaveis()
+            elif visualizacao_painel['tipo'] == 'pessoas':
+                renderizar_estatisticas_pessoas()
             else:
                 renderizar_estatisticas_prazos()
 
@@ -763,6 +1128,145 @@ def painel():
                             icon='arrow_forward',
                             on_click=lambda: ui.navigate.to('/prazos')
                         ).classes('bg-amber-500 text-white')
+
+        def renderizar_estatisticas_pessoas():
+            """Renderiza estatísticas de Pessoas."""
+            ui.label('Estatísticas de Pessoas').classes('text-2xl font-bold text-gray-800 mt-8 mb-4')
+
+            # Grid de gráficos (responsivo)
+            with ui.row().classes('w-full gap-4 flex-wrap'):
+                # 1. Gráfico de Distribuição por Categoria (Pizza/Donut)
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Distribuição por Categoria').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    if total_pessoas > 0:
+                        # Prepara dados para gráfico de pizza
+                        pie_data = []
+                        if total_clientes > 0:
+                            pie_data.append({
+                                'value': total_clientes,
+                                'name': 'Clientes',
+                                'itemStyle': {'color': '#3b82f6'}
+                            })
+                        if total_envolvidos > 0:
+                            pie_data.append({
+                                'value': total_envolvidos,
+                                'name': 'Outros Envolvidos',
+                                'itemStyle': {'color': '#8b5cf6'}
+                            })
+                        if total_parceiros > 0:
+                            pie_data.append({
+                                'value': total_parceiros,
+                                'name': 'Parceiros',
+                                'itemStyle': {'color': '#10b981'}
+                            })
+
+                        if pie_data:
+                            config = build_pie_chart_config(
+                                data=pie_data,
+                                series_name='Pessoas',
+                                donut=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhuma pessoa cadastrada.')
+                    else:
+                        create_empty_chart_state('Nenhuma pessoa cadastrada.')
+
+                # 2. Gráfico de Clientes por Tipo (Barras Horizontal)
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Clientes por Tipo').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    if todas_pessoas:
+                        # Agrupa por tipo_pessoa
+                        contador_tipos = Counter()
+                        for pessoa in todas_pessoas:
+                            tipo = pessoa.get('tipo_pessoa', 'PF')
+                            contador_tipos[tipo] += 1
+
+                        if contador_tipos:
+                            categories = ['PF', 'PJ']
+                            values = [contador_tipos.get('PF', 0), contador_tipos.get('PJ', 0)]
+                            colors = ['#3b82f6', '#f59e0b']  # Azul para PF, Amarelo para PJ
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Clientes',
+                                horizontal=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum cliente cadastrado.')
+                    else:
+                        create_empty_chart_state('Nenhum cliente cadastrado.')
+
+            # Segunda linha de gráficos
+            with ui.row().classes('w-full gap-4 flex-wrap mt-4'):
+                # 3. Gráfico de Outros Envolvidos por Tipo (Barras Horizontal)
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Outros Envolvidos por Tipo').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    if todos_envolvidos:
+                        # Agrupa por tipo_envolvido
+                        contador_tipos = Counter()
+                        for envolvido in todos_envolvidos:
+                            tipo = envolvido.get('tipo_envolvido', 'PF')
+                            contador_tipos[tipo] += 1
+
+                        if contador_tipos:
+                            # Ordem: PF, PJ, Ente Público
+                            categories = ['PF', 'PJ', 'Ente Público']
+                            values = [
+                                contador_tipos.get('PF', 0),
+                                contador_tipos.get('PJ', 0),
+                                contador_tipos.get('Ente Público', 0)
+                            ]
+                            colors = ['#3b82f6', '#10b981', '#8b5cf6']  # Azul, Verde, Roxo
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Envolvidos',
+                                horizontal=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum envolvido cadastrado.')
+                    else:
+                        create_empty_chart_state('Nenhum envolvido cadastrado.')
+
+                # 4. Gráfico de Parceiros por Tipo (Barras Horizontal)
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    ui.label('Parceiros por Tipo').classes('text-lg font-semibold text-gray-700 mb-4')
+
+                    if todos_parceiros:
+                        # Agrupa por tipo_parceiro
+                        contador_tipos = Counter()
+                        for parceiro in todos_parceiros:
+                            tipo = parceiro.get('tipo_parceiro', 'PF')
+                            contador_tipos[tipo] += 1
+
+                        if contador_tipos:
+                            categories = ['PF', 'PJ']
+                            values = [contador_tipos.get('PF', 0), contador_tipos.get('PJ', 0)]
+                            colors = ['#3b82f6', '#10b981']  # Azul para PF, Verde para PJ
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Parceiros',
+                                horizontal=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum parceiro cadastrado.')
+                    else:
+                        create_empty_chart_state('Nenhum parceiro cadastrado.')
 
         area_estatisticas()
 

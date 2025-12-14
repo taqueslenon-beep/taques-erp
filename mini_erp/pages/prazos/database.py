@@ -28,7 +28,9 @@ from ...core import (
 _cache_prazos = None
 _cache_timestamp = None
 _cache_lock = threading.Lock()
-CACHE_DURATION = 300  # 5 minutos em segundos
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+CACHE_DURATION = 900  # 15 minutos em segundos
 
 # Cache para selects (TTL 5 minutos)
 _cache_usuarios_select = None
@@ -37,7 +39,9 @@ _cache_clientes_select = None
 _cache_clientes_select_ts = None
 _cache_casos_select = None
 _cache_casos_select_ts = None
-CACHE_SELECT_DURATION = 300  # 5 minutos
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+CACHE_SELECT_DURATION = 900  # 15 minutos em segundos
 
 
 def listar_prazos() -> List[Dict[str, Any]]:

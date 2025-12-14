@@ -3,6 +3,7 @@ Página principal do módulo Pessoas.
 Orquestra todos os componentes e gerencia a estrutura de tabs e dialogs.
 """
 from nicegui import ui
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from ...core import layout
 from ...auth import is_authenticated
 from .database import delete_client, delete_opposing_party, invalidate_cache, get_clients_list, get_opposing_parties_list
@@ -31,11 +32,36 @@ def pessoas():
 
 def _render_pessoas_content():
     """Conteúdo principal da página Pessoas."""
-    # Invalida cache na entrada para garantir dados frescos do Firebase
-    invalidate_cache('clients')
-    invalidate_cache('opposing_parties')
+    # Cache de 15 minutos será utilizado se válido
+    # Invalidação ocorre apenas após operações de escrita (salvar/deletar)
+    # Isso evita recarregamento desnecessário do Firestore a cada navegação
     
     with layout('Pessoas', breadcrumbs=[('Pessoas', None)]):
+        # === Indicador de Loading ===
+        loading_row = ui.row().classes('w-full justify-center py-8')
+        with loading_row:
+            ui.spinner('dots', size='lg', color='primary')
+            ui.label('Carregando pessoas...').classes('ml-3 text-gray-500')
+        
+        # Carregamento PARALELO para reduzir tempo de espera e pré-aquecer cache
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(get_clients_list): 'clients',
+                executor.submit(get_opposing_parties_list): 'opposing',
+            }
+            
+            _data = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    _data[key] = future.result()
+                except Exception as e:
+                    print(f"[PESSOAS] Erro ao carregar {key}: {e}")
+                    _data[key] = []
+        
+        # Esconde loading após carregar dados
+        loading_row.set_visibility(False)
+        # === Fim Loading ===
         # Estilos CSS para hierarquia visual
         ui.add_head_html('''
         <style>

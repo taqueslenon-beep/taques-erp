@@ -5,12 +5,12 @@ Contém funções para criar e renderizar tabelas de clientes, outros envolvidos
 from typing import Callable, Dict, Any, List
 from nicegui import ui
 from ...core import get_full_name, get_display_name
-from .database import get_clients_list, get_opposing_parties_list, invalidate_cache
+from .database import get_clients_list, get_opposing_parties_list, invalidate_cache, get_leads_list
 from .business_logic import (
     group_clients_by_type, prepare_client_row_data, prepare_opposing_row_data
 )
 from .validators import normalize_client_type_for_display, normalize_entity_type
-from .models import CLIENTS_TABLE_COLUMNS, OPPOSING_TABLE_COLUMNS, CLIENT_GROUP_CONFIG
+from .models import CLIENTS_TABLE_COLUMNS, OPPOSING_TABLE_COLUMNS, CLIENT_GROUP_CONFIG, LEADS_TABLE_COLUMNS
 
 
 def create_table_slots(table: ui.table) -> None:
@@ -193,4 +193,55 @@ def render_bonds_map(
             
             # Botão adicionar
             ui.button(icon='add', on_click=lambda i=idx: on_add_bond(i)).props('flat dense round size=sm color=grey')
+
+
+def render_leads_table(
+    on_edit: Callable,
+    on_delete: Callable
+) -> None:
+    """
+    Renderiza tabela de leads.
+    
+    Args:
+        on_edit: Função chamada ao editar lead (recebe lead)
+        on_delete: Função chamada ao deletar lead (recebe lead)
+    """
+    # Busca lista de leads do Firebase
+    leads_data: List[Dict] = get_leads_list()
+    
+    if not leads_data:
+        ui.label('Nenhum lead cadastrado.').classes('text-gray-400 italic py-4')
+        return
+    
+    # Ordena por nome mantendo referência aos dados originais
+    sorted_leads = sorted(leads_data, key=lambda x: (x.get('nome') or x.get('full_name', '')).upper())
+    
+    rows = []
+    for i, lead in enumerate(sorted_leads):
+        row_data = {
+            'id': i,
+            'nome': lead.get('nome') or lead.get('full_name', ''),
+            'nome_exibicao': lead.get('nome_exibicao', '') or '-',
+            'email': lead.get('email', '') or '-',
+            'telefone': lead.get('telefone', '') or '-',
+            'origem': lead.get('origem', '') or '-',
+            'cpf_cnpj': lead.get('cpf_cnpj', '') or '-',
+        }
+        rows.append(row_data)
+    
+    table = ui.table(columns=LEADS_TABLE_COLUMNS, rows=rows, row_key='id').classes('w-full').props('flat dense')
+    create_table_slots(table)
+    
+    def handle_edit(e):
+        idx = e.args['id']
+        if 0 <= idx < len(sorted_leads):
+            on_edit(sorted_leads[idx])
+    
+    def handle_delete(e):
+        idx = e.args['id']
+        if 0 <= idx < len(sorted_leads):
+            on_delete(sorted_leads[idx])
+    
+    table.on('edit', handle_edit)
+    table.on('delete', handle_delete)
 

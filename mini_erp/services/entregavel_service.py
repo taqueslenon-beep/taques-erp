@@ -15,7 +15,9 @@ from ..auth import get_current_user
 _cache_entregaveis = None
 _cache_timestamp = None
 _cache_lock = threading.Lock()
-CACHE_DURATION = 300  # 5 minutos em segundos
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+CACHE_DURATION = 900  # 15 minutos em segundos
 
 
 def invalidar_cache():

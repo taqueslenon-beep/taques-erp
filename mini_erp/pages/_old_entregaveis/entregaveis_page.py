@@ -262,9 +262,8 @@ def entregaveis():
                     ui.button('Excluir', on_click=lambda: [dialog_excluir.close(), excluir_entregavel_confirmado()]).props('color=red')
         
         with layout('Entregáveis', breadcrumbs=[('Visão geral do escritório', '/visao-geral/painel'), ('Entregáveis', None)]):
-            # Header
-            with ui.row().classes('w-full items-center justify-between mb-4'):
-                ui.label('Entregáveis').classes('text-2xl font-bold text-gray-800')
+            # Header (título removido - já vem do layout())
+            with ui.row().classes('w-full items-center justify-end mb-4'):
                 ui.button('+ Novo Entregável', icon='add', on_click=abrir_modal_criacao).classes('bg-primary text-white')
             
             # Toggle de visualização

@@ -8,7 +8,8 @@ from ...core import get_full_name, get_display_name, format_cpf, format_cnpj
 from .database import (
     get_clients_list, get_opposing_parties_list,
     save_client, delete_client, save_opposing_party, delete_opposing_party,
-    invalidate_cache, get_client_by_index
+    invalidate_cache, get_client_by_index,
+    get_leads_list, save_lead, delete_lead
 )
 from .validators import (
     validate_client_documents, extract_client_documents,
@@ -19,7 +20,7 @@ from .business_logic import (
     clean_person_name_from_label, validate_bond_not_self,
     check_bond_exists, create_bond_data
 )
-from .models import DEFAULT_CLIENT_TYPE, CLIENT_TYPE_LABELS
+from .models import DEFAULT_CLIENT_TYPE, CLIENT_TYPE_LABELS, LEAD_ORIGEM_OPTIONS
 from .ui_components import (
     create_full_name_input, create_display_name_input, create_nickname_input,
     create_cpf_input, create_cnpj_input, create_cpf_cnpj_input,
@@ -548,4 +549,197 @@ def create_add_bond_dialog(
         ui.notify('Vínculo removido!')
     
     return add_bond_dialog, open_add_bond, remove_bond
+
+
+# =============================================================================
+# LEAD DIALOGS
+# =============================================================================
+
+def create_new_lead_dialog(
+    render_leads_table: Callable
+) -> ui.dialog:
+    """
+    Cria dialog para cadastrar novo lead.
+    
+    Args:
+        render_leads_table: Função refreshable para atualizar tabela
+        
+    Returns:
+        Dialog configurado
+    """
+    with ui.dialog() as new_lead_dialog, ui.card().classes('w-full max-w-lg p-6'):
+        ui.label('Novo Lead').classes('text-lg font-bold mb-4')
+        
+        # Campos obrigatórios - Nome e Nome de Exibição (na mesma linha)
+        with ui.row().classes('w-full gap-4 mb-2'):
+            lead_nome = ui.input('Nome *').classes('flex-1')
+            lead_nome_exibicao = ui.input('Nome de Exibição').classes('flex-1')
+        
+        # Campos opcionais
+        lead_email = create_email_input()
+        lead_telefone = create_phone_input()
+        lead_telefone.label = 'Telefone'
+        
+        lead_endereco = ui.input('Endereço').classes('w-full mb-2')
+        lead_cidade = ui.input('Cidade').classes('w-full mb-2')
+        lead_estado = ui.input('Estado').classes('w-full mb-2')
+        lead_cep = ui.input('CEP').classes('w-full mb-2')
+        lead_cpf_cnpj = create_cpf_cnpj_input()
+        
+        # Campo origem como dropdown
+        lead_origem = ui.select(
+            options=LEAD_ORIGEM_OPTIONS,
+            label='Origem',
+            value=None
+        ).classes('w-full mb-2').props('dense')
+        
+        lead_observacoes = ui.textarea('Observações').classes('w-full mb-4').props('rows=3')
+        
+        def save_lead_handler():
+            if not lead_nome.value:
+                ui.notify('Nome é obrigatório!', type='warning')
+                return
+            
+            new_lead = {
+                'nome': lead_nome.value,
+                'nome_exibicao': lead_nome_exibicao.value or '',
+                'email': lead_email.value or '',
+                'telefone': lead_telefone.value or '',
+                'endereco': lead_endereco.value or '',
+                'cidade': lead_cidade.value or '',
+                'estado': lead_estado.value or '',
+                'cep': lead_cep.value or '',
+                'cpf_cnpj': lead_cpf_cnpj.value or '',
+                'observacoes': lead_observacoes.value or '',
+                'origem': lead_origem.value or ''
+            }
+            
+            save_lead(new_lead)
+            invalidate_cache('pessoas')
+            render_leads_table.refresh()
+            new_lead_dialog.close()
+            
+            # Limpa campos
+            lead_nome.value = ''
+            lead_nome_exibicao.value = ''
+            lead_email.value = ''
+            lead_telefone.value = ''
+            lead_endereco.value = ''
+            lead_cidade.value = ''
+            lead_estado.value = ''
+            lead_cep.value = ''
+            lead_cpf_cnpj.value = ''
+            lead_origem.value = None
+            lead_origem.update()
+            lead_observacoes.value = ''
+            
+            ui.notify('Lead cadastrado!')
+        
+        with ui.row().classes('w-full justify-end'):
+            ui.button('Salvar', on_click=save_lead_handler).classes('bg-primary text-white')
+    
+    return new_lead_dialog
+
+
+def create_edit_lead_dialog(
+    render_leads_table: Callable
+) -> Tuple[ui.dialog, Callable]:
+    """
+    Cria dialog para editar lead existente.
+    
+    Args:
+        render_leads_table: Função refreshable para atualizar tabela
+        
+    Returns:
+        Tupla (dialog, open_edit_lead_function)
+    """
+    edit_lead_index = {'value': None}
+    
+    with ui.dialog() as edit_lead_dialog, ui.card().classes('w-full max-w-lg p-6'):
+        ui.label('Editar Lead').classes('text-lg font-bold mb-4')
+        
+        # Nome e Nome de Exibição (na mesma linha)
+        with ui.row().classes('w-full gap-4 mb-2'):
+            edit_lead_nome = ui.input('Nome *').classes('flex-1')
+            edit_lead_nome_exibicao = ui.input('Nome de Exibição').classes('flex-1')
+        
+        edit_lead_email = create_email_input()
+        edit_lead_telefone = create_phone_input()
+        edit_lead_telefone.label = 'Telefone'
+        
+        edit_lead_endereco = ui.input('Endereço').classes('w-full mb-2')
+        edit_lead_cidade = ui.input('Cidade').classes('w-full mb-2')
+        edit_lead_estado = ui.input('Estado').classes('w-full mb-2')
+        edit_lead_cep = ui.input('CEP').classes('w-full mb-2')
+        edit_lead_cpf_cnpj = create_cpf_cnpj_input()
+        
+        edit_lead_origem = ui.select(
+            options=LEAD_ORIGEM_OPTIONS,
+            label='Origem',
+            value=None
+        ).classes('w-full mb-2').props('dense')
+        
+        edit_lead_observacoes = ui.textarea('Observações').classes('w-full mb-4').props('rows=3')
+        
+        def open_edit_lead(lead):
+            leads_list = get_leads_list()
+            try:
+                edit_lead_index['value'] = leads_list.index(lead)
+            except ValueError:
+                edit_lead_index['value'] = None
+            
+            edit_lead_nome.value = lead.get('nome') or lead.get('full_name', '')
+            edit_lead_nome_exibicao.value = lead.get('nome_exibicao', '')
+            edit_lead_email.value = lead.get('email', '')
+            edit_lead_telefone.value = lead.get('telefone', '')
+            edit_lead_endereco.value = lead.get('endereco', '')
+            edit_lead_cidade.value = lead.get('cidade', '')
+            edit_lead_estado.value = lead.get('estado', '')
+            edit_lead_cep.value = lead.get('cep', '')
+            edit_lead_cpf_cnpj.value = lead.get('cpf_cnpj', '')
+            edit_lead_origem.value = lead.get('origem', '')
+            edit_lead_origem.update()
+            edit_lead_observacoes.value = lead.get('observacoes', '')
+            edit_lead_dialog.open()
+        
+        def save_edit_lead():
+            if not edit_lead_nome.value:
+                ui.notify('Nome é obrigatório!', type='warning')
+                return
+            
+            idx = edit_lead_index['value']
+            if idx is not None and 0 <= idx < len(get_leads_list()):
+                lead = get_leads_list()[idx]
+                updated_lead = {
+                    'nome': edit_lead_nome.value,
+                    'nome_exibicao': edit_lead_nome_exibicao.value or '',
+                    'email': edit_lead_email.value or '',
+                    'telefone': edit_lead_telefone.value or '',
+                    'endereco': edit_lead_endereco.value or '',
+                    'cidade': edit_lead_cidade.value or '',
+                    'estado': edit_lead_estado.value or '',
+                    'cep': edit_lead_cep.value or '',
+                    'cpf_cnpj': edit_lead_cpf_cnpj.value or '',
+                    'observacoes': edit_lead_observacoes.value or '',
+                    'origem': edit_lead_origem.value or '',
+                    'tipo_pessoa': 'lead',
+                    'status_lead': 'lead',
+                    'data_cadastro': lead.get('data_cadastro'),
+                    'created_at': lead.get('created_at')
+                }
+                
+                # Preserva _id se existir
+                if '_id' in lead:
+                    updated_lead['_id'] = lead['_id']
+                
+                save_lead(updated_lead)
+                invalidate_cache('pessoas')
+                render_leads_table.refresh()
+                edit_lead_dialog.close()
+                ui.notify('Lead atualizado!')
+        
+        with ui.row().classes('w-full justify-end'):
+            ui.button('Salvar', on_click=save_edit_lead).classes('bg-primary text-white')
+    
+    return edit_lead_dialog, open_edit_lead
 

@@ -7,6 +7,7 @@ Exibe todos os processos cadastrados no Firebase em uma tabela limpa.
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from nicegui import app, ui, context
 from ....core import layout, get_processes_list, get_clients_list, get_opposing_parties_list, get_cases_list, invalidate_cache
@@ -415,37 +416,53 @@ def fetch_processes():
     Sem nenhum filtro aplicado. Os filtros são aplicados posteriormente
     na função filter_rows() quando o usuário seleciona opções nos dropdowns.
     
+    OTIMIZAÇÃO: Carregamento PARALELO para reduzir tempo de espera.
+    
     Returns:
         Lista de dicionários prontos para a tabela (TODOS os processos + acompanhamentos + desdobramentos).
     """
     try:
-        # Buscar processos agrupados por hierarquia (pai + desdobramentos)
-        from ..database import get_processes_with_children
-        processos_hierarquicos = get_processes_with_children()
+        # Carregamento PARALELO para reduzir tempo de espera
+        from ..database import get_processes_with_children, obter_todos_acompanhamentos
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(get_processes_with_children): 'processes',
+                executor.submit(obter_todos_acompanhamentos): 'acompanhamentos',
+                executor.submit(get_clients_list): 'clients',
+                executor.submit(get_opposing_parties_list): 'opposing',
+                executor.submit(get_cases_list): 'cases',
+            }
+            
+            _data = {}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    _data[key] = future.result()
+                except Exception as e:
+                    print(f"[PROCESSOS] Erro ao carregar {key}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    _data[key] = []
+        
+        # Extrai dados carregados
+        processos_hierarquicos = _data.get('processes', [])
+        acompanhamentos_raw = _data.get('acompanhamentos', [])
+        clients_list = _data.get('clients', [])
+        opposing_list = _data.get('opposing', [])
+        cases_list = _data.get('cases', [])
+        
         print(f"[FETCH_PROCESSOS] Processos principais encontrados: {len(processos_hierarquicos)}")
         
         # Contar total de desdobramentos
         total_desdobramentos = sum(len(grupo.get('desdobramentos', [])) for grupo in processos_hierarquicos)
         print(f"[FETCH_PROCESSOS] Total de desdobramentos encontrados: {total_desdobramentos}")
+        print(f"[FETCH_PROCESSOS] Acompanhamentos encontrados: {len(acompanhamentos_raw)}")
         
-        # Buscar acompanhamentos de terceiros (não são processos hierárquicos)
-        acompanhamentos_raw = []
-        try:
-            from ..database import obter_todos_acompanhamentos
-            acompanhamentos_raw = obter_todos_acompanhamentos()
-            print(f"[FETCH_PROCESSOS] Acompanhamentos encontrados: {len(acompanhamentos_raw)}")
-            
-            # Marcar acompanhamentos
-            for acomp in acompanhamentos_raw:
-                acomp['_is_third_party_monitoring'] = True
-        except Exception as e:
-            print(f"[FETCH_PROCESSOS] Erro ao buscar acompanhamentos: {e}")
-            import traceback
-            traceback.print_exc()
+        # Marcar acompanhamentos
+        for acomp in acompanhamentos_raw:
+            acomp['_is_third_party_monitoring'] = True
         
-        # Carrega listas de pessoas para buscar siglas/display_names
-        clients_list = get_clients_list()
-        opposing_list = get_opposing_parties_list()
         all_people = clients_list + opposing_list
         
         rows = []
@@ -524,8 +541,28 @@ def processos():
         return
 
     with layout('Processos', breadcrumbs=[('Processos', None)]):
+        # === Indicador de Loading ===
+        loading_row = ui.row().classes('w-full justify-center py-8')
+        with loading_row:
+            ui.spinner('dots', size='lg', color='primary')
+            ui.label('Carregando processos...').classes('ml-3 text-gray-500')
+        
         # Aplicar CSS padrão de cores alternadas para tabelas de processos
         ui.add_head_html(TABELA_PROCESSOS_CSS)
+        
+        # Cache local para processos (evita múltiplas queries na mesma renderização)
+        _processes_cache = {'data': None, 'force_reload': False}
+        
+        def get_processes_cached(force=False):
+            """Retorna lista de processos com cache local."""
+            if force or _processes_cache['force_reload'] or _processes_cache['data'] is None:
+                from ....core import get_processes_list
+                _processes_cache['data'] = get_processes_list()
+                _processes_cache['force_reload'] = False
+                print(f"[PROCESSOS] Cache atualizado (force={force})")
+            else:
+                print(f"[PROCESSOS] Usando cache local ({len(_processes_cache['data'])} processos)")
+            return _processes_cache['data']
         
         # VISUALIZAÇÃO PADRÃO: Todos os processos (sem filtros)
         # Filtro via URL: filter=futuro_previsto (processos futuros) ou filter=acompanhamentos_terceiros
@@ -559,10 +596,10 @@ def processos():
             # Invalida cache de processos e clientes (clientes podem ter mudado)
             invalidate_cache('processes')
             invalidate_cache('clients')
+            _processes_cache['force_reload'] = True  # Força reload no próximo acesso
             
             # Log de debug: verifica quantos processos existem após invalidar cache
-            from ....core import get_processes_list
-            processos_apos_cache = get_processes_list()
+            processos_apos_cache = get_processes_cached()
             print(f"[PROCESSO SALVO] Total de processos após invalidar cache: {len(processos_apos_cache)}")
             
             # Recarrega tabela
@@ -638,13 +675,30 @@ def processos():
 
         def load_rows(force_reload: bool = False):
             """Busca processos/acompanhamentos com cache simples para evitar consultas redundantes."""
-            if force_reload or data_cache['rows'] is None:
+            # Cache local para evitar múltiplas queries na mesma renderização
+            _cache_key = "processes_load_rows"
+            if not hasattr(load_rows, '_local_cache'):
+                load_rows._local_cache = {}
+            
+            # Verificar se precisa recarregar (força reload ou cache vazio)
+            if force_reload or _cache_key not in load_rows._local_cache or data_cache['rows'] is None:
                 if initial_filter_acompanhamentos:
                     print("[LOAD_ROWS] Carregando acompanhamentos de terceiros (modo dedicado)")
-                    data_cache['rows'] = fetch_acompanhamentos_terceiros()
+                    dados = fetch_acompanhamentos_terceiros()
                 else:
                     print("[LOAD_ROWS] Carregando lista completa de processos")
-                    data_cache['rows'] = fetch_processes()
+                    dados = fetch_processes()
+                
+                # Atualiza ambos os caches
+                data_cache['rows'] = dados
+                load_rows._local_cache[_cache_key] = dados
+                print(f"[PROCESSOS] Cache atualizado - {len(dados)} processos")
+            else:
+                # Usa cache existente
+                if _cache_key in load_rows._local_cache:
+                    data_cache['rows'] = load_rows._local_cache[_cache_key]
+                    print(f"[PROCESSOS] Usando cache - {len(data_cache['rows'])} processos")
+            
             return data_cache['rows'] or []
         
         # Função para extrair opções únicas dos dados
@@ -893,10 +947,9 @@ def processos():
             def novo_desdobramento():
                 """Abre diálogo para selecionar processo pai e depois abre modal de novo desdobramento."""
                 from nicegui import ui
-                from ....core import get_processes_list
                 
                 # Obter lista de processos para seleção
-                processos = get_processes_list()
+                processos = get_processes_cached()
                 
                 if not processos:
                     ui.notify('Não há processos cadastrados para criar desdobramento.', type='warning')
@@ -1349,6 +1402,9 @@ def processos():
             Filtros são aplicados apenas quando o usuário seleciona opções nos dropdowns.
             Se filtro de acompanhamentos estiver ativo na URL, mostra apenas acompanhamentos.
             """
+            # Esconde loading após começar a renderizar
+            loading_row.set_visibility(False)
+            
             rows = load_rows()
             
             # DEBUG: Verificar se RECURSO ESPECIAL está na lista retornada por fetch_processes()
@@ -1420,7 +1476,7 @@ def processos():
                     else:
                         # É um processo normal - abrir modal de processo
                         process_id = row_id
-                        all_processes = get_processes_list()
+                        all_processes = get_processes_cached()
                         for idx, proc in enumerate(all_processes):
                             if proc.get('_id') == process_id:
                                 open_process_modal(idx)
@@ -1440,7 +1496,7 @@ def processos():
                     print(f"[DUPLICAR] Iniciando duplicação do processo: {process_id}")
                     
                     # Verificar se é acompanhamento de terceiro (não pode duplicar)
-                    all_processes = get_processes_list()
+                    all_processes = get_processes_cached()
                     is_third_party = False
                     for proc in all_processes:
                         if proc.get('_id') == process_id:
@@ -1574,11 +1630,32 @@ def processos():
                     setTimeout(setupContextMenu, 500);
                     
                     // Re-executa após mudanças na tabela
-                    const observer = new MutationObserver(setupContextMenu);
-                    const tableContainer = document.querySelector('.q-table');
-                    if (tableContainer) {
-                        observer.observe(tableContainer, { childList: true, subtree: true });
+                    function setupContextMenuObserver() {
+                        try {
+                            const observer = new MutationObserver(setupContextMenu);
+                            const tableContainer = document.querySelector('.q-table');
+                            // Tripla verificação: existe, é Node, está no DOM
+                            if (tableContainer && 
+                                tableContainer instanceof Node && 
+                                document.contains(tableContainer)) {
+                                try {
+                                    observer.observe(tableContainer, { childList: true, subtree: true });
+                                } catch (e) {
+                                    console.log('Observer error (context menu):', e.message);
+                                }
+                            }
+                        } catch (e) {
+                            console.log('Observer setup skipped (context menu):', e.message);
+                        }
                     }
+                    
+                    setTimeout(function() {
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', setupContextMenuObserver);
+                        } else {
+                            setupContextMenuObserver();
+                        }
+                    }, 500);
                 })();
             ''')
             
@@ -1650,11 +1727,32 @@ def processos():
                         setTimeout(applyStyles, 400);
                         
                         // Observa mudanças na tabela (pagination, filtros, etc)
-                        const observer = new MutationObserver(applyStyles);
-                        const tableContainer = document.querySelector('.q-table');
-                        if (tableContainer) {
-                            observer.observe(tableContainer, { childList: true, subtree: true });
+                        function setupStylesObserver() {
+                            try {
+                                const observer = new MutationObserver(applyStyles);
+                                const tableContainer = document.querySelector('.q-table');
+                                // Tripla verificação: existe, é Node, está no DOM
+                                if (tableContainer && 
+                                    tableContainer instanceof Node && 
+                                    document.contains(tableContainer)) {
+                                    try {
+                                        observer.observe(tableContainer, { childList: true, subtree: true });
+                                    } catch (e) {
+                                        console.log('Observer error (styles):', e.message);
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Observer setup skipped (styles):', e.message);
+                            }
                         }
+                        
+                        setTimeout(function() {
+                            if (document.readyState === 'loading') {
+                                document.addEventListener('DOMContentLoaded', setupStylesObserver);
+                            } else {
+                                setupStylesObserver();
+                            }
+                        }, 400);
                         
                         // Re-aplica estilos após eventos de paginação/filtros
                         const paginationArea = document.querySelector('.q-table__bottom');

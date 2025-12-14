@@ -16,6 +16,7 @@ def build_bar_chart_config(
     rotate_labels: int = 0,
     show_label: bool = True,
     label_position: str = 'top',
+    show_percentage: bool = False,
 ) -> Dict[str, Any]:
     """
     Cria configuração para gráfico de barras.
@@ -31,12 +32,52 @@ def build_bar_chart_config(
         rotate_labels: Rotação dos labels do eixo
         show_label: Mostrar valores nas barras
         label_position: Posição do label ('top', 'right', etc)
+        show_percentage: Se True, mostra porcentagem junto com o valor
     """
+    # Calcula porcentagens se necessário
+    total = sum(values) if show_percentage and values else 0
+    percentages = [(v / total * 100) if total > 0 else 0 for v in values] if show_percentage else None
+    
     # Preparar dados com cores individuais se fornecidas
     if colors and len(colors) == len(values):
         chart_data = [{'value': v, 'itemStyle': {'color': c}} for v, c in zip(values, colors)]
     else:
         chart_data = values
+    
+    # Configura formatter de label com porcentagem se necessário
+    label_config = {
+        'show': show_label,
+        'position': 'right' if horizontal else label_position,
+        'fontWeight': 'bold',
+        'fontSize': label_font_size
+    }
+    
+    if show_percentage and percentages and total > 0:
+        # Prepara dados com labels formatados já calculados
+        formatted_data = []
+        data_list = chart_data if isinstance(chart_data, list) else [{'value': v} for v in values]
+        for i, item in enumerate(data_list):
+            if isinstance(item, dict):
+                val = item.get('value', values[i] if i < len(values) else 0)
+                formatted_item = item.copy()
+                formatted_item['label'] = {
+                    'show': True,
+                    'formatter': f'{val} ({percentages[i]:.2f}%)'
+                }
+                formatted_data.append(formatted_item)
+            else:
+                val = item if isinstance(item, (int, float)) else values[i] if i < len(values) else 0
+                formatted_data.append({
+                    'value': val,
+                    'label': {
+                        'show': True,
+                        'formatter': f'{val} ({percentages[i]:.2f}%)'
+                    }
+                })
+        chart_data = formatted_data
+        label_config['show'] = False  # Desabilita label da série, já está nos dados
+    else:
+        label_config['formatter'] = '{c}'
     
     # Configuração base
     config = {
@@ -56,12 +97,7 @@ def build_bar_chart_config(
             'type': 'bar',
             'data': chart_data,
             'barWidth': bar_width,
-            'label': {
-                'show': show_label,
-                'position': 'right' if horizontal else label_position,
-                'fontWeight': 'bold',
-                'fontSize': label_font_size
-            }
+            'label': label_config
         }]
     }
     
@@ -432,6 +468,81 @@ def build_simple_pie_config(
             'labelLine': {'show': True},
             'data': data
         }]
+    }
+
+
+def build_stacked_bar_chart_config(
+    categories: List[str],
+    series_data: List[Dict[str, Any]],
+    show_labels: bool = True,
+    label_font_size: int = 11,
+) -> Dict[str, Any]:
+    """
+    Cria configuração para gráfico de barras verticais empilhadas.
+    
+    Args:
+        categories: Lista de categorias (eixo X) - meses, por exemplo
+        series_data: Lista de séries, cada uma com 'name', 'data' (valores) e 'color'
+        show_labels: Mostrar valores nas barras
+        label_font_size: Tamanho da fonte dos labels
+    
+    Returns:
+        Dicionário com configuração EChart para barras empilhadas
+    """
+    series = []
+    for idx, serie in enumerate(series_data):
+        is_last = idx == len(series_data) - 1  # Última série (topo da pilha)
+        item_style = {
+            'color': serie.get('color', '#3B82F6')
+        }
+        # Aplica bordas arredondadas apenas na última série (topo)
+        if is_last:
+            item_style['borderRadius'] = [0, 4, 4, 0]
+        
+        serie_config = {
+            'name': serie.get('name', ''),
+            'type': 'bar',
+            'stack': 'total',  # Empilha as barras
+            'data': serie.get('data', []),
+            'itemStyle': item_style,
+            'label': {
+                'show': show_labels,
+                'position': 'inside',  # Labels dentro da barra
+                'fontSize': label_font_size,
+                'fontWeight': 'bold',
+                'color': '#000' if serie.get('color') in ['#67E8F9', '#22D3EE'] else '#fff'  # Contraste para legibilidade
+            }
+        }
+        series.append(serie_config)
+    
+    return {
+        'tooltip': {
+            'trigger': 'axis',
+            'axisPointer': {'type': 'shadow'}
+        },
+        'grid': {
+            'left': '3%',
+            'right': '4%',
+            'bottom': '3%',
+            'top': '3%',
+            'containLabel': True
+        },
+        'xAxis': {
+            'type': 'category',
+            'data': categories,
+            'axisLabel': {
+                'fontSize': 11,
+                'fontWeight': 'bold'
+            }
+        },
+        'yAxis': {
+            'type': 'value',
+            'minInterval': 1
+        },
+        'legend': {
+            'show': False  # Não mostrar legenda para gráfico empilhado simples
+        },
+        'series': series
     }
 
 

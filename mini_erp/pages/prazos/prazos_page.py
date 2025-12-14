@@ -177,9 +177,8 @@ def prazos():
         dialog_excluir.open()
     
     with layout('Prazos', breadcrumbs=[('Prazos', None)]):
-        # Header com botão
-        with ui.row().classes('w-full gap-4 mb-6 items-center justify-between'):
-            ui.label('Prazos').classes('text-2xl font-bold')
+        # Header com botão (título removido - já vem do layout())
+        with ui.row().classes('w-full gap-4 mb-6 items-center justify-end'):
             ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props(
                 'color=primary'
             ).classes('font-bold')

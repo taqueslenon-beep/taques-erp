@@ -30,6 +30,12 @@ DEFAULT_CLIENT_TYPE = 'PF'
 ENTITY_TYPES = ['PF', 'PJ', 'Órgão Público']
 
 # =============================================================================
+# CONSTANTES - ORIGEM DE LEADS
+# =============================================================================
+
+LEAD_ORIGEM_OPTIONS = ['Indicação', 'Site', 'Telefone', 'Evento', 'Redes Sociais', 'Outro']
+
+# =============================================================================
 # CONSTANTES - TIPOS DE VÍNCULOS
 # =============================================================================
 
@@ -111,6 +117,16 @@ OPPOSING_TABLE_COLUMNS = [
     {'name': 'full_name', 'label': 'Nome Completo', 'field': 'full_name', 'align': 'left', 'sortable': True},
     {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left'},
     {'name': 'entity_type', 'label': 'Tipo', 'field': 'entity_type', 'align': 'left'},
+    {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left'},
+    {'name': 'actions', 'label': '', 'field': 'actions', 'align': 'right'},
+]
+
+LEADS_TABLE_COLUMNS = [
+    {'name': 'nome', 'label': 'Nome', 'field': 'nome', 'align': 'left', 'sortable': True},
+    {'name': 'nome_exibicao', 'label': 'Nome de Exibição', 'field': 'nome_exibicao', 'align': 'left'},
+    {'name': 'email', 'label': 'Email', 'field': 'email', 'align': 'left'},
+    {'name': 'telefone', 'label': 'Telefone', 'field': 'telefone', 'align': 'left'},
+    {'name': 'origem', 'label': 'Origem', 'field': 'origem', 'align': 'left'},
     {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left'},
     {'name': 'actions', 'label': '', 'field': 'actions', 'align': 'right'},
 ]

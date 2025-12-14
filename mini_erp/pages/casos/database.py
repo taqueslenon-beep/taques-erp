@@ -27,7 +27,9 @@ from .business_logic import get_cases_by_type, get_case_sort_key, get_case_type
 # Cache para usuários (5 minutos TTL)
 _usuarios_cache = None
 _usuarios_cache_timestamp = 0
-CACHE_DURATION = 300  # 5 minutos
+# Cache de 15 minutos - otimizado para poucos registros
+# Invalidação manual ocorre após operações de escrita (salvar/deletar)
+CACHE_DURATION = 900  # 15 minutos em segundos
 
 
 def remove_case(case_to_remove: dict) -> bool:

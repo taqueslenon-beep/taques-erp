@@ -3,12 +3,13 @@ Página principal do Painel - Orquestrador.
 Gerencia o layout, navegação entre abas e carregamento de dados.
 """
 from nicegui import ui
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ...core import layout, get_cases_list, get_processes_list, get_clients_list, get_opposing_parties_list, PRIMARY_COLOR
 from ...auth import is_authenticated
 
 from .models import TAB_CONFIG, TAB_STYLES
-from .data_service import create_data_service
+from .data_service import PainelDataService, create_data_service
 from .tab_visualizations import (
     render_tab_totais,
     render_tab_comparativo,
@@ -57,15 +58,43 @@ def painel():
         definir_workspace('area_cliente_schmidmeier')
         
         # Renderiza painel da Área do Cliente
-        # Carrega dados do workspace do cliente
-        ds = create_data_service(
-            get_cases_list,
-            get_processes_list,
-            get_clients_list,
-            get_opposing_parties_list,
-        )
-        
         with layout('Painel', breadcrumbs=[('Painel', None)]):
+            # === Indicador de Loading ===
+            loading_row = ui.row().classes('w-full justify-center py-8')
+            with loading_row:
+                ui.spinner('dots', size='lg', color='primary')
+                ui.label('Carregando painel...').classes('ml-3 text-gray-500')
+            
+            # Carregamento PARALELO para reduzir tempo de espera
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {
+                    executor.submit(get_cases_list): 'cases',
+                    executor.submit(get_processes_list): 'processes',
+                    executor.submit(get_clients_list): 'clients',
+                    executor.submit(get_opposing_parties_list): 'opposing',
+                }
+                
+                _data = {}
+                for future in as_completed(futures):
+                    key = futures[future]
+                    try:
+                        _data[key] = future.result()
+                    except Exception as e:
+                        print(f"[PAINEL] Erro ao carregar {key}: {e}")
+                        _data[key] = []
+            
+            # Cria data_service com dados já carregados
+            ds = PainelDataService(
+                cases=_data.get('cases', []),
+                processes=_data.get('processes', []),
+                clients=_data.get('clients', []),
+                opposing_parties=_data.get('opposing', []),
+            )
+            
+            # Remove loading após carregar
+            loading_row.set_visibility(False)
+            # === Fim Loading ===
+            
             ui.label('Visão consolidada dos dados do sistema. Informações atualizadas em tempo real.').classes('text-gray-500 text-sm mb-4 -mt-4')
             
             # Estilo para abas minimalistas

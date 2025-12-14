@@ -423,13 +423,38 @@ def prazos():
         }
         
         // Observa mudanças na tabela
-        const observer = new MutationObserver(aplicarClasseAtrasado);
-        setTimeout(function() {
-            const containers = document.querySelectorAll('.tabela-prazos');
-            containers.forEach(function(container) {
-                observer.observe(container, { childList: true, subtree: true });
+        // Só cria observer se houver elementos para observar
+        function setupPrazosObserver() {
+            try {
+                const containers = document.querySelectorAll('.tabela-prazos');
+                if (containers && containers.length > 0) {
+                    const observer = new MutationObserver(aplicarClasseAtrasado);
+                    containers.forEach(function(container) {
+                        // Tripla verificação: existe, é Node, está no DOM
+                        if (container && 
+                            container instanceof Node && 
+                            document.contains(container)) {
+                            try {
+                                observer.observe(container, { childList: true, subtree: true });
+                            } catch (e) {
+                                console.log('Observer error (prazos):', e.message);
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.log('Observer setup skipped (prazos):', e.message);
+            }
+        }
+        
+        // Executar apenas quando DOM estiver pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(setupPrazosObserver, 500);
             });
-        }, 500);
+        } else {
+            setTimeout(setupPrazosObserver, 500);
+        }
     </script>
     ''')
 
@@ -647,9 +672,8 @@ def prazos():
         dialog_reabrir.open()
 
     with layout('Prazos', breadcrumbs=[('Prazos', None)]):
-        # Header com botão
-        with ui.row().classes('w-full gap-4 mb-6 items-center justify-between'):
-            ui.label('Prazos').classes('text-2xl font-bold')
+        # Header com botão (título removido - já vem do layout())
+        with ui.row().classes('w-full gap-4 mb-6 items-center justify-end'):
             ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props(
                 'color=primary'
             ).classes('font-bold')
