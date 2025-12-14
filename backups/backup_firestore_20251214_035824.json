@@ -1,0 +1,40 @@
+{
+  "data_backup": "2025-12-14T03:58:22.052455",
+  "colecoes": {
+    "cases": [],
+    "processes": [],
+    "clients": [],
+    "opposing_parties": [],
+    "users": [],
+    "benefits": [],
+    "agreements": [],
+    "convictions": [],
+    "prioridades": [],
+    "entregaveis": [],
+    "vg_casos": [],
+    "vg_envolvidos": [],
+    "vg_processos": [],
+    "vg_pessoas": [],
+    "vg_entregaveis": [],
+    "vg_compromissos": [],
+    "vg_tarefas": [],
+    "vg_prazos": [],
+    "vg_novos_negocios": [],
+    "vg_contatos": [],
+    "vg_usuarios": [],
+    "third_party_monitoring": [],
+    "configurations": [],
+    "workspaces": [],
+    "acompanhamentos": [],
+    "tarefas": [],
+    "compromissos": [],
+    "prazos": [],
+    "novos_negocios": [],
+    "contatos": [],
+    "pessoas": []
+  },
+  "resumo": {
+    "total_colecoes": 31,
+    "total_documentos": 0
+  }
+}
