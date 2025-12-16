@@ -8,7 +8,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 from nicegui import ui, app
-from mini_erp.core import layout, PRIMARY_COLOR
+from mini_erp.core import layout, PRIMARY_COLOR, get_processes_list
 from mini_erp.auth import is_authenticated
 from mini_erp.gerenciadores.gerenciador_workspace import definir_workspace
 from mini_erp.models.prioridade import get_cor_por_prioridade
@@ -216,6 +216,7 @@ def painel():
                 executor.submit(listar_parceiros): 'todos_parceiros',
                 executor.submit(listar_entregaveis_service): 'todos_entregaveis',
                 executor.submit(get_oportunidades): 'todas_oportunidades',
+                executor.submit(get_processes_list): 'todos_processos',
             }
             
             results = {}
@@ -244,6 +245,7 @@ def painel():
             todos_parceiros = results.get('todos_parceiros', [])
             todos_entregaveis = results.get('todos_entregaveis', [])
             todas_oportunidades = results.get('todas_oportunidades', [])
+            todos_processos = results.get('todos_processos', [])
             
             # Calcular estatísticas derivadas
             total_casos = len(todos_casos)
@@ -265,6 +267,11 @@ def painel():
             oportunidades_em_andamento = sum(1 for op in oportunidades_ativas if op.get('status') == 'em_andamento')
             oportunidades_aguardando = sum(1 for op in oportunidades_ativas if op.get('status') == 'aguardando')
             oportunidades_monitorando = sum(1 for op in oportunidades_ativas if op.get('status') == 'monitorando')
+            
+            # Calcular estatísticas de processos
+            total_processos = len(todos_processos)
+            processos_em_andamento = sum(1 for p in todos_processos if p.get('status') == 'Em andamento')
+            processos_concluidos = sum(1 for p in todos_processos if p.get('status') in ['Concluído', 'Concluído com pendências'])
             
             tempo_carregamento = time.time() - _inicio_carregamento
             print(f"[PAINEL] ✅ Dados carregados em paralelo com sucesso. Tempo: {tempo_carregamento:.2f}s")
@@ -300,6 +307,10 @@ def painel():
         oportunidades_em_andamento = 0
         oportunidades_aguardando = 0
         oportunidades_monitorando = 0
+        todos_processos = []
+        total_processos = 0
+        processos_em_andamento = 0
+        processos_concluidos = 0
 
     # =========================================================================
     # FUNÇÕES DE ALTERNÂNCIA DE VISUALIZAÇÃO
@@ -436,14 +447,27 @@ def painel():
 
                     pessoas_card.on('click', selecionar_pessoas)
 
-                # Card Processos Ativos (placeholder)
-                with ui.card().classes('flex-1 min-w-0 p-4 border bg-white').style(f'border-color: {COR_CINZA_CLARO};'):
+                # Card Processos (clicável - navega para página de processos)
+                with ui.card().classes('flex-1 min-w-0 p-4 cursor-pointer hover:shadow-md transition-all bg-white border').style(f'border-color: {COR_CINZA_CLARO};') as processos_card:
                     # Cabeçalho: ícone e título na mesma linha (alinhamento horizontal)
                     with ui.row().classes('items-center gap-2 mb-2').style('display: flex; align-items: center;'):
                         ui.icon('gavel', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
-                        ui.label('Processos Ativos').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
-                    ui.label('-').classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
-                    ui.label('Funcionalidade em desenvolvimento').classes('text-xs mt-1').style('color: #999999;')
+                        ui.label('Processos').classes('text-sm').style(f'color: {COR_CINZA_MEDIO};')
+                    ui.label(str(total_processos)).classes('text-3xl font-bold').style(f'color: {COR_CINZA_ESCURO};')
+                    
+                    # Subtítulo mostra distribuição: em andamento, concluídos
+                    subtitulo_partes = []
+                    if processos_em_andamento > 0:
+                        subtitulo_partes.append(f'{processos_em_andamento} em andamento')
+                    if processos_concluidos > 0:
+                        subtitulo_partes.append(f'{processos_concluidos} concluído{"s" if processos_concluidos != 1 else ""}')
+                    
+                    if subtitulo_partes:
+                        ui.label(', '.join(subtitulo_partes)).classes('text-xs mt-1').style('color: #999999;')
+                    else:
+                        ui.label('Nenhum processo cadastrado').classes('text-xs mt-1').style('color: #999999;')
+                    
+                    processos_card.on('click', lambda: ui.navigate.to('/visao-geral/processos'))
 
                 # Card Entregáveis Pendentes (clicável - alterna visualização)
                 card_entregaveis_ativo = visualizacao_painel['tipo'] == 'entregaveis'

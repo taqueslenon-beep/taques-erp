@@ -197,3 +197,6 @@ observer.disconnect(); // Quando não precisar mais
 3. ⚠️ Otimizar `prazos.py` - criar observer só se necessário
 4. 📝 Monitorar console após correções para ver se erros persistem
 
+
+
+

@@ -5,6 +5,8 @@ Replica estrutura do modal do Schmidmeier removendo abas de Senhas e Slack.
 from nicegui import ui
 from datetime import datetime
 from typing import Optional, Callable, List, Dict, Any
+import json
+import asyncio
 from ....core import (
     PRIMARY_COLOR, format_date_br, get_display_name
 )
@@ -143,6 +145,11 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
         processo: Dicionário com dados do processo (None para criar novo)
         on_save: Callback executado após salvar com sucesso
     """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] [DEBUG] Abrindo modal para processo: {processo is not None}")
+    if processo:
+        print(f"[{timestamp}] [DEBUG] Dados recebidos: {list(processo.keys())}")
+    
     is_edicao = processo is not None
     dados = processo.copy() if processo else criar_processo_vazio()
     
@@ -190,11 +197,14 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
             # Content
             with ui.column().classes('flex-grow h-full overflow-auto bg-gray-50'):
                 with ui.tab_panels(tabs, value=tab_basic).classes('w-full h-full p-4 bg-transparent'):
-                    
                     # ============================================================
                     # TAB 1: DADOS BÁSICOS
                     # ============================================================
                     with ui.tab_panel(tab_basic):
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [DEBUG] Criando campos de Dados Básicos...")
+                        # TESTE: Verificar se o tab_panel está funcionando
+                        test_label = ui.label('TESTE - Se você vê isso, o tab_panel funciona').classes('text-red-500 font-bold mb-2')
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [DEBUG] Label de teste criado: {test_label}")
                         with ui.column().classes('w-full gap-4'):
                             
                             # Mapeamento de cores para tags
@@ -279,6 +289,7 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
                                         refresh_parent_chips(container, process_id)
                             
                             # SEÇÃO 1 - Identificação do Processo
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [DEBUG] Criando SEÇÃO 1 - Identificação do Processo...")
                             with ui.card().classes('w-full mb-4 p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
                                 ui.label('📋 Identificação do Processo').classes('text-lg font-bold mb-3')
                                 with ui.column().classes('w-full gap-4'):
@@ -489,6 +500,7 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
                                     cases_chips = ui.column().classes('w-full')
                             
                             # Renderizar chips iniciais será feito após definir todas as variáveis
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [DEBUG] Campos criados com sucesso na aba Dados Básicos")
                     
                     # ============================================================
                     # TAB 2: DADOS JURÍDICOS
@@ -884,29 +896,87 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
                 
                 ui.button('SALVAR', icon='save', on_click=do_save).props('color=primary').classes('font-bold shadow-lg')
     
-    # Carregar dados iniciais APÓS sair do contexto do dialog (quando dialog for aberto)
-    def load_initial_data_after_open():
-        """Carrega dados iniciais após o dialog ser aberto."""
+    # Função auxiliar para converter None para string vazia e fazer fallback de nomes
+    def safe_get(key, default='', fallback_key=None):
+        """Retorna valor do campo ou default, convertendo None para string vazia."""
+        # Tenta a chave original
+        value = dados.get(key)
+        
+        # Se não encontrou e há fallback, tenta o fallback
+        if value is None and fallback_key:
+            value = dados.get(fallback_key)
+        
+        # Se ainda None ou vazio, retorna default
+        if value is None or value == '':
+            return default
+        
+        # Converte para string se necessário
+        return str(value) if value else default
+    
+    # Popular campos ANTES de abrir o dialog (corrige race condition)
+    def populate_all_fields():
+        """Popula todos os campos do formulário com dados do processo."""
         if is_edicao:
             try:
-                # Preencher campos básicos
-                title_input.value = dados.get('titulo', '')
-                number_input.value = dados.get('numero', '')
-                link_input.value = dados.get('link', '')
-                type_select.value = dados.get('tipo', 'Judicial')
-                data_abertura_input.value = dados.get('data_abertura', '')
-                system_select.value = dados.get('sistema_processual', '')
-                area_select.value = dados.get('area', '')
-                estado_select.value = dados.get('estado', 'Santa Catarina')
-                comarca_input.value = dados.get('comarca', '')
-                vara_input.value = dados.get('vara', '')
-                status_select.value = dados.get('status', 'Ativo')
-                result_select.value = dados.get('resultado', 'Pendente')
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                processo_id = state.get('process_id') or 'SEM_ID'
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] Iniciando população de campos para processo ID: {processo_id}")
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] Campos disponíveis em dados: {list(dados.keys())}")
                 
-                # Carregar cenários
+                # ============================================================
+                # CAMPOS BÁSICOS (Aba 1)
+                # ============================================================
+                title_input.value = safe_get('titulo', '', 'title')
+                number_input.value = safe_get('numero', '', 'number')
+                link_input.value = safe_get('link', '')
+                type_select.value = safe_get('tipo', 'Judicial') or 'Judicial'
+                data_abertura_input.value = safe_get('data_abertura', '')
+                
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ Campos básicos populados")
+                
+                # ============================================================
+                # CAMPOS JURÍDICOS (Aba 2)
+                # ============================================================
+                system_select.value = safe_get('sistema_processual', '')
+                area_select.value = safe_get('area', '')
+                estado_select.value = safe_get('estado', 'Santa Catarina') or 'Santa Catarina'
+                comarca_input.value = safe_get('comarca', '')
+                vara_input.value = safe_get('vara', '')
+                status_select.value = safe_get('status', 'Ativo') or 'Ativo'
+                result_select.value = safe_get('resultado', 'Pendente') or 'Pendente'
+                
+                # Atualizar visibilidade do campo resultado
+                toggle_result()
+                
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ Campos jurídicos populados")
+                
+                # ============================================================
+                # CAMPOS RELATÓRIO (Aba 3) - CORRIGIDO: agora são populados
+                # ============================================================
+                relatory_facts_input.value = safe_get('relatory_facts', '')
+                relatory_timeline_input.value = safe_get('relatory_timeline', '')
+                relatory_documents_input.value = safe_get('relatory_documents', '')
+                
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ Campos de relatório populados")
+                
+                # ============================================================
+                # CAMPOS ESTRATÉGIA (Aba 4) - CORRIGIDO: agora são populados
+                # ============================================================
+                objectives_input.value = safe_get('strategy_objectives', '')
+                thesis_input.value = safe_get('legal_thesis', '')
+                # Tenta strategy_observations primeiro, depois observacoes como fallback
+                observations_input.value = safe_get('strategy_observations', '') or safe_get('observacoes', '')
+                
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ Campos de estratégia populados")
+                
+                # ============================================================
+                # CENÁRIOS (Aba 5)
+                # ============================================================
                 if dados.get('scenarios') and isinstance(dados.get('scenarios'), list):
                     state['scenarios'] = dados.get('scenarios')
+                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ {len(state['scenarios'])} cenário(s) carregado(s) da lista")
                 else:
+                    # Migração: converter campos antigos para nova estrutura
                     state['scenarios'] = []
                     if dados.get('cenario_melhor'):
                         state['scenarios'].append({'title': 'Melhor Cenário', 'type': '🟢 Positivo', 'obs': dados.get('cenario_melhor')})
@@ -914,40 +984,50 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
                         state['scenarios'].append({'title': 'Cenário Intermediário', 'type': '⚪ Neutro', 'obs': dados.get('cenario_intermediario')})
                     if dados.get('cenario_pior'):
                         state['scenarios'].append({'title': 'Pior Cenário', 'type': '🔴 Negativo', 'obs': dados.get('cenario_pior')})
+                    if state['scenarios']:
+                        print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ {len(state['scenarios'])} cenário(s) migrado(s) de campos antigos")
                 
-                # Carregar protocolos
+                # ============================================================
+                # PROTOCOLOS (Aba 6)
+                # ============================================================
                 if dados.get('protocols') and isinstance(dados.get('protocols'), list):
                     state['protocols'] = dados.get('protocols')
+                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ {len(state['protocols'])} protocolo(s) carregado(s)")
+                else:
+                    state['protocols'] = []
                 
-                # Renderizar chips após um pequeno delay para garantir que elementos existam
-                def render_chips_delayed():
-                    try:
-                        refresh_chips(client_chips, state['selected_clients'], 'clients', todas_pessoas)
-                        if isinstance(state['selected_opposing'], list):
-                            refresh_chips(opposing_chips, state['selected_opposing'], 'opposing', todas_pessoas)
-                        refresh_chips(others_chips, state['selected_others'], 'others', todas_pessoas)
-                        refresh_chips(cases_chips, state['selected_cases'], 'cases', None)
-                        if state.get('processo_pai_id'):
-                            refresh_parent_chips(parent_process_chips, state['processo_pai_id'])
-                        
-                        # Atualizar renderizações
-                        render_scenarios.refresh()
-                        render_protocols.refresh()
-                        toggle_result()
-                    except Exception as e:
-                        print(f"[DIALOG] Erro ao renderizar chips: {e}")
-                        import traceback
-                        traceback.print_exc()
+                # ============================================================
+                # RENDERIZAR CHIPS (Clientes, Parte Contrária, Casos, etc)
+                # ============================================================
+                try:
+                    refresh_chips(client_chips, state['selected_clients'], 'clients', todas_pessoas)
+                    if isinstance(state['selected_opposing'], list):
+                        refresh_chips(opposing_chips, state['selected_opposing'], 'opposing', todas_pessoas)
+                    refresh_chips(others_chips, state['selected_others'], 'others', todas_pessoas)
+                    refresh_chips(cases_chips, state['selected_cases'], 'cases', None)
+                    if state.get('processo_pai_id'):
+                        refresh_parent_chips(parent_process_chips, state['processo_pai_id'])
+                    
+                    # Nota: render_scenarios e render_protocols são @ui.refreshable
+                    # e serão atualizados automaticamente quando necessário
+                    # Não precisam ser forçados aqui para evitar re-renderização que limpa o conteúdo
+                    
+                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ Chips renderizados")
+                except Exception as e:
+                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ⚠ Erro ao renderizar chips: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
-                # Usa timer para garantir que elementos estão no DOM
-                ui.timer(0.1, render_chips_delayed, once=True)
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ População de campos concluída com sucesso")
                 
             except Exception as e:
-                print(f"[DIALOG] Erro ao carregar dados iniciais: {e}")
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ❌ Erro ao popular campos: {e}")
                 import traceback
                 traceback.print_exc()
+                ui.notify(f'Erro ao carregar dados do processo: {str(e)}', type='warning')
         
-        # Carregar opções de processos pais (sempre)
+        # Carregar opções de processos pais (sempre, mesmo para novo processo)
         try:
             all_procs = listar_processos_pais()
             parent_options = []
@@ -963,12 +1043,20 @@ def abrir_dialog_processo(processo: Optional[dict] = None, on_save: Optional[Cal
             
             parent_process_sel.options = parent_options if parent_options else ['— Nenhum (processo raiz) —']
         except Exception as e:
-            print(f"[DIALOG] Erro ao carregar processos pais: {e}")
+            print(f"[MODAL_VG] Erro ao carregar processos pais: {e}")
             parent_process_sel.options = ['— Nenhum (processo raiz) —']
     
-    # Executa após dialog ser aberto usando timer
-    ui.timer(0.2, load_initial_data_after_open, once=True)
+    # Popular campos ANTES de abrir o dialog (como no modal que funciona)
+    # Isso evita race condition e garante que o conteúdo esteja pronto quando o dialog abrir
+    if is_edicao:
+        try:
+            populate_all_fields()
+        except Exception as e:
+            print(f"[MODAL_VG] Erro ao popular campos: {e}")
+            import traceback
+            traceback.print_exc()
     
+    # Abrir dialog DEPOIS de popular os campos
     dialog.open()
 
 
@@ -1001,3 +1089,6 @@ def confirmar_exclusao(processo: dict, on_confirm: Optional[Callable] = None):
             ui.button('Excluir', on_click=executar_exclusao).props('color=negative')
     
     dialog.open()
+
+
+

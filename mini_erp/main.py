@@ -212,7 +212,7 @@ def start_server_safe():
         'port': port,
         'host': '0.0.0.0',
         'reload': False,  # CORRIGIDO: Desabilitado para evitar conflito com watchfiles (dev_server.py)
-        'show': not is_dev_server,
+        'show': False,  # NUNCA abrir navegador automaticamente - controle externo via script
         'show_welcome_message': False,
         'storage_secret': 'taques-erp-secret-key-2024',
         'binding_refresh_interval': 3.0,

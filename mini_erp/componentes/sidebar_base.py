@@ -234,15 +234,17 @@ def render_sidebar(
                 )
 
 
-def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
+def obter_itens_menu_por_workspace(workspace_id: str, usuario_admin: bool = False) -> List[Dict[str, str]]:
     """
     Retorna os itens de menu para um workspace específico.
+    Filtra itens que requerem permissão de administrador.
 
     Args:
         workspace_id: ID do workspace ('area_cliente_schmidmeier' ou 'visao_geral_escritorio')
+        usuario_admin: Se True, inclui itens restritos a administradores
 
     Returns:
-        Lista de itens de menu configurados para o workspace
+        Lista de itens de menu configurados para o workspace (filtrados por permissão)
     """
     # Menu do workspace "Área do cliente: Schmidmeier"
     MENU_AREA_CLIENTE = [
@@ -252,13 +254,14 @@ def obter_itens_menu_por_workspace(workspace_id: str) -> List[Dict[str, str]]:
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/processos'},
         {'icone': 'handshake', 'titulo': 'Acordos/parcelamentos', 'rota': '/acordos'},
-        # REMOVIDO: Item "Pessoas" removido do menu após migração para Visão Geral
-        # {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/pessoas'},
+        {'icone': 'groups', 'titulo': 'Pessoas', 'rota': '/pessoas'},
         {'icone': 'settings', 'titulo': 'Configurações', 'rota': '/configuracoes'},
     ]
 
     # Menu do workspace "Visão geral do escritório"
     MENU_VISAO_GERAL = [
+        # Central de Comando como PRIMEIRO item (acima de Painel)
+        {'icone': 'hub', 'titulo': 'Central de Comando', 'rota': '/visao-geral/central-comando'},
         {'icone': 'dashboard', 'titulo': 'Painel', 'rota': '/visao-geral/painel'},
         {'icone': 'trending_up', 'titulo': 'Novos Negócios', 'rota': '/visao-geral/novos-negocios'},
         {'icone': 'calendar_month', 'titulo': 'Prazos', 'rota': '/prazos'},

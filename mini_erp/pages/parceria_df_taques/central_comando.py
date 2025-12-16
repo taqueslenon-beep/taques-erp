@@ -115,3 +115,6 @@ def painel_redirect():
     """
     ui.navigate.to('/parceria-df-taques/central-comando')
 
+
+
+

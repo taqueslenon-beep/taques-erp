@@ -234,10 +234,11 @@ def _renderizar_pagina_casos():
         ui.add_head_html(CASO_CARD_CSS)
 
         # Estado dos filtros (simplificado)
+        # Status agora é uma lista para suportar multi-select
         filtros = {
             'busca': '',
             'nucleo': 'Todos',
-            'status': 'Todos',
+            'status': ['Em andamento', 'Em monitoramento'],  # Valores padrão pré-selecionados
             'categoria': 'Todos',
             'estado': 'Todos',
             'prioridade': 'Todas',  # 'Todas' = Todas as prioridades
@@ -306,12 +307,14 @@ def _renderizar_pagina_casos():
                         label='Núcleo'
                     ).classes('w-36').props('dense outlined')
 
-                    # Filtro por status
+                    # Filtro por status (multi-select)
+                    # Permite selecionar múltiplos status simultaneamente
                     status_select = ui.select(
-                        options=['Todos'] + STATUS_OPTIONS,
-                        value='Todos',
-                        label='Status'
-                    ).classes('w-36').props('dense outlined')
+                        options=STATUS_OPTIONS,
+                        value=['Em andamento', 'Em monitoramento'],
+                        label='Status',
+                        multiple=True
+                    ).classes('w-48').props('dense outlined use-chips')
 
                     # Filtro por categoria
                     categoria_select = ui.select(
@@ -345,14 +348,15 @@ def _renderizar_pagina_casos():
                     def limpar_filtros():
                         busca_input.value = ''
                         nucleo_select.value = 'Todos'
-                        status_select.value = 'Todos'
+                        # Volta para valores padrão do multi-select
+                        status_select.value = ['Em andamento', 'Em monitoramento']
                         categoria_select.value = 'Todos'
                         estado_select.value = 'Todos'
                         prioridade_select.value = 'Todas'
                         responsavel_select.value = 'Todos'
                         filtros['busca'] = ''
                         filtros['nucleo'] = 'Todos'
-                        filtros['status'] = 'Todos'
+                        filtros['status'] = ['Em andamento', 'Em monitoramento']
                         filtros['categoria'] = 'Todos'
                         filtros['estado'] = 'Todos'
                         filtros['prioridade'] = 'Todas'
@@ -366,7 +370,8 @@ def _renderizar_pagina_casos():
                     def aplicar_filtros():
                         filtros['busca'] = busca_input.value or ''
                         filtros['nucleo'] = nucleo_select.value
-                        filtros['status'] = status_select.value
+                        # Multi-select retorna lista (ou None se vazio)
+                        filtros['status'] = status_select.value or []
                         filtros['categoria'] = categoria_select.value
                         filtros['estado'] = estado_select.value
                         filtros['prioridade'] = prioridade_select.value
@@ -423,10 +428,15 @@ def _renderizar_grid_cards(filtros: dict, refresh_ref: dict, usuarios_firebase: 
     total = len(casos_filtrados)
     total_geral = len(todos_casos)
 
+    # Verifica se status está diferente dos valores padrão
+    status_padrao = ['Em andamento', 'Em monitoramento']
+    status_atual = filtros.get('status', [])
+    tem_filtro_status = isinstance(status_atual, list) and set(status_atual) != set(status_padrao)
+    
     tem_filtros = (
         filtros['busca'] or
         filtros['nucleo'] != 'Todos' or
-        filtros['status'] != 'Todos' or
+        tem_filtro_status or
         filtros['categoria'] != 'Todos' or
         filtros['estado'] != 'Todos' or
         (filtros['prioridade'] and filtros['prioridade'] != 'Todas') or
@@ -544,10 +554,13 @@ def _aplicar_filtros(casos: list, filtros: dict, usuarios_firebase: list = None)
     if nucleo_filtro and nucleo_filtro != 'Todos':
         resultado = [c for c in resultado if c.get('nucleo') == nucleo_filtro]
 
-    # Filtro por status
-    status_filtro = filtros.get('status', 'Todos')
-    if status_filtro and status_filtro != 'Todos':
-        resultado = [c for c in resultado if c.get('status') == status_filtro]
+    # Filtro por status (multi-select)
+    # Agora trata status_filtro como lista ao invés de string
+    status_filtro = filtros.get('status', [])
+    if status_filtro and isinstance(status_filtro, list) and len(status_filtro) > 0:
+        # Filtra casos onde status está na lista selecionada
+        resultado = [c for c in resultado if c.get('status') in status_filtro]
+    # Se lista vazia ou None, não aplica filtro (mostra todos)
 
     # Filtro por categoria
     categoria_filtro = filtros.get('categoria', 'Todos')

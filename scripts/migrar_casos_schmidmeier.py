@@ -484,3 +484,6 @@ if __name__ == '__main__':
             print("❌ Migração cancelada pelo usuário")
     else:
         print("⚠️  Nenhum caso para migrar ou erro na verificação")
+
+
+

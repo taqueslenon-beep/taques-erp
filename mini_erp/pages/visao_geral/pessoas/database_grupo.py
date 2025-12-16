@@ -366,3 +366,6 @@ def inicializar_grupo_schmidmeier() -> Optional[str]:
         traceback.print_exc()
         return None
 
+
+
+

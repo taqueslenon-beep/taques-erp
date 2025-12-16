@@ -372,3 +372,6 @@ def migracao_casos():
         btn_migrar.on('click', executar_migracao)
         btn_rollback.on('click', executar_rollback)
         btn_atualizar.on('click', atualizar_preview)
+
+
+

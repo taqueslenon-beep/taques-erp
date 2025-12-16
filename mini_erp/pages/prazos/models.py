@@ -95,3 +95,6 @@ class Prazo(TypedDict, total=False):
     criado_por: str  # user_id
 
 
+
+
+

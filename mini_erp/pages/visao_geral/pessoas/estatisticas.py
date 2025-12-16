@@ -241,3 +241,6 @@ def _renderizar_pagina_estatisticas():
                     create_empty_chart_state('Nenhum parceiro cadastrado.')
 
 
+
+
+

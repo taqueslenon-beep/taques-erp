@@ -349,3 +349,6 @@ if __name__ == '__main__':
     print("⚠️  Este script deve ser usado via interface web ou passando lista de envolvidos editados")
     print("Use: migrar_envolvidos_schmidmeier(lista_envolvidos, dry_run=False)")
 
+
+
+

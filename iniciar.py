@@ -97,9 +97,16 @@ def main():
     # Mudar para pasta do projeto
     os.chdir(PASTA_PROJETO)
     
-    # Iniciar thread para abrir navegador
-    thread = threading.Thread(target=lambda: abrir_navegador(porta), daemon=True)
-    thread.start()
+    # Verifica se DEV_SERVER está definido (não abre navegador automaticamente)
+    is_dev_server = os.environ.get('DEV_SERVER', '').lower() == 'true'
+    
+    # Iniciar thread para abrir navegador apenas se não for dev_server
+    if not is_dev_server:
+        thread = threading.Thread(target=lambda: abrir_navegador(porta), daemon=True)
+        thread.start()
+    else:
+        print(f'\n📝 Modo DEV_SERVER: Navegador não será aberto automaticamente')
+        print(f'   Acesse manualmente: http://{HOST}:{porta}\n')
     
     # Define variável de ambiente para a porta
     os.environ['APP_PORT'] = str(porta)

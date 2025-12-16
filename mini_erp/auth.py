@@ -69,32 +69,6 @@ def is_authenticated() -> bool:
     """Verifica se há um usuário autenticado na sessão."""
     return get_current_user() is not None
 
-def is_developer() -> bool:
-    """
-    Verifica se o usuário atual é desenvolvedor.
-    
-    Verifica se o email do usuário logado é 'taqueslenon@gmail.com'.
-    
-    Returns:
-        True se for desenvolvedor, False caso contrário
-    """
-    user = get_current_user()
-    if not user:
-        print("[DEBUG is_developer] Usuário não encontrado")
-        return False
-    
-    email = user.get('email', '')
-    if not email:
-        print(f"[DEBUG is_developer] Email não encontrado. User: {user}")
-        return False
-    
-    email_lower = email.lower()
-    is_dev = email_lower == 'taqueslenon@gmail.com'
-    print(f"[DEBUG is_developer] Email: {email_lower}, É desenvolvedor: {is_dev}")
-    
-    # Verifica se é o email do desenvolvedor
-    return is_dev
-
 def logout_user():
     """Remove o usuário da sessão (logout)."""
     app.storage.user.pop('user', None)
@@ -318,6 +292,27 @@ def identificar_tipo_usuario(uid: str) -> str:
     
     # 3. Se não conseguiu identificar, retorna desconhecido
     return 'desconhecido'
+
+
+def is_admin() -> bool:
+    """
+    Verifica se o usuário atual é administrador.
+    
+    Verifica se o tipo de usuário identificado é 'admin'.
+    
+    Returns:
+        True se for administrador, False caso contrário
+    """
+    user = get_current_user()
+    if not user:
+        return False
+    
+    uid = user.get('uid')
+    if not uid:
+        return False
+    
+    tipo = identificar_tipo_usuario(uid)
+    return tipo == 'admin'
 
 
 

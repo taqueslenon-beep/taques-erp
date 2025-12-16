@@ -317,3 +317,6 @@ def migracao_clientes():
         
         refresh_resumo()
 
+
+
+

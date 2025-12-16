@@ -1,72 +1,57 @@
 #!/bin/bash
 
-# Script para reiniciar servidor TAQUES-ERP via Raycast
-# Mata processos Python do projeto e reinicia o servidor
+# Required parameters:
+# @raycast.schemaVersion 1
+# @raycast.title Reiniciar TAQUES-ERP
+# @raycast.mode compact
 
-# Cores para output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Optional parameters:
+# @raycast.icon 🔄
+# @raycast.packageName TAQUES-ERP
 
-echo -e "${YELLOW}🔄 Reiniciando servidor TAQUES-ERP...${NC}"
+# Documentation:
+# @raycast.description Reinicia o servidor do sistema TAQUES-ERP
 
-# Diretório do projeto
+# Configurações
 PROJECT_DIR="/Users/lenontaques/Documents/taques-erp"
+PORTA=8081
+MAX_TENTATIVAS=15
 
-# Mata processos Python do projeto
-echo -e "${YELLOW}⏹️  Encerrando processos existentes...${NC}"
-
-pkill -f "python.*taques-erp" 2>/dev/null
-pkill -f "python.*iniciar.py" 2>/dev/null
-pkill -f "python.*dev_server" 2>/dev/null
-pkill -f "python.*mini_erp" 2>/dev/null
-
-# Aguarda processos terminarem
-sleep 1
-
-# Verifica se ainda há processos rodando
-if pgrep -f "python.*taques-erp\|python.*iniciar.py\|python.*dev_server\|python.*mini_erp" > /dev/null; then
-    echo -e "${RED}⚠️  Alguns processos ainda estão rodando. Tentando forçar encerramento...${NC}"
-    pkill -9 -f "python.*taques-erp" 2>/dev/null
-    pkill -9 -f "python.*iniciar.py" 2>/dev/null
-    pkill -9 -f "python.*dev_server" 2>/dev/null
-    pkill -9 -f "python.*mini_erp" 2>/dev/null
-    sleep 1
-fi
-
-# Muda para o diretório do projeto
-cd "$PROJECT_DIR" || {
-    echo -e "${RED}❌ Erro: Não foi possível acessar o diretório do projeto${NC}"
-    exit 1
+# Função para verificar se servidor está respondendo
+verificar_servidor() {
+    curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORTA" 2>/dev/null | grep -q "200\|302"
 }
 
-# Ativa ambiente virtual se existir
-if [ -d ".venv" ]; then
-    echo -e "${YELLOW}🐍 Ativando ambiente virtual...${NC}"
-    source .venv/bin/activate
-elif [ -d "venv" ]; then
-    echo -e "${YELLOW}🐍 Ativando ambiente virtual...${NC}"
-    source venv/bin/activate
-else
-    echo -e "${YELLOW}⚠️  Ambiente virtual não encontrado. Usando Python do sistema.${NC}"
-fi
+# 1. Mata TODOS os processos Python do projeto
+pkill -9 -f "python.*taques-erp" 2>/dev/null
+pkill -9 -f "python.*iniciar.py" 2>/dev/null
+pkill -9 -f "python.*dev_server" 2>/dev/null
+pkill -9 -f "python.*mini_erp" 2>/dev/null
 
-# Inicia o servidor em background
-echo -e "${GREEN}🚀 Iniciando servidor...${NC}"
-python3 iniciar.py > /dev/null 2>&1 &
-
-# Aguarda um pouco para o servidor iniciar
+# 2. Aguarda processos morrerem completamente
 sleep 2
 
-# Verifica se o servidor iniciou
-if pgrep -f "python.*iniciar.py\|python.*dev_server\|python.*mini_erp" > /dev/null; then
-    echo -e "${GREEN}✅ Servidor TAQUES-ERP reiniciado com sucesso!${NC}"
-    echo -e "${GREEN}🌐 Acesse: http://localhost:8081${NC}"
-else
-    echo -e "${RED}❌ Erro: Servidor não iniciou corretamente${NC}"
-    echo -e "${YELLOW}💡 Tente executar manualmente: python3 iniciar.py${NC}"
-    exit 1
-fi
+# 3. Libera porta se ainda estiver ocupada
+lsof -ti:$PORTA | xargs kill -9 2>/dev/null
+sleep 1
 
+# 4. Inicia o servidor em background (com DEV_SERVER=true para evitar abertura automática)
+cd "$PROJECT_DIR" || exit 1
+source .venv/bin/activate
+DEV_SERVER=true python3 iniciar.py > /dev/null 2>&1 &
 
+# 5. Aguarda servidor iniciar (com timeout)
+tentativa=0
+while [ $tentativa -lt $MAX_TENTATIVAS ]; do
+    sleep 1
+    if verificar_servidor; then
+        # 6. Abre UMA única aba no navegador
+        open "http://localhost:$PORTA"
+        echo "✅ Servidor TAQUES-ERP reiniciado!"
+        exit 0
+    fi
+    tentativa=$((tentativa + 1))
+done
+
+echo "⚠️ Servidor iniciado mas não respondeu em $MAX_TENTATIVAS segundos"
+exit 1

@@ -260,3 +260,6 @@ def validar_processo(dados: dict) -> tuple:
         return False, 'Resultado inválido.'
 
     return True, None
+
+
+

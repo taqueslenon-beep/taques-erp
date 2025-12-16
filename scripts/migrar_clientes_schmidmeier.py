@@ -439,3 +439,6 @@ if __name__ == '__main__':
         relatorio = migrar_clientes_schmidmeier(dry_run=args.dry_run)
         print(f"\n📄 Relatório salvo com timestamp: {relatorio['timestamp']}")
 
+
+
+

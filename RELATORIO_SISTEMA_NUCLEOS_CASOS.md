@@ -456,3 +456,6 @@ if nucleo_filtro and nucleo_filtro != 'Todos':
 5. **Reutilização possível** - Se os núcleos forem os mesmos, pode importar de `casos.models`
 
 
+
+
+

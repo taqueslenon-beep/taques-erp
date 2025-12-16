@@ -165,3 +165,6 @@ def card_usuarios(usuarios: List[Dict[str, Any]]) -> None:
                 ui.icon('info', size='xs').classes('text-blue-500')
                 ui.label('💡 Usuários em amarelo não têm login no Firebase Auth (apenas em usuarios_sistema)').classes('text-xs text-gray-500 italic')
 
+
+
+

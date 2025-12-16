@@ -2275,16 +2275,6 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             # DIREITA - Elementos alinhados
             with ui.row().style('align-items: center; gap: 16px; color: white;'):
-                # Botão /dev - Apenas para desenvolvedores
-                user_data = app.storage.user.get('user', {})
-                user_email = user_data.get('email', '').lower() if user_data else ''
-                if user_email == 'taqueslenon@gmail.com':
-                    ui.button(icon='code', on_click=lambda: ui.navigate.to('/dev')) \
-                        .props('flat dense round') \
-                        .classes('q-mr-sm') \
-                        .tooltip('Painel do Desenvolvedor') \
-                        .style('color: white; background-color: rgba(255,255,255,0.15); min-width: 40px; min-height: 40px;')
-                
                 # Workspace - Dropdown de seleção
                 from .componentes.dropdown_workspace import render_workspace_dropdown
                 render_workspace_dropdown()
@@ -2447,10 +2437,14 @@ def layout(page_title: str, breadcrumbs: list = None):
     # Sidebar - Renderiza baseado no workspace ativo
     from .componentes.sidebar_base import render_sidebar, obter_itens_menu_por_workspace
     from .gerenciadores.gerenciador_workspace import obter_workspace_atual
+    from .auth import is_admin
 
-    # Obtém workspace atual e itens de menu correspondentes
+    # Obtém workspace atual e verifica se usuário é admin
     workspace_atual = obter_workspace_atual()
-    itens_menu = obter_itens_menu_por_workspace(workspace_atual)
+    usuario_admin = is_admin()
+    
+    # Obtém itens de menu correspondentes (filtrados por permissão)
+    itens_menu = obter_itens_menu_por_workspace(workspace_atual, usuario_admin=usuario_admin)
 
     # Obtém rota atual para destacar item ativo
     # app já está importado no topo do arquivo
