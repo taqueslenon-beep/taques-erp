@@ -16,16 +16,18 @@ def get_short_name(full_name: str, source_list: List[Dict[str, Any]]) -> str:
         return full_name.split()[0] if full_name else full_name
     
     for item in source_list:
+        # Tenta combinar com diferentes campos de nome
         item_name = item.get('name') or item.get('full_name', '')
+        item_nome_exibicao = item.get('nome_exibicao', '')
+        item_nome_completo = item.get('nome_completo', '')
         item_display = get_display_name(item)
         
-        if item_name == full_name or item_display == full_name:
+        if full_name in [item_name, item_nome_exibicao, item_nome_completo, item_display]:
             display_name = get_display_name(item)
             if display_name:
                 return display_name
-            nome_exibicao = item.get('nome_exibicao', '').strip()
-            if nome_exibicao:
-                return nome_exibicao
+            if item_nome_exibicao:
+                return item_nome_exibicao
     
     return full_name.split()[0] if full_name else full_name
 
@@ -35,7 +37,12 @@ def format_option_for_search(item: Dict[str, Any]) -> str:
     display_name = get_display_name(item)
     if display_name:
         return display_name
-    return item.get('name', '') or item.get('full_name', '')
+    # Fallback para envolvidos/parceiros que usam campos diferentes
+    return (item.get('nome_exibicao', '') or 
+            item.get('nome_completo', '') or 
+            item.get('name', '') or 
+            item.get('full_name', '') or
+            'Sem nome')
 
 
 def get_option_value(formatted_option: str, source_list: List[Dict[str, Any]]) -> str:

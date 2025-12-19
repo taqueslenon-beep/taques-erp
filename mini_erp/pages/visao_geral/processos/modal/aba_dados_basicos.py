@@ -47,12 +47,12 @@ def render_aba_dados_basicos(
         'others': '#2196F3',
         'cases': '#9C27B0'
     }
-    
-    # Helper para refresh chips
+
+    # Helper para refresh chips (ainda usado por Clientes/Casos/Processo Pai)
     def refresh_chips(container, items, tag_type, source_list):
-        container.clear()
         safe_source = source_list or []
         chip_color = TAG_COLORS.get(tag_type, '#6B7280')
+        container.clear()
         with container:
             with ui.row().classes('w-full gap-1 flex-wrap min-h-8'):
                 for item in items:
@@ -70,19 +70,18 @@ def render_aba_dados_basicos(
     
     def add_item(select, list_ref, container, tag_type, source_list):
         val = select.value
-        if val and val != '-' and val not in list_ref:
-            full_name = get_option_value(val, source_list) if source_list else val
-            display_name = full_name
-            if source_list:
-                for person in source_list:
-                    person_full_name = person.get('full_name') or person.get('name', '')
-                    if person_full_name == full_name:
-                        display_name = get_display_name(person)
-                        break
-            if display_name not in list_ref:
-                list_ref.append(display_name)
-                select.value = None
-                refresh_chips(container, list_ref, tag_type, source_list)
+        if not val or val == '-' or val == '— Nenhum envolvido/parceiro cadastrado —':
+            return
+        
+        if val in list_ref:
+            ui.notify('Item já adicionado', type='warning', timeout=1500)
+            return
+        
+        # O valor selecionado já é o display_name
+        list_ref.append(val)
+        select.value = None
+        refresh_chips(container, list_ref, tag_type, source_list)
+        ui.notify(f'Adicionado: {val}', type='positive', timeout=1500)
     
     # Helper para processos pais (usa lista já carregada)
     def refresh_parent_chips(container, processo_pai_id):
@@ -297,32 +296,36 @@ def render_aba_dados_basicos(
                     # Parte Contrária (usa envolvidos e parceiros, não clientes)
                     opposing_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
                     with ui.column().classes('flex-1 gap-2'):
-                        with ui.row().classes('w-full gap-2 items-center'):
-                            opposing_sel = ui.select(
-                                opposing_options or ['— Nenhum envolvido/parceiro cadastrado —'],
-                                label='Parte Contrária',
-                                with_input=True
-                            ).classes('flex-grow').props('dense outlined')
-                            ui.button(
-                                icon='add',
-                                on_click=lambda: add_item(opposing_sel, state['selected_opposing'], opposing_chips, 'opposing', envolvidos_e_parceiros)
-                            ).props('flat dense').style('color: #F44336;')
-                        opposing_chips = ui.column().classes('w-full')
+                        opposing_sel = ui.select(
+                            opposing_options or [],
+                            label='Parte Contrária',
+                            value=state.get('selected_opposing', []) or [],
+                            with_input=True,
+                            multiple=True,
+                        ).classes('w-full').props('dense outlined use-chips')
+
+                        def _sync_opposing(_e=None):
+                            state['selected_opposing'] = opposing_sel.value or []
+
+                        opposing_sel.on_value_change(_sync_opposing)
+                        _sync_opposing()
                 
                 # Outros Envolvidos (usa envolvidos e parceiros, não clientes)
                 others_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
                 with ui.column().classes('w-full gap-2'):
-                    with ui.row().classes('w-full gap-2 items-center'):
-                        others_sel = ui.select(
-                            others_options or ['— Nenhum envolvido/parceiro cadastrado —'],
-                            label='Outros Envolvidos',
-                            with_input=True
-                        ).classes('flex-grow').props('dense outlined')
-                        ui.button(
-                            icon='add',
-                            on_click=lambda: add_item(others_sel, state['selected_others'], others_chips, 'others', envolvidos_e_parceiros)
-                        ).props('flat dense').style('color: #2196F3;')
-                    others_chips = ui.column().classes('w-full')
+                    others_sel = ui.select(
+                        others_options or [],
+                    label='Outros Envolvidos',
+                        value=state.get('selected_others', []) or [],
+                        with_input=True,
+                        multiple=True,
+                    ).classes('w-full').props('dense outlined use-chips')
+
+                    def _sync_others(_e=None):
+                        state['selected_others'] = others_sel.value or []
+
+                    others_sel.on_value_change(_sync_others)
+                    _sync_others()
         
         # SEÇÃO 3 - Vínculos
         with ui.card().classes('w-full mb-4 p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
@@ -371,8 +374,6 @@ def render_aba_dados_basicos(
         'cases_sel': cases_sel,
         'parent_process_sel': parent_process_sel,
         'client_chips': client_chips,
-        'opposing_chips': opposing_chips,
-        'others_chips': others_chips,
         'cases_chips': cases_chips,
         'parent_process_chips': parent_process_chips,
         'refresh_chips': refresh_chips,

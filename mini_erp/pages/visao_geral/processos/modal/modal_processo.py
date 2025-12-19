@@ -221,6 +221,18 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
         dados = criar_processo_vazio()
         print(f"[{timestamp}] [MODAL_VG] Novo processo criado com dados vazios")
     
+    def _normalizar_lista_texto(valor: Any) -> List[str]:
+        """Normaliza valores (string/list) para lista de strings (sem vazios)."""
+        if not valor:
+            return []
+        if isinstance(valor, list):
+            return [str(v).strip() for v in valor if str(v).strip()]
+        if isinstance(valor, str):
+            # Aceita valores antigos salvos como "A, B, C"
+            partes = [p.strip() for p in valor.split(',')]
+            return [p for p in partes if p]
+        return [str(valor).strip()] if str(valor).strip() else []
+
     # Estado local
     state = {
         'is_editing': is_edicao,
@@ -229,14 +241,12 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
         'scenarios': [],
         'protocols': dados.get('protocols', []) if isinstance(dados.get('protocols'), list) else [],
         'selected_clients': dados.get('clientes', []) if isinstance(dados.get('clientes'), list) else [],
-        'selected_opposing': dados.get('parte_contraria', '') if isinstance(dados.get('parte_contraria'), str) else (dados.get('parte_contraria', []) if isinstance(dados.get('parte_contraria'), list) else []),
-        'selected_others': [],
+        # Parte contrária pode vir como string (legado) ou lista
+        'selected_opposing': _normalizar_lista_texto(dados.get('parte_contraria')),
+        # Outros envolvidos (novo campo no VG) pode vir como string (legado) ou lista
+        'selected_others': _normalizar_lista_texto(dados.get('outros_envolvidos')),
         'selected_cases': [dados.get('caso_titulo')] if dados.get('caso_titulo') else [],
     }
-    
-    # Converter parte contrária de string para lista se necessário
-    if isinstance(state['selected_opposing'], str) and state['selected_opposing']:
-        state['selected_opposing'] = [state['selected_opposing']]
     
     # Carregar dados auxiliares em paralelo (com cache)
     dados_carregados = carregar_dados_modal()
@@ -392,6 +402,13 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         parte_contraria = ', '.join(state['selected_opposing']) if state['selected_opposing'] else ''
                     else:
                         parte_contraria = str(state['selected_opposing']) if state['selected_opposing'] else ''
+
+                    # Normalizar outros envolvidos
+                    outros_envolvidos = ''
+                    if isinstance(state.get('selected_others'), list):
+                        outros_envolvidos = ', '.join(state['selected_others']) if state['selected_others'] else ''
+                    else:
+                        outros_envolvidos = str(state.get('selected_others') or '') if state.get('selected_others') else ''
                     
                     # Buscar UID do responsável pelo nome (usa lista já carregada)
                     responsavel_uid = ''
@@ -421,6 +438,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                             for cid in state['selected_clients']
                         ],
                         'parte_contraria': parte_contraria,
+                        'outros_envolvidos': outros_envolvidos,
                         'processo_pai_id': processo_pai_id,
                         'processo_pai_titulo': processo_pai_titulo,
                         'status': aba_juridicos_refs.get('status_select', {}).value if aba_juridicos_refs.get('status_select') else 'Em andamento',
@@ -590,10 +608,11 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                 try:
                     if 'refresh_chips' in aba_basicos_refs and 'client_chips' in aba_basicos_refs:
                         aba_basicos_refs['refresh_chips'](aba_basicos_refs['client_chips'], state['selected_clients'], 'clients', todas_pessoas)
-                    if isinstance(state['selected_opposing'], list) and 'opposing_chips' in aba_basicos_refs:
-                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['opposing_chips'], state['selected_opposing'], 'opposing', envolvidos_e_parceiros)
-                    if 'others_chips' in aba_basicos_refs:
-                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['others_chips'], state['selected_others'], 'others', envolvidos_e_parceiros)
+                    # Parte contrária / Outros envolvidos agora são seleção múltipla (chips nativos)
+                    if 'opposing_sel' in aba_basicos_refs:
+                        aba_basicos_refs['opposing_sel'].value = state.get('selected_opposing', []) or []
+                    if 'others_sel' in aba_basicos_refs:
+                        aba_basicos_refs['others_sel'].value = state.get('selected_others', []) or []
                     if 'cases_chips' in aba_basicos_refs:
                         aba_basicos_refs['refresh_chips'](aba_basicos_refs['cases_chips'], state['selected_cases'], 'cases', None)
                     if state.get('processo_pai_id') and 'refresh_parent_chips' in aba_basicos_refs and 'parent_process_chips' in aba_basicos_refs:
