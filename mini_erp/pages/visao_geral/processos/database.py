@@ -144,6 +144,35 @@ def buscar_processo(processo_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def buscar_processo_por_numero(numero: str) -> Optional[Dict[str, Any]]:
+    """Busca um processo pelo número (campo 'numero')."""
+    try:
+        numero = (numero or '').strip()
+        if not numero:
+            return None
+
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return None
+
+        query = db.collection(COLECAO_PROCESSOS).where('numero', '==', numero).limit(1)
+        docs = list(query.stream())
+        if not docs:
+            return None
+
+        doc = docs[0]
+        processo = doc.to_dict()
+        processo['_id'] = doc.id
+        processo = _converter_timestamps(processo)
+        return processo
+    except Exception as e:
+        print(f"Erro ao buscar processo por número {numero}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def criar_processo(dados: Dict[str, Any]) -> Optional[str]:
     """
     Cria um novo processo na coleção.
