@@ -1,744 +1,195 @@
 """
-Página de migração/vinculação de Processos → Casos (Visão Geral).
-
-Inclui:
-- Importação de planilha do Eproc (XLSX/CSV) com preview;
-- Criação/atualização em lote de vg_processos;
-- Vinculação em lote de processos a um Caso (vg_casos).
-
+Migração de Processos - Planilha Lenon 2025 (106 processos embutidos)
 Rota: /visao-geral/migracao-processos
 """
-
-from datetime import datetime
 from typing import Dict, Any, List
-
 from nicegui import ui
-from nicegui import events
-
-import asyncio
-import io
-import inspect
-import os
-import re
-import unicodedata
-import difflib
-from pathlib import Path
+import re, unicodedata, difflib
 
 from ...core import layout
 from ...auth import is_authenticated
 from ...gerenciadores.gerenciador_workspace import definir_workspace
-from ...firebase_config import ensure_firebase_initialized
-from ...firebase_config import get_auth
-from ...storage import obter_display_name
-
-from .processos.database import listar_processos, atualizar_campos_processo, buscar_processo_por_numero, criar_processo
-from .casos.database import listar_casos
+from ...firebase_config import ensure_firebase_initialized, get_auth
+from .processos.database import atualizar_campos_processo, buscar_processo_por_numero, criar_processo
 from .pessoas.database import listar_pessoas, listar_envolvidos, listar_parceiros
 
-try:
-    import pandas as pd  # type: ignore
-except Exception:  # pragma: no cover
-    pd = None
+PROCESSOS = [
+{"n":"5002318-80.2025.8.24.0055","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"JHONNY SCHMIDMEIER","l":"Rio Negrinho","s":"Crimes contra a Flora","d":"2025-08-29"},
+{"n":"5001851-28.2024.8.24.0026","c":"Procedimento Comum Cível","a":"GERMANO WOEHL JUNIOR","r":"JOSE ADILSON KOBICHEN","l":"Guaramirim","s":"Direito de imagem","d":"2024-04-05"},
+{"n":"5003892-54.2023.8.24.0041","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"REFLORESTA EMPREENDIMENTOS LTDA","l":"Mafra","s":"Destruição ou Degradação","d":"2023-07-06"},
+{"n":"5007539-04.2024.8.24.0015","c":"Procedimento Comum Cível","a":"EDSON LUIS RAABE","r":"IMA","l":"Canoinhas","s":"Anulação de multa ambiental","d":"2024-10-22"},
+{"n":"5002478-31.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"WALDIR JANTSCH","l":"Canoinhas","s":"Flora","d":"2025-04-07"},
+{"n":"5003737-61.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"MARIA PAULA FRIEDRICH","l":"Canoinhas","s":"Flora","d":"2025-05-27"},
+{"n":"5000817-85.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"PEDRO COLACO","l":"Canoinhas","s":"Destruição ou Degradação","d":"2023-01-31"},
+{"n":"5006110-65.2025.8.24.0015","c":"Ação Penal","a":"MPSC","r":"PEDRO COLACO","l":"Canoinhas","s":"Destruição ou Degradação","d":"2025-08-27"},
+{"n":"5005980-75.2025.8.24.0015","c":"Execução ANPP","a":"MPSC","r":"ANDRE DA SILVEIRA","l":"Canoinhas","s":"ANPP","d":"2025-08-22"},
+{"n":"5000504-56.2025.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"ANDRE DA SILVEIRA","l":"Regional Mafra","s":"Destruição ou Degradação","d":"2025-01-24"},
+{"n":"5008581-25.2023.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"MARIA TRINDADE NEVES","l":"Canoinhas","s":"Dano ambiental","d":"2023-10-24"},
+{"n":"5008587-32.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"EDIVAL DOBRYCHTOP","l":"Canoinhas","s":"Fiscalização","d":"2023-10-24"},
+{"n":"5000758-67.2024.8.24.0143","c":"Ação Penal","a":"MPSC","r":"VALDECIR DALCANAL","l":"Rio do Campo","s":"Destruição","d":"2024-06-24"},
+{"n":"5001089-98.2023.8.24.0041","c":"Procedimento Comum Cível","a":"LUCIANE SCHMIDMEIER","r":"ESTADO SC","l":"Mafra","s":"Ambiental","d":"2023-02-28"},
+{"n":"0900172-96.2018.8.24.0015","c":"EXECUÇÃO FISCAL","a":"ESTADO SC","r":"ADIR PEREIRA DA ROCHA","l":"Exec Fiscal","s":"Dívida Ativa","d":"2018-10-04"},
+{"n":"5003114-65.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"MARCELO NIEZELSKI","l":"Canoinhas","s":"Destruição","d":"2023-04-14"},
+{"n":"5001271-95.2025.8.24.0047","c":"CRIMES AMBIENTAIS","a":"MPU","r":"CARLOS AUGUSTO PAPES","l":"Papanduva","s":"Meio Ambiente","d":"2025-07-07"},
+{"n":"0900097-57.2018.8.24.0015","c":"EXECUÇÃO FISCAL","a":"ESTADO SC","r":"WALDIR JANTSCH","l":"Exec Fiscal","s":"Dívida Ativa","d":"2018-08-02"},
+{"n":"5007275-84.2024.8.24.0015","c":"Produção Antecipada Prova","a":"EDSON LUIS RAABE","r":"IMA","l":"Canoinhas","s":"Dano Ambiental","d":"2024-10-11"},
+{"n":"5006402-69.2025.8.24.0041","c":"CUMPRIMENTO DE SENTENÇA","a":"ESTADO SC","r":"LUCIANE SCHMIDMEIER","l":"Mafra","s":"Multas","d":"2025-11-19"},
+{"n":"5002945-20.2019.8.24.0015","c":"EXECUÇÃO FISCAL","a":"ESTADO SC","r":"JOAO VARLEI NEVES","l":"Exec Fiscal","s":"Multas","d":"2019-11-05"},
+{"n":"5006746-31.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"LENON TAQUES","r":"JOSE LUIZ LACOWICZ","l":"Canoinhas","s":"Dano moral","d":"2025-09-19"},
+{"n":"5004560-69.2024.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"PEDRO VATRAZ","l":"Canoinhas","s":"Flora","d":"2024-07-03"},
+{"n":"5006935-94.2025.8.24.0019","c":"Representação Criminal","a":"MPSC","r":"MÁRCIO FABIANO HELBING","l":"Concórdia","s":"Destruição","d":"2025-07-18"},
+{"n":"5003797-20.2025.8.24.0052","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"RICARDO JOSE TEIXEIRA","l":"Porto União","s":"Meio Ambiente","d":"2025-10-01"},
+{"n":"5004968-26.2025.8.24.0015","c":"Ação Penal","a":"MPSC","r":"MARCOS HIROAKI NAGANO","l":"Canoinhas","s":"Ordenamento Urbano","d":"2025-07-15"},
+{"n":"5003919-66.2025.8.24.0041","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"WALDIR JANTSCH","l":"Mafra","s":"Flora","d":"2025-07-18"},
+{"n":"5020293-54.2024.8.24.0022","c":"Execução Pena Multa","a":"MPSC","r":"LUIS BENEDITO PACHECO","l":"Curitibanos","s":"Multa","d":"2024-09-11"},
+{"n":"5009586-53.2021.8.24.0015","c":"Ação Penal","a":"MPSC","r":"LUIS BENEDITO PACHECO","l":"Canoinhas","s":"Poluição","d":"2021-12-17"},
+{"n":"5001854-80.2024.8.24.0026","c":"Calúnia/Difamação","a":"GERMANO WOEHL JUNIOR","r":"JOSE ADILSON KOBICHEN","l":"Guaramirim","s":"Calúnia","d":"2024-04-05"},
+{"n":"5004348-53.2021.8.24.0015","c":"Ação Penal","a":"MPSC","r":"ELIEZER JANTSCH","l":"Canoinhas","s":"Flora","d":"2021-06-18"},
+{"n":"5003215-29.2020.8.24.0041","c":"ACP Cível","a":"MPSC","r":"DANIELLY VENEZIO RODRIGUES","l":"Mafra","s":"Flora","d":"2020-08-13"},
+{"n":"5004465-44.2021.8.24.0015","c":"EXECUÇÃO FISCAL","a":"ESTADO SC","r":"ADAO LUCACHINSKI NETO","l":"Exec Fiscal","s":"Dívida Ativa","d":"2021-06-22"},
+{"n":"5006682-89.2023.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"ANTONIO ROBERTO DE OLIVEIRA","l":"Canoinhas","s":"Dano ambiental","d":"2023-08-14"},
+{"n":"5000136-23.2020.8.24.0015","c":"EXECUÇÃO FISCAL","a":"ESTADO SC","r":"ADIR PEREIRA DA ROCHA","l":"Exec Fiscal","s":"Dívida Ativa","d":"2020-01-10"},
+{"n":"5003918-29.2025.8.24.0026","c":"JUIZADO ESPECIAL","a":"ADRIANO BLASZKOSKI","r":"GERMANO WOEHL JUNIOR","l":"Guaramirim","s":"Dano Moral","d":"2025-07-03"},
+{"n":"5008779-96.2022.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"PEDRO COLACO","l":"Canoinhas","s":"Destruição","d":"2022-12-06"},
+{"n":"5003148-55.2025.8.24.0052","c":"CUMPRIMENTO DE SENTENÇA","a":"IMA","r":"BIG SAFRA S/A","l":"Porto União","s":"Multa ambiental","d":"2025-08-18"},
+{"n":"5003526-25.2025.8.24.0015","c":"MANDADO DE SEGURANÇA","a":"CAPITAL MATE","r":"IMA Canoinhas","l":"Canoinhas","s":"Multa ambiental","d":"2025-05-20"},
+{"n":"5003390-65.2025.8.24.0520","c":"BUSCA E APREENSÃO","a":"PCSC","r":"FABIANA NUNES DA ROSA","l":"Regional Criciúma","s":"Maus Tratos","d":"2025-06-12"},
+{"n":"5006117-28.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"CARLOS AUGUSTO PAPES","l":"Canoinhas","s":"Destruição","d":"2023-07-21"},
+{"n":"5002496-52.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"SILMAR VOREL","l":"Canoinhas","s":"Flora","d":"2025-04-08"},
+{"n":"5002499-07.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"ELIEZER JANTSCH","l":"Canoinhas","s":"Flora","d":"2025-04-08"},
+{"n":"5001006-05.2019.8.24.0015","c":"Procedimento Comum Cível","a":"LENON TAQUES","r":"JOSE LUIZ LACOWICZ","l":"Canoinhas","s":"Dano moral","d":"2019-08-13"},
+{"n":"5000194-32.2022.8.24.0055","c":"INQUÉRITO POLICIAL","a":"PCSC","r":"JHONNY SCHMIDMEIER","l":"Rio Negrinho","s":"Meio Ambiente","d":"2022-01-27"},
+{"n":"0300014-62.2017.8.24.0068","c":"Procedimento Comum Cível","a":"AFRIB BIONDO","r":"ROBERT ALVES ELIAS","l":"Canoinhas","s":"Cheque","d":"2017-01-12"},
+{"n":"5002168-94.2023.8.24.0047","c":"Ação Penal","a":"MPSC","r":"ADILSO FOLMER","l":"Papanduva","s":"Destruição","d":"2023-09-14"},
+{"n":"5007625-09.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"VILA MULTISHOW LTDA","l":"Canoinhas","s":"Ordenamento Urbano","d":"2023-09-20"},
+{"n":"5002297-64.2024.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"EDSON LUIS RAABE","l":"Canoinhas","s":"Destruição","d":"2024-04-10"},
+{"n":"5005357-79.2023.8.24.0015","c":"Procedimento Comum Cível","a":"VINICIUS CORNELSEN","r":"MILI S/A","l":"Canoinhas","s":"Dano material","d":"2023-06-26"},
+{"n":"5003105-26.2022.8.24.0052","c":"TERMO CIRCUNSTANCIADO","a":"PMSC","r":"RICARDO JOSE TEIXEIRA","l":"Porto União","s":"Ordenamento Urbano","d":"2022-07-13"},
+{"n":"5002716-40.2023.8.24.0041","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"CARLOS SCHMIDMEIER","l":"Mafra","s":"Destruição","d":"2023-05-12"},
+{"n":"5003387-15.2021.8.24.0015","c":"Ação Penal","a":"MPSC","r":"ANTONIO ROBERTO DE OLIVEIRA","l":"Canoinhas","s":"Flora","d":"2021-05-14"},
+{"n":"5006894-13.2023.8.24.0015","c":"ACP Cível","a":"MPSC","r":"FERNANDO FARIAN","l":"Canoinhas","s":"Ambiental","d":"2023-08-22"},
+{"n":"5001825-97.2023.8.24.0015","c":"Execução ANPP","a":"MPSC","r":"SAULO SUCHARA","l":"Canoinhas","s":"ANPP","d":"2023-03-03"},
+{"n":"5007768-95.2023.8.24.0015","c":"Execução ANPP","a":"MPSC","r":"MATHEUS MELECHENCO","l":"Canoinhas","s":"ANPP","d":"2023-09-26"},
+{"n":"5002086-33.2021.8.24.0015","c":"Ação Penal","a":"MPSC","r":"ALBERTO SCHOSTAK","l":"Canoinhas","s":"Flora","d":"2021-03-24"},
+{"n":"5008400-24.2023.8.24.0015","c":"Produção Antecipada Prova","a":"VILA MULTISHOW","r":"IMA","l":"Canoinhas","s":"Dano ambiental","d":"2023-10-19"},
+{"n":"5001971-90.2024.8.24.0052","c":"Procedimento Comum Cível","a":"BIG SAFRA S/A","r":"IMA","l":"Porto União","s":"Multa ambiental","d":"2024-05-20"},
+{"n":"5002505-02.2021.8.24.0032","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"ADRIANO BLASZKOSKI","l":"Itaiópolis","s":"Flora","d":"2021-12-17"},
+{"n":"5000025-80.2023.8.24.0032","c":"Ação Penal","a":"MPSC","r":"CARLOS SCHMIDMEIER","l":"Itaiópolis","s":"Destruição","d":"2023-01-11"},
+{"n":"5003980-24.2025.8.24.0041","c":"Execução ANPP","a":"MPSC","r":"AUGUSTO SCHIMITBERGER","l":"Canoinhas","s":"ANPP","d":"2025-07-22"},
+{"n":"5006783-92.2024.8.24.0015","c":"Execução ANPP","a":"MPSC","r":"MARCOS TODT","l":"Canoinhas","s":"ANPP","d":"2024-09-23"},
+{"n":"5005751-86.2023.8.24.0015","c":"INQUÉRITO POLICIAL","a":"PCSC","r":"RENATO JARDEL GURTINSKI","l":"Canoinhas","s":"Meio Ambiente","d":"2023-07-07"},
+{"n":"5001144-59.2025.8.24.0015","c":"RECURSO","a":"MPSC","r":"AUGUSTO SCHIMITBERGER","l":"Canoinhas","s":"Destruição","d":"2025-01-24"},
+{"n":"5003861-78.2024.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"GENEZIO KUBIACK","l":"Canoinhas","s":"Destruição","d":"2024-06-11"},
+{"n":"5007482-83.2024.8.24.0015","c":"Calúnia/Difamação","a":"RAFAEL BONFIM","r":"JESSE DE FARIA LOPES","l":"Canoinhas","s":"Difamação","d":"2024-10-19"},
+{"n":"5005436-87.2025.8.24.0015","c":"INQUÉRITO POLICIAL","a":"PF/SC","r":"A APURAR","l":"Canoinhas","s":"Falsidade ideológica","d":"2025-08-01"},
+{"n":"5002931-60.2024.8.24.0015","c":"TERMO CIRCUNSTANCIADO","a":"PCSC","r":"JOSIEL MAIA MOREIRA","l":"Canoinhas","s":"Violação domicílio","d":"2024-05-03"},
+{"n":"5000503-71.2025.8.24.0015","c":"PIC-MP","a":"MPSC","r":"AUGUSTO SCHIMITBERGER","l":"Regional Mafra","s":"Destruição","d":"2025-01-24"},
+{"n":"5002004-43.2024.8.24.0032","c":"JUIZADO ESPECIAL","a":"JOSE ADILSON KOBICHEN","r":"GERMANO WOEHL JUNIOR","l":"Itaiópolis","s":"Dano moral","d":"2024-10-24"},
+{"n":"5001145-44.2025.8.24.0015","c":"RECURSO","a":"MPSC","r":"ANDRE DA SILVEIRA","l":"Canoinhas","s":"Destruição","d":"2025-01-24"},
+{"n":"5002920-94.2025.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"LUIS BENEDITO PACHECO","l":"Canoinhas","s":"Flora","d":"2025-04-25"},
+{"n":"5002158-15.2024.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"MARCOS HIROAKI NAGANO","l":"Canoinhas","s":"Ordenamento Urbano","d":"2024-04-05"},
+{"n":"5003083-56.2022.8.24.0055","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"ELCIO ANTONIO PSCHEIDT","l":"Rio Negrinho","s":"Meio Ambiente","d":"2022-09-22"},
+{"n":"5008988-65.2022.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"MARIA PAULA FRIEDRICH","l":"Canoinhas","s":"Destruição","d":"2022-12-14"},
+{"n":"5001364-05.2023.8.24.0055","c":"Ação Penal","a":"MPSC","r":"SIEGRID SCHLUP","l":"Rio Negrinho","s":"Destruição","d":"2023-05-11"},
+{"n":"5000200-91.2024.8.24.0015","c":"Produção Antecipada Prova","a":"MATHEUS MELECHENCO","r":"ESTADO SC","l":"Canoinhas","s":"Dano ambiental","d":"2024-01-17"},
+{"n":"5004642-42.2020.8.24.0015","c":"ACP Cível","a":"MPSC","r":"WALDIR JANTSCH","l":"Canoinhas","s":"Flora","d":"2020-07-28"},
+{"n":"5007339-94.2024.8.24.0015","c":"Embargos à Execução","a":"ADEMAR STAWAS","r":"MPSC","l":"Canoinhas","s":"APP","d":"2024-10-15"},
+{"n":"5007373-06.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"MATHEUS MELECHENCO","l":"Regional Mafra","s":"Destruição","d":"2023-09-08"},
+{"n":"5009151-45.2022.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"SAULO SUCHARA","l":"Regional Mafra","s":"Destruição","d":"2022-12-16"},
+{"n":"5001435-30.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"FLAVIO CAVALHEIRO","l":"Canoinhas","s":"Destruição","d":"2023-02-17"},
+{"n":"5000896-64.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"MARCOS TODT","l":"Canoinhas","s":"Destruição","d":"2023-02-02"},
+{"n":"5003038-94.2022.8.24.0041","c":"EXECUÇÃO TÍTULO EXTRAJUDICIAL","a":"MPSC","r":"BIG SAFRA S/A","l":"Mafra","s":"Poluição","d":"2022-06-14"},
+{"n":"5006545-10.2023.8.24.0015","c":"TERMO CIRCUNSTANCIADO","a":"PMSC","r":"DITER HERMANN MULLER","l":"Canoinhas","s":"Destruição","d":"2023-08-09"},
+{"n":"5005494-32.2021.8.24.0015","c":"ACP Cível","a":"MPSC","r":"JOAO VARLEI NEVES","l":"Canoinhas","s":"Flora","d":"2021-07-22"},
+{"n":"5004677-16.2023.8.24.0041","c":"TERMO CIRCUNSTANCIADO","a":"PMSC","r":"RODRIGO BALBINOTTI","l":"Mafra","s":"Destruição","d":"2023-08-09"},
+{"n":"5004680-68.2023.8.24.0041","c":"TERMO CIRCUNSTANCIADO","a":"PMSC","r":"EDSON SCHECK","l":"Mafra","s":"Destruição","d":"2023-08-09"},
+{"n":"5008276-41.2023.8.24.0015","c":"JUIZADO ESPECIAL","a":"WILLIAN CILAS SILVA","r":"AUTO PRATENSE LTDA","l":"Canoinhas","s":"Dano moral","d":"2023-10-16"},
+{"n":"5002005-28.2024.8.24.0032","c":"JUIZADO ESPECIAL","a":"ADRIANO BLASZKOSKI","r":"GERMANO WOEHL JUNIOR","l":"Itaiópolis","s":"Dano moral","d":"2024-10-24"},
+{"n":"5002714-24.2020.8.24.0058","c":"Representação Criminal","a":"MPSC","r":"RENAN CARVALHO OLIVEIRA","l":"São Bento Sul","s":"Flora","d":"2020-04-29"},
+{"n":"5008881-55.2021.8.24.0015","c":"ACP Cível","a":"MPSC","r":"JOAO ARILDO BALAO","l":"Canoinhas","s":"Dano ambiental","d":"2021-11-25"},
+{"n":"5000834-89.2023.8.24.0058","c":"Execução ANPP","a":"MPSC","r":"CRCO INCORPORADORA","l":"São Bento Sul","s":"ANPP","d":"2023-02-03"},
+{"n":"5004658-89.2022.8.24.0026","c":"INQUÉRITO POLICIAL","a":"PCSC","r":"ADRIANO BLASZKOSKI","l":"Guaramirim","s":"Armas","d":"2022-08-26"},
+{"n":"5005704-34.2023.8.24.0041","c":"MANDADO DE SEGURANÇA","a":"BIG SAFRA S/A","r":"IMA Mafra","l":"Mafra","s":"Licença Ambiental","d":"2023-09-29"},
+{"n":"5002338-31.2024.8.24.0015","c":"TERMO CIRCUNSTANCIADO","a":"PCSC","r":"ANDREA GEOVANA HOFFMANN","l":"Canoinhas","s":"Dano","d":"2024-04-11"},
+{"n":"5002495-04.2024.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"GENEZIO KUBIACK","l":"Canoinhas","s":"Destruição","d":"2024-04-16"},
+{"n":"5005422-74.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"CLEBER FRIDRICH","l":"Canoinhas","s":"Estabelecimentos Poluidores","d":"2023-06-27"},
+{"n":"5002623-24.2024.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"GENEZIO KUBIACK","l":"Canoinhas","s":"Destruição","d":"2024-04-22"},
+{"n":"5008582-10.2023.8.24.0015","c":"CUMPRIMENTO DE SENTENÇA","a":"MPSC","r":"MARIA TRINDADE NEVES","l":"Canoinhas","s":"Dano ambiental","d":"2023-10-24"},
+{"n":"5002670-32.2023.8.24.0015","c":"ACP Cível","a":"MPSC","r":"NILSO BECKER","l":"Canoinhas","s":"Dano ambiental","d":"2023-03-29"},
+{"n":"0900003-75.2019.8.24.0015","c":"ACP Cível","a":"MPSC","r":"ADIR PEREIRA DA ROCHA","l":"Canoinhas","s":"Flora","d":"2019-01-17"},
+{"n":"5005434-88.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"CARLOS AUGUSTO PAPES","l":"Canoinhas","s":"Destruição","d":"2023-06-27"},
+{"n":"5007864-47.2022.8.24.0015","c":"MANDADO DE SEGURANÇA","a":"PLANEJA EMPREEND","r":"IMA Canoinhas","l":"Canoinhas","s":"Licença Ambiental","d":"2022-10-29"},
+{"n":"5000169-08.2023.8.24.0015","c":"CRIMES AMBIENTAIS","a":"MPSC","r":"FLAVIO CAVALHEIRO","l":"Canoinhas","s":"Destruição","d":"2023-01-12"},
+]
 
-
-def _fmt_text(v: Any) -> str:
-    return (str(v).strip() if v is not None else '').strip()
-
-def _fix_mojibake(s: str) -> str:
-    """
-    Tenta corrigir textos quebrados (ex: 'DestruÃ­...' / 'ExecuÃ§Ã£o').
-    Resolve boa parte dos exports do Eproc/Excel.
-    """
-    if not s:
-        return s
-    if 'Ã' in s or 'Â' in s or '�' in s:
-        try:
-            return s.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore').strip()
-        except Exception:
-            return s
-    return s
-
-
-def _norm(s: str) -> str:
-    s = _fix_mojibake(_fmt_text(s)).lower()
+def _norm(s):
+    s = str(s or '').lower().strip()
     s = unicodedata.normalize('NFKD', s)
-    s = ''.join([c for c in s if not unicodedata.combining(c)])
-    s = re.sub(r'\s+', ' ', s).strip()
-    return s
+    return ''.join(c for c in s if not unicodedata.combining(c))
 
+def _parse_date(d):
+    if not d: return ''
+    m = re.search(r'(\d{4})-(\d{2})-(\d{2})', str(d))
+    return f'{m.group(3)}/{m.group(2)}/{m.group(1)}' if m else str(d)
 
-def _split_names(raw: Any) -> List[str]:
-    """Divide autores/réus vindos da planilha em lista de nomes."""
-    text = _fmt_text(raw)
-    if not text:
-        return []
-    # separadores comuns
-    parts = re.split(r'[;\n]| \| |, (?=[A-ZÁÉÍÓÚÃÕÇ])', text)
-    cleaned = []
-    for p in parts:
-        p = _fmt_text(p)
-        if p:
-            cleaned.append(p)
-    # remove duplicados preservando ordem
-    seen = set()
-    out = []
-    for p in cleaned:
-        key = _norm(p)
-        if key and key not in seen:
-            seen.add(key)
-            out.append(p)
-    return out
-
-
-def _parse_date_to_ddmmyyyy(raw: Any) -> str:
-    """Converte várias entradas para DD/MM/AAAA (ou mantém texto)."""
-    v = raw
-    if v is None or v == '':
-        return ''
-    # pandas Timestamp / datetime
+def _uid_lenon():
     try:
-        if hasattr(v, 'strftime'):
-            return v.strftime('%d/%m/%Y')
-    except Exception:
-        pass
-    s = _fmt_text(v)
-    if not s:
-        return ''
-    # Formatos comuns do Eproc: "29/08/2025 18:48:51" ou "29/08/2025"
-    m = re.search(r'(\d{2})/(\d{2})/(\d{4})', s)
-    if m:
-        return f'{m.group(1)}/{m.group(2)}/{m.group(3)}'
-    # fallback: mantém (ex: "2025" ou "09/2025")
-    return s
-
-
-def _detectar_coluna(cols: List[str], chaves: List[str]) -> str:
-    """Tenta escolher uma coluna pelo nome (heurística simples)."""
-    cols_norm = {c: _norm(c) for c in cols}
-    for key in chaves:
-        for original, n in cols_norm.items():
-            if key in n:
-                return original
+        for user in get_auth().list_users().users:
+            if 'lenon' in (user.display_name or '').lower():
+                return user.uid
+    except: pass
     return ''
 
-
-def _uid_lenon() -> str:
-    """Busca UID do Firebase Auth cujo nome de exibição contenha 'lenon'."""
-    try:
-        auth_instance = get_auth()
-        page = auth_instance.list_users()
-        while page:
-            for user in page.users:
-                if user.disabled:
-                    continue
-                try:
-                    display_name = obter_display_name(user.uid)
-                    if display_name == "Usuário":
-                        display_name = user.email.split('@')[0] if user.email else ''
-                except Exception:
-                    display_name = user.email.split('@')[0] if user.email else ''
-                if 'lenon' in _norm(display_name):
-                    return user.uid
-            try:
-                page = page.get_next_page()
-            except StopIteration:
-                break
-        return ''
-    except Exception as e:
-        print(f"[MIGRACAO_PROCESSOS] Erro ao buscar UID do Lenon: {e}")
-        return ''
-
-
-def _melhor_match(nome: str, candidatos: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Retorna melhor candidato por similaridade (difflib)."""
-    alvo = _norm(nome)
-    if not alvo:
-        return {}
-    best = None
-    best_score = 0.0
-    for c in candidatos:
-        dn = _fmt_text(c.get('_display_name'))
-        score = difflib.SequenceMatcher(None, alvo, _norm(dn)).ratio()
-        if score > best_score:
-            best_score = score
-            best = c
-    if best and best_score >= 0.78:
-        return {'id': best.get('_id', ''), 'nome': best.get('_display_name', ''), 'score': best_score}
-    return {}
-
-
 @ui.page('/visao-geral/migracao-processos')
-def migracao_processos():
+def migracao_page():
     if not is_authenticated():
-        ui.navigate.to('/login')
-        return
-
+        ui.navigate.to('/login'); return
+    definir_workspace('visao_geral')
     ensure_firebase_initialized()
-    definir_workspace('visao_geral_escritorio')
 
-    with layout('Migração de Processos', breadcrumbs=[
-        ('Visão geral do escritório', '/visao-geral/painel'),
-        ('Processos', '/visao-geral/processos'),
-        ('Migração de Processos', None),
-    ]):
-        with ui.card().classes('w-full mb-4'):
-            ui.label('Migração de Processos → Casos').classes('text-2xl font-bold text-gray-800 mb-2')
-            ui.label(
-                'Aqui você vincula processos já cadastrados aos seus respectivos Casos. '
-                'Selecione um Caso e marque os processos na lista para vincular em lote.'
-            ).classes('text-gray-600')
-
-        estado: Dict[str, Any] = {
-            'caso_selecionado': None,
-            'somente_sem_caso': True,
-            'df': None,
-            'import_rows': [],
-        }
-
-        # ---------------------------------------------------------------------
-        # 1) IMPORTAÇÃO DE PLANILHA (EPROC)
-        # ---------------------------------------------------------------------
-        with ui.card().classes('w-full mb-4'):
-            ui.label('1) Importar planilha do Eproc').classes('text-xl font-bold text-gray-800 mb-2')
-            ui.label(
-                'Faça upload do XLSX/CSV exportado do Eproc. Depois escolha quais colunas representam número, autores, réus, '
-                'data de distribuição (vira a data de abertura) e núcleo.'
-            ).classes('text-gray-600 mb-3')
-
-            if pd is None:
-                ui.label('⚠️ pandas/openpyxl não estão disponíveis neste ambiente.').classes('text-red-600')
-            else:
-                # Defaults pedidos
-                default_sistema = 'eproc - TJSC - 1ª instância'
-                default_responsavel_nome = 'Lenon'
-                default_nucleo = 'Ambiental'
-
-                # Carrega bases para matching (uma vez)
-                pessoas = listar_pessoas()
-                envolvidos = listar_envolvidos()
-                parceiros = listar_parceiros()
-                candidatos_autores = []
-                for p in pessoas:
-                    dn = _fmt_text(p.get('nome_exibicao') or p.get('nome_completo') or p.get('full_name') or p.get('name') or '')
-                    if dn:
-                        candidatos_autores.append({'_id': p.get('_id', ''), '_display_name': dn})
-                candidatos_reus = []
-                for x in (envolvidos + parceiros):
-                    dn = _fmt_text(x.get('nome_exibicao') or x.get('nome_completo') or x.get('full_name') or x.get('name') or '')
-                    if dn:
-                        candidatos_reus.append({'_id': x.get('_id', ''), '_display_name': dn})
-
-                lenon_uid = _uid_lenon()
-
-                # Estado da UI
-                mapping = {
-                    'numero': None,
-                    'titulo': None,
-                    'autores': None,
-                    'reus': None,
-                    'data_dist': None,
-                    'nucleo': None,
-                }
-
-                sobrescrever = ui.checkbox('Sobrescrever campos existentes do processo', value=False)
-
-                with ui.row().classes('w-full items-center gap-3 flex-wrap'):
-                    upload = ui.upload(
-                        label='Upload planilha (XLSX/CSV)',
-                        auto_upload=True,
-                        max_files=1,
-                    ).props('flat color=primary')
-
-                    sheet_name_input = ui.input('Aba (opcional)', placeholder='Ex: Planilha1').props('dense outlined').classes('w-56')
-
-                preview_container = ui.column().classes('w-full mt-2')
-                # Carregar arquivo local (sem upload) — atende quem não quer fazer upload pelo browser
-                default_path = os.environ.get('EPROC_IMPORT_PATH', 'relatorio-processos-2025-lenon.xls')
-                with ui.row().classes('w-full items-center gap-3 flex-wrap mt-2'):
-                    path_input = ui.input('Arquivo local (opcional)', value=default_path, placeholder='Ex: imports/eproc.xlsx').props('dense outlined').classes('flex-grow min-w-[320px]')
-                    btn_load_local = ui.button('Carregar arquivo local', icon='folder_open').props('dense color=secondary')
-
-                def _ler_planilha(nome_arquivo: str, content: bytes):
-                    ext = (nome_arquivo or '').lower()
-                    raw = content or b''
-                    raw_head = raw[:8000].lower()
-                    looks_like_html = (b'<table' in raw_head) or (b'<html' in raw_head) or (b'<!doctype' in raw_head)
-
-                    def _postprocess_df(df_in):
-                        try:
-                            df2 = df_in.copy()
-                            for c in df2.columns:
-                                df2[c] = df2[c].astype(str).map(_fix_mojibake)
-                            return df2
-                        except Exception:
-                            return df_in
-
-                    buf = io.BytesIO(raw)
-                    if ext.endswith('.csv'):
-                        # tenta ; e ,
-                        try:
-                            return _postprocess_df(pd.read_csv(buf, sep=';', dtype=str))
-                        except Exception:
-                            buf.seek(0)
-                            return _postprocess_df(pd.read_csv(buf, sep=',', dtype=str))
-
-                    # HTML disfarçado (comum em relatórios .xls do Eproc)
-                    if looks_like_html:
-                        text = ''
-                        for enc in ['utf-8', 'cp1252', 'latin-1']:
-                            try:
-                                text = raw.decode(enc)
-                                break
-                            except Exception:
-                                continue
-                        if not text:
-                            text = raw.decode('latin-1', errors='ignore')
-                        dfs = pd.read_html(text)
-                        if dfs:
-                            return _postprocess_df(dfs[0].astype(str))
-
-                    # xlsx/xls "de verdade"
-                    try:
-                        if sheet_name_input.value and sheet_name_input.value.strip():
-                            return _postprocess_df(pd.read_excel(buf, sheet_name=sheet_name_input.value.strip(), dtype=str))
-                        return _postprocess_df(pd.read_excel(buf, dtype=str))
-                    except Exception:
-                        # fallback final: tenta como HTML mesmo se não detectou
-                        try:
-                            text = raw.decode('latin-1', errors='ignore')
-                            dfs = pd.read_html(text)
-                            if dfs:
-                                return _postprocess_df(dfs[0].astype(str))
-                        except Exception:
-                            pass
-                        raise
-
-                def _montar_rows(df):
-                    cols = list(df.columns)
-                    # auto-detect
-                    mapping['numero'] = mapping['numero'] or _detectar_coluna(cols, ['nº do processo', 'no do processo', 'numero do processo', 'número do processo', 'processo'])
-                    mapping['data_dist'] = mapping['data_dist'] or _detectar_coluna(cols, ['data de autuacao', 'data de autuação', 'data de distribuicao', 'data de distribuição', 'data'])
-                    mapping['autores'] = mapping['autores'] or _detectar_coluna(cols, ['autor', 'autores', 'parte autora'])
-                    mapping['reus'] = mapping['reus'] or _detectar_coluna(cols, ['reu', 'réu', 'acusado', 'demandado', 'parte re'])
-                    mapping['titulo'] = mapping['titulo'] or _detectar_coluna(cols, ['classe', 'classe da acao', 'classe da ação', 'assunto', 'titulo'])
-                    mapping['nucleo'] = mapping['nucleo'] or _detectar_coluna(cols, ['nucleo', 'núcleo'])
-
-                    # UI de mapping
-                    preview_container.clear()
-                    with preview_container:
-                        ui.label('Mapeamento de colunas').classes('text-sm font-bold text-gray-700')
-                        with ui.row().classes('w-full gap-3 flex-wrap'):
-                            sel_numero = ui.select(cols, label='Coluna: Número', value=mapping['numero']).props('dense outlined').classes('w-64')
-                            sel_titulo = ui.select(['(auto)'] + cols, label='Coluna: Título/Classe', value=mapping['titulo'] or '(auto)').props('dense outlined').classes('w-64')
-                            sel_data = ui.select(['(vazio)'] + cols, label='Coluna: Data distribuição', value=mapping['data_dist'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_autores = ui.select(['(vazio)'] + cols, label='Coluna: Autores', value=mapping['autores'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_reus = ui.select(['(vazio)'] + cols, label='Coluna: Réus', value=mapping['reus'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_nucleo = ui.select(['(padrão)'] + cols, label='Coluna: Núcleo', value=mapping['nucleo'] or '(padrão)').props('dense outlined').classes('w-64')
-
-                        ui.separator().classes('my-2')
-                        ui.label('Preview (selecione linhas para importar/atualizar)').classes('text-sm font-bold text-gray-700')
-
-                        # Monta preview rows (limitado)
-                        rows = []
-                        for _, r in df.head(200).iterrows():
-                            numero = _fmt_text(r.get(sel_numero.value))
-                            if not numero:
-                                continue
-                            titulo_raw = ''
-                            if sel_titulo.value and sel_titulo.value != '(auto)':
-                                titulo_raw = _fmt_text(r.get(sel_titulo.value))
-                            else:
-                                # auto: classe + assunto (se existirem)
-                                classe = _fmt_text(r.get(_detectar_coluna(cols, ['classe'])))
-                                assunto = _fmt_text(r.get(_detectar_coluna(cols, ['assunto'])))
-                                titulo_raw = ' - '.join([x for x in [classe, assunto] if x]) or f'Processo {numero}'
-
-                            data_raw = _fmt_text(r.get(sel_data.value)) if sel_data.value and sel_data.value != '(vazio)' else ''
-                            data_abertura = _parse_date_to_ddmmyyyy(data_raw)
-
-                            autores_raw = _fmt_text(r.get(sel_autores.value)) if sel_autores.value and sel_autores.value != '(vazio)' else ''
-                            reus_raw = _fmt_text(r.get(sel_reus.value)) if sel_reus.value and sel_reus.value != '(vazio)' else ''
-                            nucleo_raw = _fmt_text(r.get(sel_nucleo.value)) if sel_nucleo.value and sel_nucleo.value not in ['(padrão)'] else default_nucleo
-
-                            # sugestões rápidas (somente 1º nome)
-                            autores_list = _split_names(autores_raw)
-                            reus_list = _split_names(reus_raw)
-                            sug_autor = _melhor_match(autores_list[0], candidatos_autores) if autores_list else {}
-                            sug_reu = _melhor_match(reus_list[0], candidatos_reus) if reus_list else {}
-
-                            rows.append({
-                                '_key': numero,
-                                'numero': numero,
-                                'titulo': titulo_raw,
-                                'data_abertura': data_abertura or '—',
-                                'nucleo': nucleo_raw or '—',
-                                'autor': autores_list[0] if autores_list else '—',
-                                'sug_autor': (sug_autor.get('nome') if sug_autor else '—'),
-                                'reu': reus_list[0] if reus_list else '—',
-                                'sug_reu': (sug_reu.get('nome') if sug_reu else '—'),
-                            })
-
-                        tabela_imp = ui.table(
-                            columns=[
-                                {'name': 'numero', 'label': 'Número', 'field': 'numero', 'align': 'left', 'sortable': True},
-                                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                                {'name': 'data_abertura', 'label': 'Data abertura', 'field': 'data_abertura', 'align': 'left'},
-                                {'name': 'nucleo', 'label': 'Núcleo', 'field': 'nucleo', 'align': 'left'},
-                                {'name': 'autor', 'label': 'Autor (1º)', 'field': 'autor', 'align': 'left'},
-                                {'name': 'sug_autor', 'label': 'Sugestão autor', 'field': 'sug_autor', 'align': 'left'},
-                                {'name': 'reu', 'label': 'Réu (1º)', 'field': 'reu', 'align': 'left'},
-                                {'name': 'sug_reu', 'label': 'Sugestão réu', 'field': 'sug_reu', 'align': 'left'},
-                            ],
-                            rows=rows,
-                            row_key='_key',
-                            selection='multiple',
-                            pagination={'rowsPerPage': 10},
-                        ).classes('w-full')
-
-                        def _importar_selecionados():
-                            selecionados = tabela_imp.selected_rows or []
-                            if not selecionados:
-                                ui.notify('Selecione ao menos 1 linha do preview.', type='warning')
-                                return
-
-                            ok = 0
-                            atualizados = 0
-                            erros = 0
-
-                            for item in selecionados:
-                                numero = item.get('numero', '')
-                                # pega linha original do df pelo numero (primeira ocorrência)
-                                try:
-                                    linha = df[df[sel_numero.value].astype(str).str.strip() == numero].head(1).to_dict('records')[0]
-                                except Exception:
-                                    linha = {}
-
-                                titulo = _fmt_text(item.get('titulo') or f'Processo {numero}')
-                                data_abertura = _fmt_text(item.get('data_abertura'))
-                                nucleo_val = _fmt_text(item.get('nucleo')) or default_nucleo
-
-                                autores_list = _split_names(linha.get(sel_autores.value)) if sel_autores.value and sel_autores.value != '(vazio)' else []
-                                reus_list = _split_names(linha.get(sel_reus.value)) if sel_reus.value and sel_reus.value != '(vazio)' else []
-
-                                # Monta clientes (autores) com match
-                                clientes = []
-                                clientes_nomes = []
-                                for nome in autores_list:
-                                    m = _melhor_match(nome, candidatos_autores)
-                                    if m:
-                                        clientes.append(m.get('id') or m.get('nome'))
-                                        clientes_nomes.append(m.get('nome') or nome)
-                                    else:
-                                        clientes.append(nome)
-                                        clientes_nomes.append(nome)
-
-                                # Monta parte contrária (réus) com match (texto)
-                                reus_final = []
-                                for nome in reus_list:
-                                    m = _melhor_match(nome, candidatos_reus)
-                                    reus_final.append(m.get('nome') if m else nome)
-                                parte_contraria = ', '.join([x for x in reus_final if _fmt_text(x)])
-
-                                patch = {
-                                    'numero': numero,
-                                    'titulo': titulo,
-                                    'data_abertura': data_abertura if data_abertura != '—' else '',
-                                    'nucleo': nucleo_val,
-                                    'clientes': clientes,
-                                    'clientes_nomes': clientes_nomes,
-                                    'parte_contraria': parte_contraria,
-                                    'responsavel': lenon_uid,
-                                    'responsavel_nome': default_responsavel_nome,
-                                    'sistema_processual': default_sistema,
-                                    'status': 'Em andamento',
-                                }
-
-                                try:
-                                    existente = buscar_processo_por_numero(numero)
-                                    if existente:
-                                        # se não sobrescrever, só preenche vazios
-                                        if not sobrescrever.value:
-                                            patch_limpo = {}
-                                            for k, v in patch.items():
-                                                atual = existente.get(k)
-                                                vazio = (atual is None) or (isinstance(atual, str) and not atual.strip()) or (isinstance(atual, list) and len(atual) == 0)
-                                                if vazio and v not in [None, '', [], {}]:
-                                                    patch_limpo[k] = v
-                                            patch = patch_limpo
-                                        if patch:
-                                            atualizar_campos_processo(existente['_id'], patch)
-                                            atualizados += 1
-                                        ok += 1
-                                    else:
-                                        # cria novo (mínimo necessário)
-                                        dados_novos = {
-                                            'titulo': titulo,
-                                            'numero': numero,
-                                            'tipo': 'Judicial',
-                                            'status': 'Em andamento',
-                                            'resultado': 'Pendente',
-                                            'area': '',
-                                            'estado': 'Santa Catarina',
-                                            'data_abertura': patch.get('data_abertura', ''),
-                                            'nucleo': nucleo_val,
-                                            'sistema_processual': default_sistema,
-                                            'clientes': clientes,
-                                            'clientes_nomes': clientes_nomes,
-                                            'parte_contraria': parte_contraria,
-                                            'responsavel': lenon_uid,
-                                            'responsavel_nome': default_responsavel_nome,
-                                        }
-                                        pid = criar_processo(dados_novos)
-                                        if pid:
-                                            ok += 1
-                                        else:
-                                            erros += 1
-                                except Exception as e:
-                                    print(f"[MIGRACAO_PROCESSOS] Erro ao importar {numero}: {e}")
-                                    erros += 1
-
-                            ui.notify(f'Importação concluída: OK {ok} | Atualizados {atualizados} | Erros {erros}',
-                                      type='positive' if erros == 0 else 'warning')
-                            render_tabela.refresh()
-
-                        ui.button('Criar/Atualizar processos selecionados', icon='cloud_upload', on_click=_importar_selecionados).props('color=primary').classes('mt-3')
-
-                async def handle_upload(e: events.UploadEventArguments):
-                    try:
-                        if not hasattr(e, 'file') or e.file is None:
-                            ui.notify('Upload inválido.', type='negative')
-                            return
-
-                        file_name = getattr(e.file, 'name', '') or getattr(e, 'name', '') or 'arquivo'
-                        file_bytes = None
-
-                        if hasattr(e.file, 'read'):
-                            try:
-                                if callable(e.file.read):
-                                    res = e.file.read()
-                                    # UploadFile.read() pode ser coroutine
-                                    if inspect.isawaitable(res):
-                                        res = await res
-                                    file_bytes = res
-                            except Exception:
-                                file_bytes = None
-
-                        # Fallbacks (algumas versões expõem content/data/bytes)
-                        if file_bytes is None:
-                            for attr in ['content', 'data', 'bytes']:
-                                if hasattr(e.file, attr):
-                                    res = getattr(e.file, attr)
-                                    # pode ser coroutine/awaitable também
-                                    if inspect.isawaitable(res):
-                                        res = await res
-                                    file_bytes = res
-                                    break
-
-                        # Se ainda veio como coroutine por qualquer motivo
-                        if inspect.isawaitable(file_bytes):
-                            file_bytes = await file_bytes
-
-                        if not file_bytes:
-                            ui.notify('Não foi possível ler o arquivo.', type='negative')
-                            upload.reset()
-                            return
-
-                        df = _ler_planilha(file_name, file_bytes)
-                        estado['df'] = df
-                        _montar_rows(df)
-                        ui.notify('Planilha carregada! Ajuste o mapeamento e selecione linhas.', type='positive')
-                    except Exception as ex:
-                        print(f"[MIGRACAO_PROCESSOS] Erro ao ler planilha: {type(ex).__name__}: {ex}")
-                        import traceback
-                        traceback.print_exc()
-                        ui.notify(f'Erro ao ler planilha: {str(ex)}', type='negative')
-                    finally:
-                        upload.reset()
-
-                upload.on_upload(handle_upload)
-
-                def _carregar_arquivo_local():
-                    try:
-                        raw_path = (path_input.value or '').strip()
-                        if not raw_path:
-                            ui.notify('Informe o caminho do arquivo.', type='warning')
-                            return
-
-                        # aceita relativo ao projeto
-                        base = Path(__file__).resolve().parents[3]  # .../mini_erp/pages/visao_geral -> projeto
-                        p = Path(raw_path)
-                        if not p.is_absolute():
-                            p = (base / p).resolve()
-
-                        if not p.exists():
-                            ui.notify(f'Arquivo não encontrado: {p}', type='negative')
-                            return
-
-                        content = p.read_bytes()
-                        df = _ler_planilha(p.name, content)
-                        estado['df'] = df
-                        _montar_rows(df)
-                        ui.notify(f'Arquivo carregado: {p.name}', type='positive')
-                    except Exception as ex:
-                        print(f"[MIGRACAO_PROCESSOS] Erro ao carregar arquivo local: {type(ex).__name__}: {ex}")
-                        import traceback
-                        traceback.print_exc()
-                        ui.notify(f'Erro ao carregar arquivo local: {str(ex)}', type='negative')
-
-                btn_load_local.on_click(_carregar_arquivo_local)
-
-                # Auto-carrega se o arquivo default existir (para “já entrar e estar lá”)
-                def _auto_try_load():
-                    try:
-                        raw_path = (path_input.value or '').strip()
-                        if not raw_path:
-                            return
-                        base = Path(__file__).resolve().parents[3]
-                        p = Path(raw_path)
-                        if not p.is_absolute():
-                            p = (base / p).resolve()
-                        if p.exists():
-                            _carregar_arquivo_local()
-                    except Exception:
-                        return
-
-                ui.timer(0.3, _auto_try_load, once=True)
-
-        # Carrega casos (para dropdown)
-        casos = listar_casos()
-        casos_opts: Dict[str, str] = {}
-        for c in casos:
-            cid = _fmt_text(c.get('_id'))
-            titulo = _fmt_text(c.get('titulo') or c.get('title') or 'Sem título')
-            nucleo = _fmt_text(c.get('nucleo') or '')
-            label = titulo
-            if nucleo:
-                label = f'{titulo} — {nucleo}'
-            # Ajuda quando existem títulos iguais
-            label = f'{label} ({cid[:6]})' if cid else label
-            if cid:
-                casos_opts[cid] = label
-
-        # Controles
-        with ui.card().classes('w-full mb-4'):
-            with ui.row().classes('w-full items-center gap-3 flex-wrap'):
-                caso_select = ui.select(
-                    options=casos_opts,
-                    label='Selecione o Caso para vincular',
-                    with_input=True,
-                ).classes('min-w-[320px] flex-grow').props('outlined dense use-input fill-input')
-
-                somente_sem_caso = ui.checkbox(
-                    'Mostrar apenas processos sem Caso',
-                    value=True,
-                ).classes('mt-1')
-
-        # Tabela de processos
-        with ui.card().classes('w-full mb-4'):
-            ui.label('Processos (marque e vincule)').classes('text-xl font-bold text-gray-800 mb-3')
-
-            @ui.refreshable
-            def render_tabela():
-                processos = listar_processos()
-                linhas: List[Dict[str, Any]] = []
-
-                for p in processos:
-                    pid = _fmt_text(p.get('_id'))
-                    titulo = _fmt_text(p.get('titulo') or 'Sem título')
-                    numero = _fmt_text(p.get('numero') or '')
-                    caso_titulo = _fmt_text(p.get('caso_titulo') or '')
-                    caso_id = _fmt_text(p.get('caso_id') or '')
-                    clientes = p.get('clientes_nomes') if isinstance(p.get('clientes_nomes'), list) else []
-                    clientes_txt = ', '.join([_fmt_text(x) for x in clientes if _fmt_text(x)]) if clientes else ''
-
-                    if somente_sem_caso.value and caso_id:
-                        continue
-
-                    linhas.append({
-                        '_id': pid,
-                        'titulo': titulo,
-                        'numero': numero or '-',
-                        'caso_atual': caso_titulo or ('—' if not caso_id else f'({caso_id[:6]})'),
-                        'clientes': clientes_txt or '—',
-                    })
-
-                colunas = [
-                    {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left', 'sortable': True},
-                    {'name': 'numero', 'label': 'Número', 'field': 'numero', 'align': 'left', 'sortable': True},
-                    {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left'},
-                    {'name': 'caso_atual', 'label': 'Caso atual', 'field': 'caso_atual', 'align': 'left'},
-                ]
-
-                tabela = ui.table(
-                    columns=colunas,
-                    rows=linhas,
-                    row_key='_id',
-                    selection='multiple',
-                    pagination={'rowsPerPage': 20},
-                ).classes('w-full')
-
-                return tabela
-
-            tabela_ref = {'table': None}
-
-            def _render():
-                tabela_ref['table'] = render_tabela()
-
-            _render()
-
-            # Ações
-            with ui.row().classes('w-full items-center gap-3 mt-4 flex-wrap'):
-                def atualizar_lista():
-                    render_tabela.refresh()
-
-                ui.button('Atualizar lista', icon='refresh', on_click=atualizar_lista).props('color=secondary').classes('whitespace-nowrap')
-
-                def vincular_em_lote():
-                    caso_id = caso_select.value
-                    if not caso_id:
-                        ui.notify('Selecione um Caso primeiro.', type='warning')
-                        return
-
-                    caso_label = casos_opts.get(caso_id, '')
-                    caso_titulo = caso_label.split(' — ')[0].strip() if caso_label else ''
-                    if not caso_titulo:
-                        # fallback: pega antes do " (xxxxxx)"
-                        caso_titulo = caso_label.split(' (')[0].strip() if caso_label else ''
-
-                    tabela = tabela_ref.get('table')
-                    if not tabela:
-                        ui.notify('Tabela não disponível.', type='negative')
-                        return
-
-                    selecionados = tabela.selected_rows or []
-                    if not selecionados:
-                        ui.notify('Selecione pelo menos 1 processo.', type='warning')
-                        return
-
-                    ok = 0
-                    erro = 0
-                    for row in selecionados:
-                        pid = row.get('_id')
-                        if not pid:
-                            continue
-                        sucesso = atualizar_campos_processo(pid, {
-                            'caso_id': caso_id,
-                            'caso_titulo': caso_titulo,
-                        })
-                        if sucesso:
-                            ok += 1
-                        else:
-                            erro += 1
-
-                    ui.notify(f'Vinculados: {ok} | Erros: {erro}', type='positive' if erro == 0 else 'warning')
-                    render_tabela.refresh()
-
-                ui.button('Vincular processos selecionados ao Caso', icon='link', on_click=vincular_em_lote).props('color=primary').classes('whitespace-nowrap')
-
-        with ui.card().classes('w-full'):
-            ui.label('Dica').classes('text-lg font-bold text-gray-800 mb-1')
-            ui.label(
-                'Depois de importar a planilha, você pode usar a seção abaixo para vincular processos aos Casos em lote.'
-            ).classes('text-gray-600')
-
-
+    with layout('Migração de Processos'):
+        ui.label('Migração de Processos — Planilha Lenon 2025').classes('text-2xl font-bold mb-4')
+        ui.label(f'{len(PROCESSOS)} processos prontos. Selecione e migre.').classes('text-gray-600 mb-4')
+
+        sobrescrever = ui.checkbox('Sobrescrever campos existentes', value=False)
+
+        rows = [{'_key': p['n'], 'numero': p['n'], 'classe': p['c'][:40], 'reu': p['r'][:30], 'localidade': p['l'][:20], 'data': _parse_date(p['d']), '_raw': p} for p in PROCESSOS]
+
+        tabela = ui.table(
+            columns=[
+                {'name': 'numero', 'label': 'Número', 'field': 'numero', 'align': 'left', 'sortable': True},
+                {'name': 'classe', 'label': 'Classe', 'field': 'classe', 'align': 'left'},
+                {'name': 'reu', 'label': 'Réu', 'field': 'reu', 'align': 'left'},
+                {'name': 'localidade', 'label': 'Localidade', 'field': 'localidade', 'align': 'left'},
+                {'name': 'data', 'label': 'Data', 'field': 'data', 'align': 'left'},
+            ],
+            rows=rows, row_key='_key', selection='multiple', pagination={'rowsPerPage': 25},
+        ).classes('w-full')
+
+        async def _migrar():
+            sel = tabela.selected_rows or []
+            if not sel: ui.notify('Selecione ao menos 1.', type='warning'); return
+            uid = _uid_lenon()
+            criados = atualizados = erros = 0
+            for row in sel:
+                try:
+                    p = row['_raw']
+                    ex = await buscar_processo_por_numero(p['n'])
+                    if ex:
+                        campos = {}
+                        if sobrescrever.value or not ex.get('titulo'): campos['titulo'] = f"{p['c']} - {p['s']}"
+                        if sobrescrever.value or not ex.get('responsavel'): campos['responsavel'] = uid
+                        if sobrescrever.value or not ex.get('nucleo'): campos['nucleo'] = 'Ambiental'
+                        if sobrescrever.value or not ex.get('sistema_processual'): campos['sistema_processual'] = 'Eproc TJ Santa Catarina 1ª Instância'
+                        if campos: await atualizar_campos_processo(ex['_id'], campos); atualizados += 1
+                    else:
+                        await criar_processo({'numero': p['n'], 'titulo': f"{p['c']} - {p['s']}", 'data_abertura': _parse_date(p['d']), 'responsavel': uid, 'sistema_processual': 'Eproc TJ Santa Catarina 1ª Instância', 'nucleo': 'Ambiental', 'estado': 'Santa Catarina', 'status': 'Em andamento', 'parte_contraria': p['r'], 'observacoes': f"Localidade: {p['l']}"})
+                        criados += 1
+                except Exception as e: print(f"Erro {p['n']}: {e}"); erros += 1
+            ui.notify(f'✅ {criados} criados, {atualizados} atualizados' + (f', {erros} erros' if erros else ''), type='positive' if not erros else 'warning')
+
+        with ui.row().classes('gap-2 mt-4'):
+            ui.button('Migrar selecionados', icon='upload', on_click=_migrar).props('color=primary')
+            ui.button('Selecionar todos', on_click=lambda: tabela.update(selected=rows)).props('flat')
+            ui.button('Limpar seleção', on_click=lambda: tabela.update(selected=[])).props('flat')
+            ui.button('Voltar', icon='arrow_back', on_click=lambda: ui.navigate.to('/visao-geral/processos')).props('flat')
