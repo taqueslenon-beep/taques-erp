@@ -44,9 +44,23 @@ except Exception:  # pragma: no cover
 def _fmt_text(v: Any) -> str:
     return (str(v).strip() if v is not None else '').strip()
 
+def _fix_mojibake(s: str) -> str:
+    """
+    Tenta corrigir textos quebrados (ex: 'DestruÃ­...' / 'ExecuÃ§Ã£o').
+    Resolve boa parte dos exports do Eproc/Excel.
+    """
+    if not s:
+        return s
+    if 'Ã' in s or 'Â' in s or '�' in s:
+        try:
+            return s.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore').strip()
+        except Exception:
+            return s
+    return s
+
 
 def _norm(s: str) -> str:
-    s = _fmt_text(s).lower()
+    s = _fix_mojibake(_fmt_text(s)).lower()
     s = unicodedata.normalize('NFKD', s)
     s = ''.join([c for c in s if not unicodedata.combining(c)])
     s = re.sub(r'\s+', ' ', s).strip()
@@ -239,25 +253,65 @@ def migracao_processos():
 
                 preview_container = ui.column().classes('w-full mt-2')
                 # Carregar arquivo local (sem upload) — atende quem não quer fazer upload pelo browser
-                default_path = os.environ.get('EPROC_IMPORT_PATH', 'imports/eproc.xlsx')
+                default_path = os.environ.get('EPROC_IMPORT_PATH', 'relatorio-processos-2025-lenon.xls')
                 with ui.row().classes('w-full items-center gap-3 flex-wrap mt-2'):
                     path_input = ui.input('Arquivo local (opcional)', value=default_path, placeholder='Ex: imports/eproc.xlsx').props('dense outlined').classes('flex-grow min-w-[320px]')
                     btn_load_local = ui.button('Carregar arquivo local', icon='folder_open').props('dense color=secondary')
 
                 def _ler_planilha(nome_arquivo: str, content: bytes):
                     ext = (nome_arquivo or '').lower()
-                    buf = io.BytesIO(content)
+                    raw = content or b''
+                    raw_head = raw[:8000].lower()
+                    looks_like_html = (b'<table' in raw_head) or (b'<html' in raw_head) or (b'<!doctype' in raw_head)
+
+                    def _postprocess_df(df_in):
+                        try:
+                            df2 = df_in.copy()
+                            for c in df2.columns:
+                                df2[c] = df2[c].astype(str).map(_fix_mojibake)
+                            return df2
+                        except Exception:
+                            return df_in
+
+                    buf = io.BytesIO(raw)
                     if ext.endswith('.csv'):
                         # tenta ; e ,
                         try:
-                            return pd.read_csv(buf, sep=';', dtype=str)
+                            return _postprocess_df(pd.read_csv(buf, sep=';', dtype=str))
                         except Exception:
                             buf.seek(0)
-                            return pd.read_csv(buf, sep=',', dtype=str)
-                    # xlsx/xls
-                    if sheet_name_input.value and sheet_name_input.value.strip():
-                        return pd.read_excel(buf, sheet_name=sheet_name_input.value.strip(), dtype=str)
-                    return pd.read_excel(buf, dtype=str)
+                            return _postprocess_df(pd.read_csv(buf, sep=',', dtype=str))
+
+                    # HTML disfarçado (comum em relatórios .xls do Eproc)
+                    if looks_like_html:
+                        text = ''
+                        for enc in ['utf-8', 'cp1252', 'latin-1']:
+                            try:
+                                text = raw.decode(enc)
+                                break
+                            except Exception:
+                                continue
+                        if not text:
+                            text = raw.decode('latin-1', errors='ignore')
+                        dfs = pd.read_html(text)
+                        if dfs:
+                            return _postprocess_df(dfs[0].astype(str))
+
+                    # xlsx/xls "de verdade"
+                    try:
+                        if sheet_name_input.value and sheet_name_input.value.strip():
+                            return _postprocess_df(pd.read_excel(buf, sheet_name=sheet_name_input.value.strip(), dtype=str))
+                        return _postprocess_df(pd.read_excel(buf, dtype=str))
+                    except Exception:
+                        # fallback final: tenta como HTML mesmo se não detectou
+                        try:
+                            text = raw.decode('latin-1', errors='ignore')
+                            dfs = pd.read_html(text)
+                            if dfs:
+                                return _postprocess_df(dfs[0].astype(str))
+                        except Exception:
+                            pass
+                        raise
 
                 def _montar_rows(df):
                     cols = list(df.columns)
