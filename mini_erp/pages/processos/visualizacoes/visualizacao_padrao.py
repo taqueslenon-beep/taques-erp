@@ -540,7 +540,11 @@ def processos():
         ui.navigate.to('/login')
         return
 
-    with layout('Processos', breadcrumbs=[('Processos', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ....componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Processos', url_modulo='/processos')
+    
+    with layout('Processos', breadcrumbs=breadcrumbs):
         # === Indicador de Loading ===
         loading_row = ui.row().classes('w-full justify-center py-8')
         with loading_row:

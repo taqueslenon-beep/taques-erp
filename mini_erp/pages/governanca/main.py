@@ -54,7 +54,11 @@ from .tributaria import render_tributaria
 def governanca():
     """Página principal do módulo de Governança"""
     
-    with layout('', breadcrumbs=[('Governança', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Governança', url_modulo='/governanca')
+    
+    with layout('', breadcrumbs=breadcrumbs):
         # Adiciona estilos customizados para as sub-tabs
         ui.add_head_html(SUBTABS_STYLE)
         

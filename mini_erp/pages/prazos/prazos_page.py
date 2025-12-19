@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from nicegui import ui
 from ...core import layout, get_display_name
 from ...auth import is_authenticated
+from ...componentes.breadcrumb_helper import gerar_breadcrumbs
 from .database import (
     listar_prazos,
     buscar_prazo_por_id,
@@ -194,7 +195,10 @@ def prazos():
         
         dialog_excluir.open()
     
-    with layout('Prazos', breadcrumbs=[('Prazos', None)]):
+    # Gera breadcrumb padronizado com workspace
+    breadcrumbs = gerar_breadcrumbs('Prazos', url_modulo='/prazos')
+    
+    with layout('Prazos', breadcrumbs=breadcrumbs):
         # Header com botão (título removido - já vem do layout())
         with ui.row().classes('w-full gap-4 mb-6 items-center justify-end'):
             ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props(

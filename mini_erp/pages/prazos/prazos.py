@@ -225,22 +225,38 @@ def obter_proxima_semana() -> Tuple[date, date]:
 def obter_semana_do_ano(ano: int, numero_semana: int) -> Tuple[date, date]:
     """
     Retorna início e fim de uma semana específica do ano.
+    
+    Semanas são calculadas de segunda a domingo.
+    A primeira segunda-feira do ano marca o início da Semana 1.
 
     Args:
         ano: Ano (ex: 2025)
-        numero_semana: Número da semana (1-52)
+        numero_semana: Número da semana (1-53)
 
     Returns:
-        Tupla (data_inicio, data_fim)
+        Tupla (data_inicio, data_fim) onde:
+        - data_inicio é segunda-feira
+        - data_fim é domingo
     """
-    # Usar isocalendar para encontrar a semana correta
-    # Primeiro dia do ano
-    primeiro_dia = date(ano, 1, 4)  # 4 de janeiro sempre está na semana 1
-    inicio_semana_1 = primeiro_dia - timedelta(days=primeiro_dia.weekday())
-
+    # Encontrar a primeira segunda-feira do ano
+    primeiro_janeiro = date(ano, 1, 1)
+    
+    # weekday() retorna: 0=segunda, 1=terça, ..., 6=domingo
+    # Se 1º de janeiro é segunda (0), está na semana 1
+    # Se é terça (1), a segunda anterior está no ano anterior
+    # Se é domingo (6), a próxima segunda é dia 2
+    
+    if primeiro_janeiro.weekday() == 0:
+        # 1º de janeiro é segunda-feira
+        primeira_segunda = primeiro_janeiro
+    else:
+        # Calcular quantos dias até a próxima segunda
+        dias_ate_segunda = 7 - primeiro_janeiro.weekday()
+        primeira_segunda = primeiro_janeiro + timedelta(days=dias_ate_segunda)
+    
     # Calcular início da semana desejada
-    inicio = inicio_semana_1 + timedelta(weeks=numero_semana - 1)
-    fim = inicio + timedelta(days=6)
+    inicio = primeira_segunda + timedelta(weeks=numero_semana - 1)
+    fim = inicio + timedelta(days=6)  # Domingo
 
     return inicio, fim
 
@@ -288,29 +304,159 @@ def filtrar_prazos_por_semana(prazos: List[Dict[str, Any]], inicio_semana: date,
     return filtrados
 
 
-def criar_opcoes_semanas(ano: int = None) -> Dict[str, str]:
+def calcular_semanas_do_ano(ano: int) -> List[Dict[str, Any]]:
     """
-    Cria opções de semanas para o dropdown.
-
+    Calcula todas as semanas de um ano, incluindo as que cruzam para o próximo ano.
+    
+    Semanas que cruzam entre anos aparecem em ambos os anos.
+    
     Args:
-        ano: Ano para gerar semanas (padrão: ano atual)
+        ano: Ano para calcular semanas
+        
+    Returns:
+        Lista de dicionários com:
+        - 'numero': número da semana
+        - 'inicio': data de início (date)
+        - 'fim': data de fim (date)
+        - 'ano': ano de referência
+    """
+    semanas = []
+    numero = 1
+    
+    # Encontrar primeira segunda-feira do ano
+    primeiro_janeiro = date(ano, 1, 1)
+    
+    if primeiro_janeiro.weekday() == 0:
+        # 1º de janeiro é segunda-feira
+        primeira_segunda = primeiro_janeiro
+    else:
+        # Calcular quantos dias até a próxima segunda
+        dias_ate_segunda = 7 - primeiro_janeiro.weekday()
+        primeira_segunda = primeiro_janeiro + timedelta(days=dias_ate_segunda)
+    
+    # Gerar semanas até que o início esteja no próximo ano
+    inicio = primeira_segunda
+    while inicio.year <= ano:
+        fim = inicio + timedelta(days=6)
+        
+        semanas.append({
+            'numero': numero,
+            'inicio': inicio,
+            'fim': fim,
+            'ano': ano
+        })
+        
+        # Próxima semana
+        inicio = inicio + timedelta(days=7)
+        numero += 1
+        
+        # Limite de segurança (máximo 54 semanas)
+        if numero > 54:
+            break
+    
+    return semanas
+
+
+def criar_opcoes_semanas(ano: int) -> Dict[str, str]:
+    """
+    Cria opções de semanas para o dropdown com formato específico.
+    
+    Formato: "Semana X - DD/MM/AAAA a DD/MM/AAAA"
+    
+    Inclui semanas que cruzam entre anos:
+    - Semanas do ano anterior que terminam no ano atual (aparecem em ambos)
+    - Semanas do ano atual que terminam no próximo ano (aparecem em ambos)
+    
+    Args:
+        ano: Ano para gerar semanas (obrigatório)
 
     Returns:
         Dicionário {valor: label} para o dropdown
+        Valor: "ano-numero_semana" ou "ano-numero-proximo" para semanas do próximo ano
+        Label: "Semana X - DD/MM/AAAA a DD/MM/AAAA"
     """
-    if ano is None:
-        ano = date.today().year
-
     opcoes = {}
-    for semana in range(1, 53):
-        try:
-            inicio, fim = obter_semana_do_ano(ano, semana)
-            label = f"Semana {semana}: {inicio.strftime('%d/%m')} - {fim.strftime('%d/%m')}"
-            opcoes[f"{ano}-{semana}"] = label
-        except Exception:
-            continue
+    
+    # Semanas do ano atual
+    semanas = calcular_semanas_do_ano(ano)
+    
+    for semana_info in semanas:
+        numero = semana_info['numero']
+        inicio = semana_info['inicio']
+        fim = semana_info['fim']
+        
+        # Formato: "Semana X - DD/MM/AAAA a DD/MM/AAAA"
+        label = f"Semana {numero} - {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
+        valor = f"{ano}-{numero}"
+        opcoes[valor] = label
+    
+    # Adicionar semanas do ano anterior que cruzam para o ano atual
+    if ano > 2020:  # Limite mínimo de segurança
+        semanas_ano_anterior = calcular_semanas_do_ano(ano - 1)
+        for semana_info in semanas_ano_anterior:
+            # Se a semana termina no ano atual, incluir no dropdown
+            if semana_info['fim'].year == ano:
+                numero = semana_info['numero']
+                inicio = semana_info['inicio']
+                fim = semana_info['fim']
+                
+                # Usar número da semana do ano anterior, mas mostrar no ano atual
+                # Criar um número único para evitar conflito (offset 200)
+                numero_ajustado = numero + 200
+                label = f"Semana {numero} ({ano-1}) - {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
+                valor = f"{ano}-{numero_ajustado}"
+                opcoes[valor] = label
+    
+    # Adicionar primeira semana do próximo ano se começar no ano atual
+    if ano < 2030:  # Limite máximo de segurança
+        semanas_proximo_ano = calcular_semanas_do_ano(ano + 1)
+        if semanas_proximo_ano:
+            primeira_semana = semanas_proximo_ano[0]
+            # Se a primeira semana do próximo ano começa no ano atual
+            if primeira_semana['inicio'].year == ano:
+                numero = primeira_semana['numero']
+                inicio = primeira_semana['inicio']
+                fim = primeira_semana['fim']
+                
+                # Usar número 1 para a primeira semana do próximo ano
+                label = f"Semana 1 ({ano+1}) - {inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
+                valor = f"{ano}-1-proximo"
+                opcoes[valor] = label
+    
+    # Ordenar opções por data de início
+    opcoes_ordenadas = {}
+    items_ordenados = sorted(opcoes.items(), key=lambda x: (
+        # Extrair data de início do label para ordenar
+        x[1].split(' - ')[0] if ' - ' in x[1] else x[0]
+    ))
+    
+    for valor, label in items_ordenados:
+        opcoes_ordenadas[valor] = label
+    
+    return opcoes_ordenadas
 
-    return opcoes
+
+def obter_semanas_que_cruzam_anos(ano: int) -> List[Dict[str, Any]]:
+    """
+    Retorna semanas que cruzam entre o ano especificado e o próximo ano.
+    
+    Essas semanas devem aparecer em ambos os anos.
+    
+    Args:
+        ano: Ano de referência
+        
+    Returns:
+        Lista de semanas que cruzam para o próximo ano
+    """
+    semanas_cruzadas = []
+    semanas = calcular_semanas_do_ano(ano)
+    
+    for semana_info in semanas:
+        # Se o fim da semana está no próximo ano, ela cruza
+        if semana_info['fim'].year > ano:
+            semanas_cruzadas.append(semana_info)
+    
+    return semanas_cruzadas
 
 
 def formatar_lista_nomes(ids: List[str], opcoes: Dict[str, str]) -> str:
@@ -802,7 +948,11 @@ def prazos():
 
         dialog_reabrir.open()
 
-    with layout('Prazos', breadcrumbs=[('Prazos', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Prazos', url_modulo='/prazos')
+    
+    with layout('Prazos', breadcrumbs=breadcrumbs):
         # Header com botão (título removido - já vem do layout())
         with ui.row().classes('w-full gap-4 mb-6 items-center justify-end flex-wrap'):
             chk_apenas_parcelas = ui.checkbox(
@@ -1383,7 +1533,12 @@ def prazos():
             # =================================================================
             with ui.tab_panel(tab_semana):
                 # Estado do filtro de semana
-                filtro_semana = {'tipo': 'esta_semana', 'semana_especifica': None}
+                ano_atual = date.today().year
+                filtro_semana = {
+                    'tipo': 'esta_semana',
+                    'semana_especifica': None,
+                    'ano_selecionado': ano_atual
+                }
 
                 def obter_periodo_filtro():
                     """Retorna início e fim baseado no filtro atual."""
@@ -1404,24 +1559,52 @@ def prazos():
                     render_filtros_semana.refresh()
                     render_tabela_semana.refresh()
 
+                def selecionar_ano(ano_str: str):
+                    """Seleciona o ano e atualiza o dropdown de semanas."""
+                    if ano_str:
+                        try:
+                            ano = int(ano_str)
+                            filtro_semana['ano_selecionado'] = ano
+                            # Limpar seleção de semana ao trocar ano
+                            filtro_semana['semana_especifica'] = None
+                            render_filtros_semana.refresh()
+                        except Exception as e:
+                            print(f"[ERROR] Erro ao selecionar ano: {e}")
+
                 def selecionar_semana_especifica(valor):
                     """Seleciona uma semana específica do dropdown."""
                     if valor:
                         try:
                             partes = valor.split('-')
                             ano = int(partes[0])
-                            num_semana = int(partes[1])
+                            
+                            # Lidar com formato especial "ano-1-proximo"
+                            if len(partes) == 3 and partes[2] == 'proximo':
+                                # Primeira semana do próximo ano que começa no ano atual
+                                num_semana = 1
+                                ano_real = ano + 1
+                            else:
+                                num_semana = int(partes[1])
+                                # Se número >= 200, é semana do ano anterior (offset 200)
+                                if num_semana >= 200:
+                                    num_semana = num_semana - 200
+                                    ano_real = ano - 1
+                                else:
+                                    ano_real = ano
+                            
                             filtro_semana['tipo'] = 'selecionar'
-                            filtro_semana['semana_especifica'] = (ano, num_semana)
+                            filtro_semana['semana_especifica'] = (ano_real, num_semana)
                             render_filtros_semana.refresh()
                             render_tabela_semana.refresh()
                         except Exception as e:
                             print(f"[ERROR] Erro ao selecionar semana: {e}")
+                            import traceback
+                            traceback.print_exc()
 
                 # Filtros de semana
                 @ui.refreshable
                 def render_filtros_semana():
-                    """Renderiza os botões de filtro por semana."""
+                    """Renderiza os filtros de semana com dropdowns de ano e semana."""
                     inicio, fim = obter_periodo_filtro()
 
                     with ui.row().classes('w-full gap-2 mb-4 items-center flex-wrap'):
@@ -1459,19 +1642,33 @@ def prazos():
                         # Separador
                         ui.label('|').classes('text-gray-300 mx-2')
 
-                        # Dropdown para selecionar semana específica
-                        opcoes_semanas = criar_opcoes_semanas()
+                        # Dropdown de Ano
+                        opcoes_anos = {'2025': '2025', '2026': '2026'}
+                        ano_selecionado_str = str(filtro_semana['ano_selecionado'])
+                        
+                        select_ano = ui.select(
+                            options=opcoes_anos,
+                            value=ano_selecionado_str,
+                            label='Selecionar Ano:',
+                            on_change=lambda e: selecionar_ano(e.value)
+                        ).classes('w-40')
+                        select_ano.props('outlined')
+
+                        # Dropdown de Semana (atualiza baseado no ano selecionado)
+                        opcoes_semanas = criar_opcoes_semanas(filtro_semana['ano_selecionado'])
                         valor_atual = None
                         if filtro_semana['tipo'] == 'selecionar' and filtro_semana['semana_especifica']:
                             ano, num = filtro_semana['semana_especifica']
-                            valor_atual = f"{ano}-{num}"
+                            # Só manter seleção se o ano corresponder
+                            if ano == filtro_semana['ano_selecionado']:
+                                valor_atual = f"{ano}-{num}"
 
                         select_semana = ui.select(
                             options=opcoes_semanas,
                             value=valor_atual,
                             label='Selecionar Semana',
                             on_change=lambda e: selecionar_semana_especifica(e.value)
-                        ).classes('w-64')
+                        ).classes('w-80')
 
                         if filtro_semana['tipo'] == 'selecionar':
                             select_semana.props('outlined color=primary')

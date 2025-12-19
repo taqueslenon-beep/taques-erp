@@ -9,6 +9,14 @@ from .constants import (
     AREAS_PROCESSO, AREA_CORES,
     SISTEMAS_PROCESSUAIS, ESTADOS, PARTE_CONTRARIA_TIPOS
 )
+# Import de prioridades
+from mini_erp.models.prioridade import (
+    PRIORIDADE_PADRAO,
+    CODIGOS_PRIORIDADE,
+    get_cor_por_prioridade,
+    validar_prioridade,
+    normalizar_prioridade
+)
 
 # =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
@@ -66,6 +74,9 @@ class Processo(TypedDict, total=False):
     responsavel: str            # UID do responsável pelo processo
     responsavel_nome: str       # Nome de exibição do responsável
     
+    # Prioridade
+    prioridade: str             # P1, P2, P3, P4 (opcional, default: P4)
+    
     # Observações
     observacoes: str             # Observações gerais (texto livre)
 
@@ -91,6 +102,23 @@ def obter_cor_area(area: str) -> dict:
     """Retorna as cores (bg, text, border) do badge de área."""
     from .constants import AREA_CORES
     return AREA_CORES.get(area, {'bg': '#f3f4f6', 'text': '#374151', 'border': '#d1d5db'})
+
+
+def obter_cor_prioridade(codigo: str) -> str:
+    """
+    Retorna a cor hexadecimal de uma prioridade.
+    
+    Args:
+        codigo: Código da prioridade (P1, P2, P3, P4)
+    
+    Returns:
+        Cor hexadecimal (ex: '#DC2626')
+    """
+    try:
+        return get_cor_por_prioridade(codigo)
+    except (ValueError, TypeError):
+        # Fallback para P4 se código inválido
+        return get_cor_por_prioridade(PRIORIDADE_PADRAO)
 
 
 def criar_processo_vazio() -> dict:
@@ -124,6 +152,7 @@ def criar_processo_vazio() -> dict:
         'data_ultima_movimentacao': '',
         'responsavel': '',
         'responsavel_nome': '',
+        'prioridade': PRIORIDADE_PADRAO,  # P4 por padrão
         'observacoes': '',
     }
 
@@ -170,6 +199,11 @@ def validar_processo(dados: dict) -> tuple:
     resultado = dados.get('resultado', 'Pendente')
     if resultado and resultado not in RESULTADOS_PROCESSO:
         return False, 'Resultado inválido.'
+
+    # Prioridade válida (se informada)
+    prioridade = dados.get('prioridade', PRIORIDADE_PADRAO)
+    if prioridade and not validar_prioridade(prioridade):
+        return False, 'Prioridade inválida. Deve ser P1, P2, P3 ou P4.'
 
     return True, None
 

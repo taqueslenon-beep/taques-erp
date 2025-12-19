@@ -29,7 +29,11 @@ def configuracoes():
         ui.navigate.to('/login')
         return
     
-    with layout('Configurações', breadcrumbs=[('Configurações', None)]):
+    # Gera breadcrumb padronizado (configurações não precisa de workspace)
+    from ..componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Configurações', incluir_workspace=False, url_modulo='/configuracoes')
+    
+    with layout('Configurações', breadcrumbs=breadcrumbs):
         # Estado do timer da aba Usuários (isolado para evitar interferência)
         timer_ref = {'timer': None}
         # Referência para função refresh_data (será definida dentro da aba Usuários)

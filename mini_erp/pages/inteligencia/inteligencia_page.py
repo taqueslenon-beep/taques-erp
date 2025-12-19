@@ -22,7 +22,11 @@ def inteligencia():
         total_crimes = sum(len(p.get('crimes', [])) for p in PROCESSOS)
         comarcas = set(p['comarca'] for p in PROCESSOS)
         
-        with layout('Módulo de Inteligência', breadcrumbs=[('Inteligência', None)]):
+        # Gera breadcrumb padronizado com workspace
+        from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+        breadcrumbs = gerar_breadcrumbs('Inteligência', url_modulo='/inteligencia')
+        
+        with layout('Módulo de Inteligência', breadcrumbs=breadcrumbs):
             with ui.column().classes('w-full gap-6 p-6'):
                 # Subtítulo
                 ui.label('Análises estratégicas e cenários de risco').classes('text-gray-600 text-sm mb-4')

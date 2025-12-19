@@ -42,7 +42,7 @@ SYSTEM_OPTIONS = [
 ]
 
 # Opções de núcleo
-NUCLEO_OPTIONS = ['Ambiental']
+NUCLEO_OPTIONS = ['Ambiental', 'Cobranças', 'Generalista']
 
 # Opções de área
 AREA_OPTIONS = ['Administrativo', 'Criminal', 'Cível', 'Tributário', 'Técnico/projetos', 'Outros']

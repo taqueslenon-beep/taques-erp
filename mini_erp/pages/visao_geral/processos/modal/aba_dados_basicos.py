@@ -10,6 +10,7 @@ from .helpers import (
     get_option_value
 )
 from ..constants import TIPOS_PROCESSO
+from mini_erp.models.prioridade import PRIORIDADE_PADRAO, CODIGOS_PRIORIDADE
 
 
 def render_aba_dados_basicos(
@@ -18,7 +19,8 @@ def render_aba_dados_basicos(
     todas_pessoas: List[Dict[str, Any]],
     todos_casos: List[Dict[str, Any]],
     usuarios_internos: List[Dict[str, Any]],
-    processos_pais: List[Dict[str, Any]]
+    processos_pais: List[Dict[str, Any]],
+    envolvidos_e_parceiros: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Renderiza a aba de Dados Básicos do modal.
@@ -26,14 +28,18 @@ def render_aba_dados_basicos(
     Args:
         state: Estado do modal
         dados: Dados do processo (se edição)
-        todas_pessoas: Lista de todas as pessoas
+        todas_pessoas: Lista de todas as pessoas (clientes)
         todos_casos: Lista de todos os casos
         usuarios_internos: Lista de usuários internos já carregada
         processos_pais: Lista de processos pais já carregada
+        envolvidos_e_parceiros: Lista de envolvidos e parceiros para Parte Contrária e Outros Envolvidos
         
     Returns:
         Dicionário com referências aos campos criados
     """
+    # Fallback para compatibilidade
+    if envolvidos_e_parceiros is None:
+        envolvidos_e_parceiros = []
     # Mapeamento de cores para tags
     TAG_COLORS = {
         'clients': '#4CAF50',
@@ -244,6 +250,13 @@ def render_aba_dados_basicos(
                     
                     ui.button(icon='edit_calendar', on_click=date_menu.open).props('flat dense round').tooltip('Selecionar data aproximada')
                 
+                # Prioridade
+                prioridade_select = ui.select(
+                    CODIGOS_PRIORIDADE,
+                    label='Prioridade',
+                    value=dados.get('prioridade', PRIORIDADE_PADRAO)
+                ).classes('w-full').props('outlined dense')
+                
                 # Responsável pelo Processo (usa lista já carregada)
                 responsavel_options = [''] + [u.get('nome', u.get('email', '')) for u in usuarios_internos]
                 
@@ -281,32 +294,33 @@ def render_aba_dados_basicos(
                             ).props('flat dense').style('color: #4CAF50;')
                         client_chips = ui.column().classes('w-full')
                     
-                    # Parte Contrária
-                    opposing_options = [format_option_for_search(p) for p in todas_pessoas]
+                    # Parte Contrária (usa envolvidos e parceiros, não clientes)
+                    opposing_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
                     with ui.column().classes('flex-1 gap-2'):
                         with ui.row().classes('w-full gap-2 items-center'):
                             opposing_sel = ui.select(
-                                opposing_options or ['-'],
+                                opposing_options or ['— Nenhum envolvido/parceiro cadastrado —'],
                                 label='Parte Contrária',
                                 with_input=True
                             ).classes('flex-grow').props('dense outlined')
                             ui.button(
                                 icon='add',
-                                on_click=lambda: add_item(opposing_sel, state['selected_opposing'], opposing_chips, 'opposing', todas_pessoas)
+                                on_click=lambda: add_item(opposing_sel, state['selected_opposing'], opposing_chips, 'opposing', envolvidos_e_parceiros)
                             ).props('flat dense').style('color: #F44336;')
                         opposing_chips = ui.column().classes('w-full')
                 
-                # Outros Envolvidos
+                # Outros Envolvidos (usa envolvidos e parceiros, não clientes)
+                others_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
                 with ui.column().classes('w-full gap-2'):
                     with ui.row().classes('w-full gap-2 items-center'):
                         others_sel = ui.select(
-                            opposing_options or ['-'],
+                            others_options or ['— Nenhum envolvido/parceiro cadastrado —'],
                             label='Outros Envolvidos',
                             with_input=True
                         ).classes('flex-grow').props('dense outlined')
                         ui.button(
                             icon='add',
-                            on_click=lambda: add_item(others_sel, state['selected_others'], others_chips, 'others', todas_pessoas)
+                            on_click=lambda: add_item(others_sel, state['selected_others'], others_chips, 'others', envolvidos_e_parceiros)
                         ).props('flat dense').style('color: #2196F3;')
                     others_chips = ui.column().classes('w-full')
         
@@ -349,6 +363,7 @@ def render_aba_dados_basicos(
         'link_input': link_input,
         'type_select': type_select,
         'data_abertura_input': data_abertura_input,
+        'prioridade_select': prioridade_select,
         'responsavel_select': responsavel_select,
         'client_sel': client_sel,
         'opposing_sel': opposing_sel,

@@ -88,7 +88,11 @@ def casos():
     # OTIMIZAÇÃO: Carrega todos os dados UMA ÚNICA VEZ no início
     # ==========================================================================
     
-    with layout('Casos', breadcrumbs=[('Casos', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Casos', url_modulo='/casos')
+    
+    with layout('Casos', breadcrumbs=breadcrumbs):
         # === Indicador de Loading ===
         loading_container = ui.column().classes('w-full items-center justify-center py-16')
         with loading_container:

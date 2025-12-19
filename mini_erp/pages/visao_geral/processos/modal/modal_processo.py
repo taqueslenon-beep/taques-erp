@@ -10,13 +10,14 @@ import time
 from mini_erp.core import PRIMARY_COLOR, get_display_name
 from mini_erp.firebase_config import ensure_firebase_initialized, get_auth
 from mini_erp.storage import obter_display_name
+from mini_erp.models.prioridade import PRIORIDADE_PADRAO
 from ..database import (
     criar_processo, atualizar_processo, excluir_processo,
     buscar_processo, listar_processos_pais
 )
 from ..models import validar_processo, criar_processo_vazio
 from ..cache import cached_call
-from ...pessoas.database import listar_pessoas
+from ...pessoas.database import listar_pessoas, listar_envolvidos, listar_parceiros
 from ...casos.database import listar_casos
 from .aba_dados_basicos import render_aba_dados_basicos
 from .aba_dados_juridicos import render_aba_dados_juridicos
@@ -84,7 +85,7 @@ def carregar_dados_modal():
     Carrega todos os dados necessários em paralelo usando cache.
     
     Returns:
-        Dicionário com 'pessoas', 'casos', 'usuarios', 'processos_pais'
+        Dicionário com 'pessoas', 'casos', 'usuarios', 'processos_pais', 'envolvidos_e_parceiros'
     """
     t0 = time.time()
     print(f"[MODAL] Iniciando carregamento paralelo...")
@@ -93,15 +94,19 @@ def carregar_dados_modal():
         'pessoas': [],
         'casos': [],
         'usuarios': [],
-        'processos_pais': []
+        'processos_pais': [],
+        'envolvidos': [],
+        'parceiros': []
     }
     
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {
             executor.submit(lambda: cached_call('pessoas', listar_pessoas)): 'pessoas',
             executor.submit(lambda: cached_call('casos', listar_casos)): 'casos',
             executor.submit(lambda: cached_call('usuarios', listar_usuarios_internos)): 'usuarios',
             executor.submit(lambda: cached_call('processos_pais', listar_processos_pais)): 'processos_pais',
+            executor.submit(lambda: cached_call('envolvidos', listar_envolvidos)): 'envolvidos',
+            executor.submit(lambda: cached_call('parceiros', listar_parceiros)): 'parceiros',
         }
         
         for future in as_completed(futures):
@@ -114,6 +119,9 @@ def carregar_dados_modal():
                 import traceback
                 traceback.print_exc()
                 resultados[key] = []
+    
+    # Combina envolvidos e parceiros em uma única lista
+    resultados['envolvidos_e_parceiros'] = resultados['envolvidos'] + resultados['parceiros']
     
     print(f"[MODAL] Total carregamento: {time.time() - t0:.2f}s")
     return resultados
@@ -185,14 +193,33 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
     Args:
         processo: Dicionário com dados do processo (None para criar novo)
         on_save: Callback executado após salvar com sucesso
+    
+    BUGFIX 2024-12-19: Adicionado tratamento robusto de erros e logging
+    detalhado para resolver problema de modal vazio no workspace VG.
     """
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] [DEBUG] Abrindo modal para processo: {processo is not None}")
+    print(f"[{timestamp}] [MODAL_VG] ====== ABRINDO MODAL ======")
+    print(f"[{timestamp}] [MODAL_VG] Modo: {'EDIÇÃO' if processo else 'CRIAÇÃO'}")
+    
     if processo:
-        print(f"[{timestamp}] [DEBUG] Dados recebidos: {list(processo.keys())}")
+        print(f"[{timestamp}] [MODAL_VG] Processo ID: {processo.get('_id', 'SEM_ID')}")
+        print(f"[{timestamp}] [MODAL_VG] Título: {processo.get('titulo', 'SEM_TÍTULO')}")
+        print(f"[{timestamp}] [MODAL_VG] Campos recebidos: {list(processo.keys())}")
+    
+    # Validação de dados para modo edição
+    if processo and not processo.get('_id'):
+        print(f"[{timestamp}] [MODAL_VG] ⚠ ALERTA: Processo recebido sem _id!")
+        ui.notify('Erro: Dados do processo incompletos (sem ID).', type='warning')
     
     is_edicao = processo is not None
-    dados = processo.copy() if processo else criar_processo_vazio()
+    
+    # Copia dados de forma segura, garantindo que não seja None
+    if processo:
+        dados = dict(processo)  # Cria cópia segura
+        print(f"[{timestamp}] [MODAL_VG] Dados copiados: {len(dados)} campos")
+    else:
+        dados = criar_processo_vazio()
+        print(f"[{timestamp}] [MODAL_VG] Novo processo criado com dados vazios")
     
     # Estado local
     state = {
@@ -217,6 +244,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
     todos_casos = dados_carregados['casos']
     usuarios_internos = dados_carregados['usuarios']
     processos_pais = dados_carregados['processos_pais']
+    envolvidos_e_parceiros = dados_carregados['envolvidos_e_parceiros']
     
     # CSS do modal
     ui.add_head_html(f'<style>{PROCESSES_TABLE_CSS}</style>')
@@ -270,7 +298,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                     with ui.tab_panel(tab_basic):
                         try:
                             aba_basicos_refs = render_aba_dados_basicos(
-                                state, dados, todas_pessoas, todos_casos, usuarios_internos, processos_pais
+                                state, dados, todas_pessoas, todos_casos, usuarios_internos, processos_pais, envolvidos_e_parceiros
                             )
                             abas_renderizadas['basic'] = True
                         except Exception as e:
@@ -281,79 +309,47 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                                 ui.label('Erro ao carregar aba Dados Básicos').classes('text-red-500 font-bold text-lg')
                                 ui.label(f'Erro: {str(e)}').classes('text-red-400 text-sm')
                     
-                    # TAB 2: DADOS JURÍDICOS - lazy
+                    # TAB 2: DADOS JURÍDICOS
                     with ui.tab_panel(tab_legal):
-                        container_legal = ui.column().classes('w-full')
-                        with container_legal:
-                            ui.label('Carregando...').classes('text-gray-400')
+                        try:
+                            aba_juridicos_refs = render_aba_dados_juridicos(dados)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Dados Jurídicos: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
-                    # TAB 3: RELATÓRIO - lazy
+                    # TAB 3: RELATÓRIO
                     with ui.tab_panel(tab_relatory):
-                        container_relatory = ui.column().classes('w-full')
-                        with container_relatory:
-                            ui.label('Carregando...').classes('text-gray-400')
+                        try:
+                            aba_relatorio_refs = render_aba_relatorio(dados, is_edicao)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Relatório: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
-                    # TAB 4: ESTRATÉGIA - lazy
+                    # TAB 4: ESTRATÉGIA
                     with ui.tab_panel(tab_strategy):
-                        container_strategy = ui.column().classes('w-full')
-                        with container_strategy:
-                            ui.label('Carregando...').classes('text-gray-400')
+                        try:
+                            aba_estrategia_refs = render_aba_estrategia(dados, is_edicao)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Estratégia: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
-                    # TAB 5: CENÁRIOS - lazy
+                    # TAB 5: CENÁRIOS
                     with ui.tab_panel(tab_scenarios):
-                        container_scenarios = ui.column().classes('w-full')
-                        with container_scenarios:
-                            ui.label('Carregando...').classes('text-gray-400')
+                        try:
+                            aba_cenarios_refs = render_aba_cenarios(state)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Cenários: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
-                    # TAB 6: PROTOCOLOS - lazy
+                    # TAB 6: PROTOCOLOS
                     with ui.tab_panel(tab_protocols):
-                        container_protocols = ui.column().classes('w-full')
-                        with container_protocols:
-                            ui.label('Carregando...').classes('text-gray-400')
+                        try:
+                            aba_protocolos_refs = render_aba_protocolos(state)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Protocolos: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
-                    # Handler para mudança de aba (lazy loading)
-                    def on_tab_change(e):
-                        """Renderiza aba sob demanda quando usuário clica nela."""
-                        current_tab = panels.value
-                        
-                        if current_tab == tab_legal and not abas_renderizadas['legal']:
-                            print(f"[MODAL] Renderizando aba: legal")
-                            container_legal.clear()
-                            with container_legal:
-                                nonlocal aba_juridicos_refs
-                                aba_juridicos_refs = render_aba_dados_juridicos(dados)
-                            abas_renderizadas['legal'] = True
-                        elif current_tab == tab_relatory and not abas_renderizadas['relatory']:
-                            print(f"[MODAL] Renderizando aba: relatory")
-                            container_relatory.clear()
-                            with container_relatory:
-                                nonlocal aba_relatorio_refs
-                                aba_relatorio_refs = render_aba_relatorio(dados, is_edicao)
-                            abas_renderizadas['relatory'] = True
-                        elif current_tab == tab_strategy and not abas_renderizadas['strategy']:
-                            print(f"[MODAL] Renderizando aba: strategy")
-                            container_strategy.clear()
-                            with container_strategy:
-                                nonlocal aba_estrategia_refs
-                                aba_estrategia_refs = render_aba_estrategia(dados, is_edicao)
-                            abas_renderizadas['strategy'] = True
-                        elif current_tab == tab_scenarios and not abas_renderizadas['scenarios']:
-                            print(f"[MODAL] Renderizando aba: scenarios")
-                            container_scenarios.clear()
-                            with container_scenarios:
-                                nonlocal aba_cenarios_refs
-                                aba_cenarios_refs = render_aba_cenarios(state)
-                            abas_renderizadas['scenarios'] = True
-                        elif current_tab == tab_protocols and not abas_renderizadas['protocols']:
-                            print(f"[MODAL] Renderizando aba: protocols")
-                            container_protocols.clear()
-                            with container_protocols:
-                                nonlocal aba_protocolos_refs
-                                aba_protocolos_refs = render_aba_protocolos(state)
-                            abas_renderizadas['protocols'] = True
-                    
-                    # Registra handler de mudança de aba
-                    panels.on('update:model-value', on_tab_change)
+                    # Todas as abas são renderizadas de uma vez (sem lazy loading)
             
             # Footer Actions
             with ui.row().classes('absolute bottom-0 right-0 p-4 gap-2 z-10').style('background: rgba(249, 250, 251, 0.95); border-radius: 8px 0 0 0;'):
@@ -410,12 +406,13 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                     novos_dados = {
                         'titulo': aba_basicos_refs.get('title_input', {}).value.strip() if aba_basicos_refs.get('title_input') and aba_basicos_refs['title_input'].value else '',
                         'numero': aba_basicos_refs.get('number_input', {}).value.strip() if aba_basicos_refs.get('number_input') and aba_basicos_refs['number_input'].value else '',
+                        'link': aba_basicos_refs.get('link_input', {}).value.strip() if aba_basicos_refs.get('link_input') and aba_basicos_refs['link_input'].value else '',
                         'tipo': aba_basicos_refs.get('type_select', {}).value if aba_basicos_refs.get('type_select') else 'Judicial',
+                        'nucleo': aba_juridicos_refs.get('nucleo_select', {}).value if aba_juridicos_refs.get('nucleo_select') else 'Ambiental',
+                        'tipo_ambiental': aba_juridicos_refs.get('tipo_ambiental_select', {}).value if aba_juridicos_refs.get('tipo_ambiental_select') and aba_juridicos_refs.get('nucleo_select', {}).value == 'Ambiental' else '',
                         'sistema_processual': aba_juridicos_refs.get('system_select', {}).value if aba_juridicos_refs.get('system_select') else '',
                         'area': aba_juridicos_refs.get('area_select', {}).value if aba_juridicos_refs.get('area_select') else '',
                         'estado': aba_juridicos_refs.get('estado_select', {}).value if aba_juridicos_refs.get('estado_select') else '',
-                        'comarca': aba_juridicos_refs.get('comarca_input', {}).value.strip() if aba_juridicos_refs.get('comarca_input') and aba_juridicos_refs['comarca_input'].value else '',
-                        'vara': aba_juridicos_refs.get('vara_input', {}).value.strip() if aba_juridicos_refs.get('vara_input') and aba_juridicos_refs['vara_input'].value else '',
                         'caso_id': selected_cases_ids[0] if selected_cases_ids else '',
                         'caso_titulo': caso_titulo,
                         'clientes': state['selected_clients'].copy(),
@@ -426,9 +423,9 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         'parte_contraria': parte_contraria,
                         'processo_pai_id': processo_pai_id,
                         'processo_pai_titulo': processo_pai_titulo,
-                        'status': aba_juridicos_refs.get('status_select', {}).value if aba_juridicos_refs.get('status_select') else 'Ativo',
-                        'resultado': aba_juridicos_refs.get('result_select', {}).value if aba_juridicos_refs.get('result_select') and aba_juridicos_refs['result_select'].value and aba_juridicos_refs['result_select'].value != 'Pendente' else 'Pendente',
+                        'status': aba_juridicos_refs.get('status_select', {}).value if aba_juridicos_refs.get('status_select') else 'Em andamento',
                         'data_abertura': aba_basicos_refs.get('data_abertura_input', {}).value.strip() if aba_basicos_refs.get('data_abertura_input') and aba_basicos_refs['data_abertura_input'].value else '',
+                        'prioridade': aba_basicos_refs.get('prioridade_select', {}).value if aba_basicos_refs.get('prioridade_select') else PRIORIDADE_PADRAO,
                         'responsavel': responsavel_uid,
                         'responsavel_nome': responsavel_nome,
                         'observacoes': aba_estrategia_refs.get('observations_input', {}).value if aba_estrategia_refs.get('observations_input') else '',
@@ -488,102 +485,136 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
         
         # Popular campos após criar o dialog (garante que todos os campos existam)
         def populate_all_fields():
-            """Popula todos os campos do formulário com dados do processo."""
-            if is_edicao and aba_basicos_refs:
+            """
+            Popula todos os campos do formulário com dados do processo.
+            
+            BUGFIX 2024-12-19: Adicionado verificações de segurança e
+            logging detalhado para diagnosticar problemas de carregamento.
+            """
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            if not is_edicao:
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] Modo criação - nada a popular")
+                return
+            
+            if not aba_basicos_refs:
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ❌ ERRO: aba_basicos_refs está vazio!")
+                ui.notify('Erro interno: campos não inicializados.', type='warning')
+                return
+            
+            if not dados:
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ❌ ERRO: dados está vazio!")
+                ui.notify('Erro: dados do processo não disponíveis.', type='warning')
+                return
+                
+            try:
+                processo_id = state.get('process_id') or dados.get('_id') or 'SEM_ID'
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] Iniciando população de campos para processo ID: {processo_id}")
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] Campos disponíveis em dados: {list(dados.keys())}")
+                
+                # Campos básicos
+                if 'title_input' in aba_basicos_refs:
+                    aba_basicos_refs['title_input'].value = safe_get('titulo', '', 'title')
+                if 'number_input' in aba_basicos_refs:
+                    aba_basicos_refs['number_input'].value = safe_get('numero', '', 'number')
+                if 'link_input' in aba_basicos_refs:
+                    aba_basicos_refs['link_input'].value = safe_get('link', '')
+                if 'type_select' in aba_basicos_refs:
+                    aba_basicos_refs['type_select'].value = safe_get('tipo', 'Judicial') or 'Judicial'
+                if 'data_abertura_input' in aba_basicos_refs:
+                    aba_basicos_refs['data_abertura_input'].value = safe_get('data_abertura', '')
+                if 'prioridade_select' in aba_basicos_refs:
+                    aba_basicos_refs['prioridade_select'].value = safe_get('prioridade', PRIORIDADE_PADRAO) or PRIORIDADE_PADRAO
+                
+                # Campos jurídicos
+                if 'nucleo_select' in aba_juridicos_refs:
+                    aba_juridicos_refs['nucleo_select'].value = safe_get('nucleo', 'Ambiental') or 'Ambiental'
+                if 'tipo_ambiental_select' in aba_juridicos_refs:
+                    aba_juridicos_refs['tipo_ambiental_select'].value = safe_get('tipo_ambiental', 'Desmatamento') or 'Desmatamento'
+                if 'system_select' in aba_juridicos_refs:
+                    aba_juridicos_refs['system_select'].value = safe_get('sistema_processual', '')
+                if 'area_select' in aba_juridicos_refs:
+                    aba_juridicos_refs['area_select'].value = safe_get('area', '')
+                if 'estado_select' in aba_juridicos_refs:
+                    aba_juridicos_refs['estado_select'].value = safe_get('estado', 'Santa Catarina') or 'Santa Catarina'
+                if 'status_select' in aba_juridicos_refs:
+                    # Migração de status antigos para novos
+                    status_antigo = safe_get('status', 'Em andamento')
+                    status_mapeamento = {
+                        'Ativo': 'Em andamento',
+                        'Suspenso': 'Em monitoramento',
+                        'Arquivado': 'Concluído',
+                        'Baixado': 'Concluído',
+                        'Encerrado': 'Concluído',
+                    }
+                    status_novo = status_mapeamento.get(status_antigo, status_antigo)
+                    if status_novo not in ['Em andamento', 'Concluído', 'Em monitoramento']:
+                        status_novo = 'Em andamento'
+                    aba_juridicos_refs['status_select'].value = status_novo
+                
+                # Campos de relatório
+                if 'relatory_facts_input' in aba_relatorio_refs:
+                    aba_relatorio_refs['relatory_facts_input'].value = safe_get('relatory_facts', '')
+                if 'relatory_timeline_input' in aba_relatorio_refs:
+                    aba_relatorio_refs['relatory_timeline_input'].value = safe_get('relatory_timeline', '')
+                if 'relatory_documents_input' in aba_relatorio_refs:
+                    aba_relatorio_refs['relatory_documents_input'].value = safe_get('relatory_documents', '')
+                
+                # Campos de estratégia
+                if 'objectives_input' in aba_estrategia_refs:
+                    aba_estrategia_refs['objectives_input'].value = safe_get('strategy_objectives', '')
+                if 'thesis_input' in aba_estrategia_refs:
+                    aba_estrategia_refs['thesis_input'].value = safe_get('legal_thesis', '')
+                if 'observations_input' in aba_estrategia_refs:
+                    aba_estrategia_refs['observations_input'].value = safe_get('strategy_observations', '') or safe_get('observacoes', '')
+                
+                # Cenários
+                if dados.get('scenarios') and isinstance(dados.get('scenarios'), list):
+                    state['scenarios'] = dados.get('scenarios')
+                else:
+                    state['scenarios'] = []
+                    if dados.get('cenario_melhor'):
+                        state['scenarios'].append({'title': 'Melhor Cenário', 'type': '🟢 Positivo', 'obs': dados.get('cenario_melhor')})
+                    if dados.get('cenario_intermediario'):
+                        state['scenarios'].append({'title': 'Cenário Intermediário', 'type': '⚪ Neutro', 'obs': dados.get('cenario_intermediario')})
+                    if dados.get('cenario_pior'):
+                        state['scenarios'].append({'title': 'Pior Cenário', 'type': '🔴 Negativo', 'obs': dados.get('cenario_pior')})
+                
+                # Protocolos
+                if dados.get('protocols') and isinstance(dados.get('protocols'), list):
+                    state['protocols'] = dados.get('protocols')
+                else:
+                    state['protocols'] = []
+                
+                # Renderizar chips
                 try:
-                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    processo_id = state.get('process_id') or 'SEM_ID'
-                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] Iniciando população de campos para processo ID: {processo_id}")
-                    
-                    # Campos básicos
-                    if 'title_input' in aba_basicos_refs:
-                        aba_basicos_refs['title_input'].value = safe_get('titulo', '', 'title')
-                    if 'number_input' in aba_basicos_refs:
-                        aba_basicos_refs['number_input'].value = safe_get('numero', '', 'number')
-                    if 'link_input' in aba_basicos_refs:
-                        aba_basicos_refs['link_input'].value = safe_get('link', '')
-                    if 'type_select' in aba_basicos_refs:
-                        aba_basicos_refs['type_select'].value = safe_get('tipo', 'Judicial') or 'Judicial'
-                    if 'data_abertura_input' in aba_basicos_refs:
-                        aba_basicos_refs['data_abertura_input'].value = safe_get('data_abertura', '')
-                    
-                    # Campos jurídicos
-                    if 'system_select' in aba_juridicos_refs:
-                        aba_juridicos_refs['system_select'].value = safe_get('sistema_processual', '')
-                    if 'area_select' in aba_juridicos_refs:
-                        aba_juridicos_refs['area_select'].value = safe_get('area', '')
-                    if 'estado_select' in aba_juridicos_refs:
-                        aba_juridicos_refs['estado_select'].value = safe_get('estado', 'Santa Catarina') or 'Santa Catarina'
-                    if 'comarca_input' in aba_juridicos_refs:
-                        aba_juridicos_refs['comarca_input'].value = safe_get('comarca', '')
-                    if 'vara_input' in aba_juridicos_refs:
-                        aba_juridicos_refs['vara_input'].value = safe_get('vara', '')
-                    if 'status_select' in aba_juridicos_refs:
-                        aba_juridicos_refs['status_select'].value = safe_get('status', 'Ativo') or 'Ativo'
-                    if 'result_select' in aba_juridicos_refs:
-                        aba_juridicos_refs['result_select'].value = safe_get('resultado', 'Pendente') or 'Pendente'
-                    if 'toggle_result' in aba_juridicos_refs:
-                        aba_juridicos_refs['toggle_result']()
-                    
-                    # Campos de relatório
-                    if 'relatory_facts_input' in aba_relatorio_refs:
-                        aba_relatorio_refs['relatory_facts_input'].value = safe_get('relatory_facts', '')
-                    if 'relatory_timeline_input' in aba_relatorio_refs:
-                        aba_relatorio_refs['relatory_timeline_input'].value = safe_get('relatory_timeline', '')
-                    if 'relatory_documents_input' in aba_relatorio_refs:
-                        aba_relatorio_refs['relatory_documents_input'].value = safe_get('relatory_documents', '')
-                    
-                    # Campos de estratégia
-                    if 'objectives_input' in aba_estrategia_refs:
-                        aba_estrategia_refs['objectives_input'].value = safe_get('strategy_objectives', '')
-                    if 'thesis_input' in aba_estrategia_refs:
-                        aba_estrategia_refs['thesis_input'].value = safe_get('legal_thesis', '')
-                    if 'observations_input' in aba_estrategia_refs:
-                        aba_estrategia_refs['observations_input'].value = safe_get('strategy_observations', '') or safe_get('observacoes', '')
-                    
-                    # Cenários
-                    if dados.get('scenarios') and isinstance(dados.get('scenarios'), list):
-                        state['scenarios'] = dados.get('scenarios')
-                    else:
-                        state['scenarios'] = []
-                        if dados.get('cenario_melhor'):
-                            state['scenarios'].append({'title': 'Melhor Cenário', 'type': '🟢 Positivo', 'obs': dados.get('cenario_melhor')})
-                        if dados.get('cenario_intermediario'):
-                            state['scenarios'].append({'title': 'Cenário Intermediário', 'type': '⚪ Neutro', 'obs': dados.get('cenario_intermediario')})
-                        if dados.get('cenario_pior'):
-                            state['scenarios'].append({'title': 'Pior Cenário', 'type': '🔴 Negativo', 'obs': dados.get('cenario_pior')})
-                    
-                    # Protocolos
-                    if dados.get('protocols') and isinstance(dados.get('protocols'), list):
-                        state['protocols'] = dados.get('protocols')
-                    else:
-                        state['protocols'] = []
-                    
-                    # Renderizar chips
-                    try:
-                        if 'refresh_chips' in aba_basicos_refs and 'client_chips' in aba_basicos_refs:
-                            aba_basicos_refs['refresh_chips'](aba_basicos_refs['client_chips'], state['selected_clients'], 'clients', todas_pessoas)
-                        if isinstance(state['selected_opposing'], list) and 'opposing_chips' in aba_basicos_refs:
-                            aba_basicos_refs['refresh_chips'](aba_basicos_refs['opposing_chips'], state['selected_opposing'], 'opposing', todas_pessoas)
-                        if 'others_chips' in aba_basicos_refs:
-                            aba_basicos_refs['refresh_chips'](aba_basicos_refs['others_chips'], state['selected_others'], 'others', todas_pessoas)
-                        if 'cases_chips' in aba_basicos_refs:
-                            aba_basicos_refs['refresh_chips'](aba_basicos_refs['cases_chips'], state['selected_cases'], 'cases', None)
-                        if state.get('processo_pai_id') and 'refresh_parent_chips' in aba_basicos_refs and 'parent_process_chips' in aba_basicos_refs:
-                            aba_basicos_refs['refresh_parent_chips'](aba_basicos_refs['parent_process_chips'], state['processo_pai_id'])
-                    except Exception as e:
-                        print(f"[MODAL_VG] [POPULAR] ⚠ Erro ao renderizar chips: {e}")
-                        import traceback
-                        traceback.print_exc()
-                    
-                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ População de campos concluída")
-                    
+                    if 'refresh_chips' in aba_basicos_refs and 'client_chips' in aba_basicos_refs:
+                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['client_chips'], state['selected_clients'], 'clients', todas_pessoas)
+                    if isinstance(state['selected_opposing'], list) and 'opposing_chips' in aba_basicos_refs:
+                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['opposing_chips'], state['selected_opposing'], 'opposing', envolvidos_e_parceiros)
+                    if 'others_chips' in aba_basicos_refs:
+                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['others_chips'], state['selected_others'], 'others', envolvidos_e_parceiros)
+                    if 'cases_chips' in aba_basicos_refs:
+                        aba_basicos_refs['refresh_chips'](aba_basicos_refs['cases_chips'], state['selected_cases'], 'cases', None)
+                    if state.get('processo_pai_id') and 'refresh_parent_chips' in aba_basicos_refs and 'parent_process_chips' in aba_basicos_refs:
+                        aba_basicos_refs['refresh_parent_chips'](aba_basicos_refs['parent_process_chips'], state['processo_pai_id'])
                 except Exception as e:
-                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    print(f"[{timestamp}] [MODAL_VG] [POPULAR] ❌ Erro ao popular campos: {e}")
+                    print(f"[MODAL_VG] [POPULAR] ⚠ Erro ao renderizar chips: {e}")
                     import traceback
                     traceback.print_exc()
-                    ui.notify(f'Erro ao carregar dados do processo: {str(e)}', type='warning')
+                
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ✓ População de campos concluída com sucesso")
+                
+                # Feedback visual de sucesso (discreto)
+                titulo_processo = dados.get('titulo', 'Processo')
+                ui.notify(f'Dados carregados: {titulo_processo[:40]}...', type='info', timeout=2000)
+                
+            except Exception as e:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{timestamp}] [MODAL_VG] [POPULAR] ❌ Erro ao popular campos: {e}")
+                import traceback
+                traceback.print_exc()
+                ui.notify(f'Erro ao carregar dados do processo: {str(e)}', type='negative')
         
         # Carregar opções de processos pais (usa lista já carregada em paralelo)
         if aba_basicos_refs and 'parent_process_sel' in aba_basicos_refs:

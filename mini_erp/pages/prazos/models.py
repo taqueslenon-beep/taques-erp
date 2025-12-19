@@ -101,6 +101,33 @@ INTERVALOS_PARCELAS_LABELS = {
 
 
 # =============================================================================
+# CONSTANTES - PRIORIDADES
+# =============================================================================
+
+# Valores possíveis de prioridade
+PRIORIDADE_OPCOES = ['baixa', 'media', 'alta', 'urgente']
+
+# Prioridade padrão
+PRIORIDADE_PADRAO = 'media'
+
+# Labels para exibição
+PRIORIDADE_LABELS = {
+    'baixa': 'Baixa',
+    'media': 'Média',
+    'alta': 'Alta',
+    'urgente': 'Urgente',
+}
+
+# Ordem de prioridade (para ordenação: maior = mais prioritário)
+PRIORIDADE_ORDEM = {
+    'urgente': 4,
+    'alta': 3,
+    'media': 2,
+    'baixa': 1,
+}
+
+
+# =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
 # =============================================================================
 
@@ -121,6 +148,7 @@ class Prazo(TypedDict, total=False):
     casos: List[str]  # Lista de caso_ids (slugs)
     prazo_fatal: float  # Timestamp (time.time())
     status: str  # 'pendente' | 'concluido'
+    prioridade: str  # 'baixa' | 'media' | 'alta' | 'urgente' (obrigatório)
     recorrente: bool
     tipo_prazo: str  # 'simples' | 'recorrente' | 'parcelado'
     config_recorrencia: Optional[ConfigRecorrencia]
@@ -134,6 +162,61 @@ class Prazo(TypedDict, total=False):
     criado_em: float  # Timestamp
     atualizado_em: float  # Timestamp
     criado_por: str  # user_id
+
+
+# =============================================================================
+# FUNÇÕES AUXILIARES DE PRIORIDADE
+# =============================================================================
+
+def validar_prioridade(prioridade: str) -> bool:
+    """
+    Valida se uma prioridade é válida.
+    
+    Args:
+        prioridade: Código da prioridade a validar
+    
+    Returns:
+        True se válida, False caso contrário
+    """
+    if not prioridade:
+        return False
+    
+    return prioridade.lower() in PRIORIDADE_OPCOES
+
+
+def normalizar_prioridade(prioridade: Optional[str]) -> str:
+    """
+    Normaliza uma prioridade (converte para minúscula e valida).
+    
+    Args:
+        prioridade: Código da prioridade (pode ser None ou vazio)
+    
+    Returns:
+        Código normalizado ou PRIORIDADE_PADRAO se inválido
+    """
+    if not prioridade:
+        return PRIORIDADE_PADRAO
+    
+    prioridade_lower = prioridade.lower().strip()
+    
+    if validar_prioridade(prioridade_lower):
+        return prioridade_lower
+    
+    return PRIORIDADE_PADRAO
+
+
+def obter_ordem_prioridade(prioridade: str) -> int:
+    """
+    Retorna a ordem numérica de uma prioridade para ordenação.
+    
+    Args:
+        prioridade: Código da prioridade
+    
+    Returns:
+        Ordem numérica (1-4, onde 4 = mais prioritário)
+    """
+    prioridade_normalizada = normalizar_prioridade(prioridade)
+    return PRIORIDADE_ORDEM.get(prioridade_normalizada, 2)  # Default: media
 
 
 

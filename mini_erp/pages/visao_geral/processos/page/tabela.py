@@ -4,6 +4,7 @@ Contém CSS, slots Vue e funções de conversão de dados.
 """
 from datetime import datetime
 from typing import Dict, Any, List
+from mini_erp.models.prioridade import PRIORIDADE_PADRAO, get_cor_por_prioridade
 
 # =============================================================================
 # CSS PADRÃO PARA TABELAS DE PROCESSOS
@@ -106,11 +107,9 @@ BODY_SLOT_STATUS = '''
     <q-td :props="props" style="vertical-align: middle;">
         <div style="display: flex; align-items: center; gap: 6px;">
             <q-badge 
-                :style="props.value === 'Ativo' ? 'background-color: #22c55e; color: white;' : 
-                        props.value === 'Suspenso' ? 'background-color: #eab308; color: #1f2937;' : 
-                        props.value === 'Arquivado' ? 'background-color: #6b7280; color: white;' : 
-                        props.value === 'Baixado' ? 'background-color: #ef4444; color: white;' : 
-                        props.value === 'Encerrado' ? 'background-color: #166534; color: white;' : 
+                :style="props.value === 'Em andamento' ? 'background-color: #fbbf24; color: #1f2937;' : 
+                        props.value === 'Concluído' ? 'background-color: #059669; color: white;' : 
+                        props.value === 'Em monitoramento' ? 'background-color: #f97316; color: white;' : 
                         'background-color: #d1d5db; color: #000000;'"
                 class="px-3 py-1"
                 style="border: 1px solid rgba(0,0,0,0.1);"
@@ -121,20 +120,55 @@ BODY_SLOT_STATUS = '''
     </q-td>
 '''
 
+BODY_SLOT_NUCLEO = '''
+    <q-td :props="props" style="vertical-align: middle;">
+        <q-badge 
+            v-if="props.value && props.value !== '-'"
+            :style="props.value === 'Ambiental' ? 'background-color: #223631; color: white;' : 
+                    props.value === 'Cobranças' ? 'background-color: #f59e0b; color: white;' : 
+                    props.value === 'Generalista' ? 'background-color: #6366f1; color: white;' : 
+                    'background-color: #e5e7eb; color: #374151;'"
+            class="px-2 py-1"
+            style="font-weight: 600; font-size: 11px; border-radius: 4px;"
+        >
+            {{ props.value }}
+        </q-badge>
+        <span v-else class="text-gray-400">-</span>
+    </q-td>
+'''
+
 # =============================================================================
 # COLUNAS DA TABELA
 # =============================================================================
 
 COLUMNS = [
+    {'name': 'acoes', 'label': '', 'field': 'acoes', 'align': 'center', 'sortable': False, 'style': 'width: 50px; min-width: 50px;'},
     {'name': 'data_abertura', 'label': 'Data', 'field': 'data_abertura_sort', 'align': 'center', 'sortable': True, 'style': 'width: 90px; min-width: 90px;'},
+    {'name': 'nucleo', 'label': 'Núcleo', 'field': 'nucleo', 'align': 'center', 'sortable': True, 'style': 'width: 100px;'},
     {'name': 'area', 'label': 'Área', 'field': 'area', 'align': 'left', 'sortable': True, 'style': 'width: 120px; max-width: 120px;'},
     {'name': 'title', 'label': 'Título', 'field': 'title', 'align': 'left', 'sortable': True, 'style': 'width: 280px; max-width: 280px;'},
     {'name': 'cases', 'label': 'Casos', 'field': 'cases', 'align': 'left', 'style': 'width: 180px; min-width: 180px;'},
     {'name': 'number', 'label': 'Número', 'field': 'number', 'align': 'left', 'sortable': True, 'style': 'width: 180px;'},
-    {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
-    {'name': 'opposing', 'label': 'Parte Contrária', 'field': 'opposing', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
-    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 150px;'},
+    {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left', 'style': 'width: 120px; max-width: 120px;'},
+    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 140px;'},
 ]
+
+# Slot para coluna de ações (botão editar)
+BODY_SLOT_ACOES = '''
+    <q-td :props="props" style="vertical-align: middle; text-align: center; padding: 4px;">
+        <q-btn 
+            flat 
+            round 
+            dense 
+            icon="edit" 
+            color="primary" 
+            size="sm"
+            @click="$parent.$emit('edit', props.row)"
+        >
+            <q-tooltip>Editar</q-tooltip>
+        </q-btn>
+    </q-td>
+'''
 
 
 # =============================================================================
@@ -202,20 +236,34 @@ def converter_processo_para_row(processo: dict) -> dict:
     parte_contraria = processo.get('parte_contraria', '')
     opposing_list = [parte_contraria.upper()] if parte_contraria else []
     
+    # Migra status antigos para novos
+    status_raw = processo.get('status', 'Em andamento')
+    status_mapeamento = {
+        'Ativo': 'Em andamento',
+        'Suspenso': 'Em monitoramento',
+        'Arquivado': 'Concluído',
+        'Baixado': 'Concluído',
+        'Encerrado': 'Concluído',
+    }
+    status_final = status_mapeamento.get(status_raw, status_raw)
+    if status_final not in ['Em andamento', 'Concluído', 'Em monitoramento']:
+        status_final = 'Em andamento'
+    
     return {
         '_id': processo.get('_id', ''),
         'data_abertura': data_abertura_display,
         'data_abertura_sort': data_abertura_sort,
+        'nucleo': processo.get('nucleo', 'Ambiental'),
         'title': processo.get('titulo', 'Sem título'),
         'title_raw': processo.get('titulo', 'Sem título'),
         'number': processo.get('numero', ''),
         'clients_list': clients_list,
-        'opposing_list': opposing_list,
         'cases_list': cases_list,
         'system': processo.get('sistema_processual', ''),
-        'status': processo.get('status', 'Ativo'),
+        'status': status_final,
         'area': processo.get('area', ''),
-        'link': '',  # vg_processos não tem campo link
+        'link': processo.get('link', ''),
+        'prioridade': processo.get('prioridade', PRIORIDADE_PADRAO),
         'is_third_party_monitoring': False,
         'is_desdobramento': False,
     }

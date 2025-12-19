@@ -172,7 +172,11 @@ def acordos():
             print(f"[ERROR] Erro ao abrir modal de edição: {e}")
             ui.notify('Erro ao carregar dados do acordo. Tente novamente.', type='negative')
     
-    with layout('Acordos', breadcrumbs=[('Acordos', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Acordos', url_modulo='/acordos')
+    
+    with layout('Acordos', breadcrumbs=breadcrumbs):
         # Header com botão e busca
         with ui.row().classes('w-full gap-4 mb-6 items-center flex-wrap'):
             ui.button('+ NOVO ACORDO', on_click=open_dialog_novo).props(

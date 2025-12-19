@@ -10,8 +10,8 @@ from mini_erp.firebase_config import ensure_firebase_initialized
 from ..database import listar_processos, buscar_processo
 from ..modal.modal_processo import abrir_modal_processo
 from .tabela import (
-    TABELA_PROCESSOS_CSS, COLUMNS, BODY_SLOT_AREA, BODY_SLOT_STATUS,
-    converter_processo_para_row
+    TABELA_PROCESSOS_CSS, COLUMNS, BODY_SLOT_AREA, BODY_SLOT_STATUS, BODY_SLOT_ACOES,
+    BODY_SLOT_NUCLEO, converter_processo_para_row
 )
 from .filtros import (
     criar_barra_pesquisa, criar_filtros, criar_botao_limpar_filtros, filtrar_rows
@@ -106,24 +106,52 @@ def _renderizar_pagina_processos():
                             ui.label('Nenhum processo encontrado para os filtros atuais.').classes('text-gray-400 italic')
                         return
                     
-                    # Cria tabela
+                    # Cria tabela com evento row-click habilitado
                     table = ui.table(columns=COLUMNS, rows=filtered_rows, row_key='_id', pagination={'rowsPerPage': 20}).classes('w-full')
                     
-                    # Handler para clique no título (abre modal de edição)
-                    def handle_title_click(e):
+                    # Handler para clique no botão editar - abre modal de edição
+                    def handle_edit_click(e):
+                        """Handler para clique no botão editar do processo."""
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] ========== BOTÃO EDITAR ==========")
+                        print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] Args: {e.args}")
+                        
                         clicked_row = e.args
                         if clicked_row and '_id' in clicked_row:
                             processo_id = clicked_row['_id']
+                            titulo_preview = clicked_row.get('title', clicked_row.get('titulo', 'SEM_TITULO'))[:50]
+                            print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] Processo ID: {processo_id}")
+                            print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] Título: {titulo_preview}")
+                            
+                            # Busca dados completos do Firestore
+                            print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] Buscando no Firestore...")
                             processo_completo = buscar_processo(processo_id)
+                            
                             if processo_completo:
+                                print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] ✓ Dados encontrados!")
+                                print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] Campos: {list(processo_completo.keys())}")
+                                
                                 abrir_modal_processo(
                                     processo=processo_completo,
                                     on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None
                                 )
+                                print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] ✓ Modal aberto com sucesso")
+                            else:
+                                print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] ❌ Processo NÃO encontrado!")
+                                ui.notify(f'Processo não encontrado: {processo_id}', type='negative')
+                        else:
+                            print(f"[{timestamp}] [PROCESSOS_VG] [EDIT] ❌ Dados inválidos")
+                            ui.notify('Erro: dados do processo não recebidos.', type='negative')
                     
-                    table.on('titleClick', handle_title_click)
+                    # Registra evento 'edit' emitido pelo botão no slot
+                    table.on('edit', handle_edit_click)
                     
                     # Slots customizados
+                    # Slot para coluna de ações (botão editar)
+                    table.add_slot('body-cell-acoes', BODY_SLOT_ACOES)
+                    
                     # Slot para data de abertura
                     table.add_slot('body-cell-data_abertura', '''
                         <q-td :props="props" 
@@ -136,18 +164,33 @@ def _renderizar_pagina_processos():
                         </q-td>
                     ''')
                     
+                    # Slot para núcleo
+                    table.add_slot('body-cell-nucleo', BODY_SLOT_NUCLEO)
+                    
                     # Slot para área
                     table.add_slot('body-cell-area', BODY_SLOT_AREA)
                     
-                    # Slot para título (clicável)
+                    # Slot para título - estilização (clique é capturado pelo row-click)
                     table.add_slot('body-cell-title', '''
-                        <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 280px; padding: 8px 12px; vertical-align: middle; position: relative;">
-                            <span 
-                                class="text-sm cursor-pointer font-medium" 
-                                style="line-height: 1.4; color: #223631; user-select: none;"
-                                @click="$parent.$emit('titleClick', props.row)">
-                                {{ props.value }}
-                            </span>
+                        <q-td :props="props" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 280px; padding: 8px 12px; vertical-align: middle; position: relative; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <span 
+                                    class="text-sm font-medium hover:text-[#00523C] hover:underline" 
+                                    style="line-height: 1.4; color: #223631; user-select: none;">
+                                    {{ props.value }}
+                                </span>
+                                <q-badge 
+                                    v-if="props.row.prioridade"
+                                    :style="props.row.prioridade === 'P1' ? 'background-color: #DC2626; color: white;' : 
+                                            props.row.prioridade === 'P2' ? 'background-color: #CA8A04; color: white;' : 
+                                            props.row.prioridade === 'P3' ? 'background-color: #2563EB; color: white;' : 
+                                            'background-color: #6B7280; color: white;'"
+                                    class="px-2 py-0.5"
+                                    style="font-weight: 600; font-size: 10px; border-radius: 9999px;"
+                                >
+                                    {{ props.row.prioridade }}
+                                </q-badge>
+                            </div>
                         </q-td>
                     ''')
                     
@@ -166,18 +209,6 @@ def _renderizar_pagina_processos():
                         </q-td>
                     ''')
                     
-                    # Slot para parte contrária
-                    table.add_slot('body-cell-opposing', '''
-                        <q-td :props="props" style="white-space: normal; vertical-align: middle; max-width: 100px; padding: 8px 8px;">
-                            <div v-if="props.row.opposing_list && props.row.opposing_list.length > 0" class="flex flex-col gap-0.5">
-                                <div v-for="(opposing, index) in props.row.opposing_list" :key="index" class="text-xs text-gray-700 leading-tight font-medium" style="word-wrap: break-word; overflow-wrap: break-word;">
-                                    {{ opposing }}
-                                </div>
-                            </div>
-                            <span v-else class="text-gray-400">—</span>
-                        </q-td>
-                    ''')
-                    
                     # Slot para casos
                     table.add_slot('body-cell-cases', '''
                         <q-td :props="props" style="vertical-align: middle; padding: 8px 12px;">
@@ -190,11 +221,19 @@ def _renderizar_pagina_processos():
                         </q-td>
                     ''')
                     
-                    # Slot para número
+                    # Slot para número (com link clicável se houver)
                     table.add_slot('body-cell-number', '''
                         <q-td :props="props" style="vertical-align: middle; padding: 6px 10px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <span v-if="props.value" 
+                                <a v-if="props.value && props.row.link" 
+                                   :href="props.row.link"
+                                   target="_blank"
+                                   class="process-number-link"
+                                   style="font-size: 11px; font-weight: normal; color: #0066cc; line-height: 1.4; font-family: inherit; text-decoration: underline; cursor: pointer;"
+                                   @click.stop>
+                                    {{ props.value }}
+                                </a>
+                                <span v-else-if="props.value" 
                                       class="process-number-text"
                                       style="font-size: 11px; font-weight: normal; color: #374151; line-height: 1.4; font-family: inherit;">
                                     {{ props.value }}

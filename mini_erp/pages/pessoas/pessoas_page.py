@@ -36,7 +36,11 @@ def _render_pessoas_content():
     # Invalidação ocorre apenas após operações de escrita (salvar/deletar)
     # Isso evita recarregamento desnecessário do Firestore a cada navegação
     
-    with layout('Pessoas', breadcrumbs=[('Pessoas', None)]):
+    # Gera breadcrumb padronizado com workspace
+    from ...componentes.breadcrumb_helper import gerar_breadcrumbs
+    breadcrumbs = gerar_breadcrumbs('Pessoas', url_modulo='/pessoas')
+    
+    with layout('Pessoas', breadcrumbs=breadcrumbs):
         # === Indicador de Loading ===
         loading_row = ui.row().classes('w-full justify-center py-8')
         with loading_row:

@@ -9,17 +9,22 @@ Todas as constantes usadas no módulo estão centralizadas aqui.
 TIPOS_PROCESSO = ["Judicial", "Administrativo"]
 
 # =============================================================================
+# CONSTANTES - TIPO PROCESSO AMBIENTAL
+# =============================================================================
+
+TIPOS_PROCESSO_AMBIENTAL = ["Desmatamento", "APP", "Outro"]
+TIPO_AMBIENTAL_PADRAO = "Desmatamento"
+
+# =============================================================================
 # CONSTANTES - STATUS
 # =============================================================================
 
-STATUS_PROCESSO = ["Ativo", "Suspenso", "Arquivado", "Baixado", "Encerrado"]
+STATUS_PROCESSO = ["Em andamento", "Concluído", "Em monitoramento"]
 
 STATUS_CORES = {
-    'Ativo': {'bg': '#22c55e', 'text': 'white'},              # verde
-    'Suspenso': {'bg': '#eab308', 'text': '#1f2937'},         # amarelo
-    'Arquivado': {'bg': '#6b7280', 'text': 'white'},          # cinza
-    'Baixado': {'bg': '#ef4444', 'text': 'white'},            # vermelho
-    'Encerrado': {'bg': '#166534', 'text': 'white'},          # verde escuro
+    'Em andamento': {'bg': '#fbbf24', 'text': '#1f2937'},       # amarelo
+    'Concluído': {'bg': '#059669', 'text': 'white'},            # verde esmeralda (diferente do padrão)
+    'Em monitoramento': {'bg': '#f97316', 'text': 'white'},     # laranja
 }
 
 # =============================================================================
@@ -69,23 +74,38 @@ AREA_CORES = {
 }
 
 # =============================================================================
-# CONSTANTES - SISTEMAS PROCESSUAIS
+# CONSTANTES - SISTEMAS PROCESSUAIS (igual ao workspace Área do Cliente)
 # =============================================================================
 
 SISTEMAS_PROCESSUAIS = [
-    "TJSC",
-    "TJPR",
-    "TJRS",
-    "TRF4",
-    "STJ",
-    "STF",
-    "TST",
-    "IBAMA",
-    "IAT",
-    "IMA",
-    "FATMA",
-    "Outro"
+    'eproc - TJSC - 1ª instância',
+    'eproc - TJSC - 2ª instância',
+    'eproc - TRF-4 - 1ª instância',
+    'eproc - TRF-4 - 2ª instância',
+    'e-STF',
+    'e-STJ',
+    'eProtocolo',
+    'Projudi',
+    'SEI - Ibama',
+    'SGPE',
+    'SinFAT',
+    'SAT/PGE-Net',
+    'Sistema Interno - MPPR',
+    'Sistema Interno - MPSC',
+    'Processo físico 📁',
 ]
+
+# =============================================================================
+# CONSTANTES - NÚCLEOS (igual ao módulo de Casos)
+# =============================================================================
+
+NUCLEOS_PROCESSO = ['Ambiental', 'Cobranças', 'Generalista']
+
+NUCLEO_CORES = {
+    'Ambiental': {'bg': '#10b981', 'text': 'white'},      # verde
+    'Cobranças': {'bg': '#f59e0b', 'text': 'white'},      # laranja
+    'Generalista': {'bg': '#6366f1', 'text': 'white'},    # roxo/índigo
+}
 
 # =============================================================================
 # CONSTANTES - ESTADOS
@@ -95,8 +115,7 @@ ESTADOS = [
     "Santa Catarina",
     "Paraná",
     "Rio Grande do Sul",
-    "São Paulo",
-    "Outro"
+    "Rio de Janeiro",
 ]
 
 # =============================================================================
