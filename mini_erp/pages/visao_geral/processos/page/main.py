@@ -1,115 +1,21 @@
 """
 Página principal do módulo Processos do workspace Visão Geral.
 Rota: /visao-geral/processos
-Visualização em Tabela padronizada (unificada com /processos).
 """
 from nicegui import ui
-from datetime import datetime
-from ....core import layout, PRIMARY_COLOR
-from ....auth import is_authenticated
-from ....gerenciadores.gerenciador_workspace import definir_workspace
-from ....firebase_config import ensure_firebase_initialized
-from .database import listar_processos, excluir_processo, buscar_processo
-from .processo_dialog import abrir_dialog_processo, confirmar_exclusao
-from ....pages.processos.ui_components import TABELA_PROCESSOS_CSS, BODY_SLOT_AREA, BODY_SLOT_STATUS
-
-# Importa constantes do módulo processos principal para consistência
-from ....pages.processos.models import (
-    AREA_OPTIONS, STATUS_OPTIONS, PROCESS_TYPE_OPTIONS
+from mini_erp.core import layout
+from mini_erp.auth import is_authenticated
+from mini_erp.gerenciadores.gerenciador_workspace import definir_workspace
+from mini_erp.firebase_config import ensure_firebase_initialized
+from ..database import listar_processos, buscar_processo
+from ..modal.modal_processo import abrir_modal_processo
+from .tabela import (
+    TABELA_PROCESSOS_CSS, COLUMNS, BODY_SLOT_AREA, BODY_SLOT_STATUS,
+    converter_processo_para_row
 )
-
-
-def _converter_processo_para_row(processo: dict) -> dict:
-    """
-    Converte processo do formato vg_processos para formato esperado pela tabela.
-    
-    Args:
-        processo: Dicionário do processo no formato vg_processos
-        
-    Returns:
-        Dicionário no formato esperado pela tabela
-    """
-    # Processa data de abertura
-    data_abertura_raw = processo.get('data_abertura') or ''
-    data_abertura_display = ''
-    data_abertura_sort = ''
-    
-    if data_abertura_raw:
-        try:
-            # Tenta converter timestamps ISO para formato DD/MM/AAAA
-            if isinstance(data_abertura_raw, str) and 'T' in data_abertura_raw:
-                # É um timestamp ISO
-                dt = datetime.fromisoformat(data_abertura_raw.replace('Z', '+00:00'))
-                data_abertura_display = dt.strftime('%d/%m/%Y')
-                data_abertura_sort = dt.strftime('%Y/%m/%d')
-            else:
-                data_abertura_raw = str(data_abertura_raw).strip()
-                
-                # Formato: AAAA (apenas ano)
-                if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
-                    data_abertura_display = data_abertura_raw
-                    data_abertura_sort = f"{data_abertura_raw}/00/00"
-                # Formato: MM/AAAA (mês e ano)
-                elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
-                    partes = data_abertura_raw.split('/')
-                    if len(partes) == 2:
-                        data_abertura_display = data_abertura_raw
-                        data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
-                # Formato: DD/MM/AAAA (completa)
-                elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
-                    partes = data_abertura_raw.split('/')
-                    if len(partes) == 3:
-                        data_abertura_display = data_abertura_raw
-                        data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                else:
-                    data_abertura_display = data_abertura_raw
-        except Exception:
-            data_abertura_display = str(data_abertura_raw)
-    
-    # Extrai clientes (formato esperado: lista de strings)
-    clientes_nomes = processo.get('clientes_nomes', [])
-    if not isinstance(clientes_nomes, list):
-        clientes_nomes = [str(clientes_nomes)] if clientes_nomes else []
-    clients_list = [str(c).upper() for c in clientes_nomes if c]
-    
-    # Extrai casos vinculados
-    caso_titulo = processo.get('caso_titulo', '')
-    cases_list = [caso_titulo] if caso_titulo else []
-    
-    # Mapeia parte contrária
-    parte_contraria = processo.get('parte_contraria', '')
-    opposing_list = [parte_contraria.upper()] if parte_contraria else []
-    
-    return {
-        '_id': processo.get('_id', ''),
-        'data_abertura': data_abertura_display,
-        'data_abertura_sort': data_abertura_sort,
-        'title': processo.get('titulo', 'Sem título'),
-        'title_raw': processo.get('titulo', 'Sem título'),
-        'number': processo.get('numero', ''),
-        'clients_list': clients_list,
-        'opposing_list': opposing_list,
-        'cases_list': cases_list,
-        'system': processo.get('sistema_processual', ''),
-        'status': processo.get('status', 'Ativo'),
-        'area': processo.get('area', ''),
-        'link': '',  # vg_processos não tem campo link
-        'is_third_party_monitoring': False,
-        'is_desdobramento': False,
-    }
-
-
-# Colunas da tabela (mesmas da visualização padrão)
-COLUMNS = [
-    {'name': 'data_abertura', 'label': 'Data', 'field': 'data_abertura_sort', 'align': 'center', 'sortable': True, 'style': 'width: 90px; min-width: 90px;'},
-    {'name': 'area', 'label': 'Área', 'field': 'area', 'align': 'left', 'sortable': True, 'style': 'width: 120px; max-width: 120px;'},
-    {'name': 'title', 'label': 'Título', 'field': 'title', 'align': 'left', 'sortable': True, 'style': 'width: 280px; max-width: 280px;'},
-    {'name': 'cases', 'label': 'Casos', 'field': 'cases', 'align': 'left', 'style': 'width: 180px; min-width: 180px;'},
-    {'name': 'number', 'label': 'Número', 'field': 'number', 'align': 'left', 'sortable': True, 'style': 'width: 180px;'},
-    {'name': 'clients', 'label': 'Clientes', 'field': 'clients', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
-    {'name': 'opposing', 'label': 'Parte Contrária', 'field': 'opposing', 'align': 'left', 'style': 'width: 100px; max-width: 100px;'},
-    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 150px;'},
-]
+from .filtros import (
+    criar_barra_pesquisa, criar_filtros, criar_botao_limpar_filtros, filtrar_rows
+)
 
 
 @ui.page('/visao-geral/processos')
@@ -147,7 +53,7 @@ def _renderizar_pagina_processos():
             # Aplicar CSS padrão de tabelas de processos
             ui.add_head_html(TABELA_PROCESSOS_CSS)
 
-            # Estado dos filtros (padronizado com visualização principal)
+            # Estado dos filtros
             filtros = {
                 'busca': '',
                 'area': None,
@@ -165,85 +71,18 @@ def _renderizar_pagina_processos():
 
             # Barra de pesquisa e botões de ação
             with ui.row().classes('w-full items-center gap-2 sm:gap-4 mb-4 flex-wrap'):
-                # Campo de busca
-                with ui.input(placeholder='Pesquisar processos por título, número...').props('outlined dense clearable').classes('flex-grow w-full sm:w-auto sm:max-w-xl') as search_input:
-                    with search_input.add_slot('prepend'):
-                        ui.icon('search').classes('text-gray-400')
-                
-                # Callback para atualizar pesquisa
-                def on_search_change():
-                    filtros['busca'] = search_input.value if search_input.value else ''
-                    if refresh_ref['func']:
-                        refresh_ref['func'].refresh()
-                
-                search_input.on('update:model-value', on_search_change)
+                search_input = criar_barra_pesquisa(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
                 # Botão Novo Processo
                 def novo_processo():
-                    abrir_dialog_processo(on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+                    abrir_modal_processo(on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
                 ui.button('Novo Processo', icon='add', on_click=novo_processo).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
 
             # Linha de filtros
             with ui.row().classes('w-full items-center mb-4 gap-3 flex-wrap'):
-                ui.label('Filtros:').classes('text-gray-600 font-medium text-sm w-full sm:w-auto')
-                
-                # Filtro por área
-                area_options = [''] + [a for a in AREA_OPTIONS if a]
-                area_select = ui.select(area_options, label='Área', value='').props('clearable dense outlined').classes('w-full sm:w-auto min-w-[100px] sm:min-w-[120px]')
-                area_select.style('font-size: 12px; border-color: #d1d5db;')
-                
-                def on_area_change():
-                    filtros['area'] = area_select.value if area_select.value else None
-                    if refresh_ref['func']:
-                        refresh_ref['func'].refresh()
-                
-                area_select.on('update:model-value', on_area_change)
-
-                # Filtro por status
-                status_options = [''] + [s for s in STATUS_OPTIONS if s]
-                status_select = ui.select(status_options, label='Status', value='').props('clearable dense outlined').classes('w-full sm:w-auto min-w-[100px] sm:min-w-[140px]')
-                status_select.style('font-size: 12px; border-color: #d1d5db;')
-                
-                def on_status_change():
-                    filtros['status'] = status_select.value if status_select.value else None
-                    if refresh_ref['func']:
-                        refresh_ref['func'].refresh()
-                
-                status_select.on('update:model-value', on_status_change)
-
-                # Botão limpar filtros
-                def limpar_filtros():
-                    filtros['busca'] = ''
-                    filtros['area'] = None
-                    filtros['status'] = None
-                    search_input.value = ''
-                    area_select.value = ''
-                    status_select.value = ''
-                    if refresh_ref['func']:
-                        refresh_ref['func'].refresh()
-
-                ui.button('Limpar', icon='clear_all', on_click=limpar_filtros).props('flat dense').classes('text-xs text-gray-600 w-full sm:w-auto')
-
-            # Função para filtrar rows
-            def filter_rows(rows):
-                """Aplica filtros aos processos."""
-                filtered = rows
-                
-                # Filtro de pesquisa (título/número)
-                if filtros['busca']:
-                    term = filtros['busca'].lower()
-                    filtered = [r for r in filtered if term in (r.get('title_raw') or r.get('title') or '').lower() or term in (r.get('number') or '').lower()]
-                
-                # Filtro de área
-                if filtros['area']:
-                    filtered = [r for r in filtered if (r.get('area') or '').strip() == filtros['area'].strip()]
-                
-                # Filtro de status
-                if filtros['status']:
-                    filtered = [r for r in filtered if (r.get('status') or '').strip() == filtros['status'].strip()]
-                
-                return filtered
+                filtro_components = criar_filtros(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+                criar_botao_limpar_filtros(filtros, search_input, filtro_components, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
             # Função para renderizar tabela
             @ui.refreshable
@@ -257,10 +96,10 @@ def _renderizar_pagina_processos():
                     todos_processos = listar_processos(filtros)
                     
                     # Converte para formato da tabela
-                    rows = [_converter_processo_para_row(p) for p in todos_processos]
+                    rows = [converter_processo_para_row(p) for p in todos_processos]
                     
                     # Aplica filtros adicionais
-                    filtered_rows = filter_rows(rows)
+                    filtered_rows = filtrar_rows(rows, filtros)
                     
                     if not filtered_rows:
                         with ui.card().classes('w-full p-8 flex justify-center items-center'):
@@ -277,7 +116,7 @@ def _renderizar_pagina_processos():
                             processo_id = clicked_row['_id']
                             processo_completo = buscar_processo(processo_id)
                             if processo_completo:
-                                abrir_dialog_processo(
+                                abrir_modal_processo(
                                     processo=processo_completo,
                                     on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None
                                 )
@@ -416,3 +255,4 @@ def _renderizar_pagina_processos():
                 ui.label('Erro ao carregar página de processos').classes('text-xl font-bold text-gray-600 mt-4')
                 ui.label(f'Erro: {str(e)}').classes('text-gray-400 mt-2')
                 ui.button('Voltar ao Painel', icon='arrow_back', on_click=lambda: ui.navigate.to('/visao-geral/painel')).props('color=primary').classes('mt-4')
+

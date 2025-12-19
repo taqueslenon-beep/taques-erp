@@ -103,6 +103,24 @@ def prazos():
     if not is_authenticated():
         ui.navigate.to('/login')
         return
+
+    # CSS: tabela com linhas zebradas + checkbox arredondado (visual apenas)
+    ui.add_head_html('''
+    <style>
+        /* Linhas zebradas sutis para manter legibilidade */
+        .tabela-prazos tbody tr:nth-child(even) {
+            background-color: #ffffff !important;
+        }
+        .tabela-prazos tbody tr:nth-child(odd) {
+            background-color: #fafafa !important;
+        }
+
+        /* Força checkbox visualmente arredondado (compatibilidade) */
+        .tabela-prazos .q-checkbox__bg {
+            border-radius: 999px !important;
+        }
+    </style>
+    ''')
     
     # Carregar opções para formatação
     usuarios_opcoes = buscar_usuarios_para_select()
@@ -210,14 +228,49 @@ def prazos():
                     
                     # Definir colunas da tabela
                     columns = [
-                        {'name': 'concluido', 'label': '', 'field': 'concluido', 'align': 'center', 'style': 'width: 50px;'},
+                        {
+                            'name': 'concluido',
+                            'label': '',
+                            'field': 'concluido',
+                            'align': 'center',
+                            'style': 'width: 50px;',
+                        },
                         {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                        {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 200px;'},
-                        {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left', 'style': 'width: 200px;'},
-                        {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 120px;'},
-                        {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'style': 'width: 120px;'},
-                        {'name': 'recorrente', 'label': 'Recorrente', 'field': 'recorrente', 'align': 'center', 'style': 'width: 100px;'},
-                        {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 120px;'},
+                        {
+                            'name': 'responsaveis',
+                            'label': 'Responsáveis',
+                            'field': 'responsaveis',
+                            'align': 'left',
+                            'style': 'width: 230px;',
+                        },
+                        {
+                            'name': 'clientes',
+                            'label': 'Clientes',
+                            'field': 'clientes',
+                            'align': 'left',
+                            'style': 'width: 230px;',
+                        },
+                        {
+                            'name': 'prazo_fatal',
+                            'label': 'Prazo Fatal',
+                            'field': 'prazo_fatal',
+                            'align': 'center',
+                            'style': 'width: 120px;',
+                        },
+                        {
+                            'name': 'status',
+                            'label': 'Status',
+                            'field': 'status',
+                            'align': 'center',
+                            'style': 'width: 120px;',
+                        },
+                        {
+                            'name': 'acoes',
+                            'label': 'Ações',
+                            'field': 'acoes',
+                            'align': 'center',
+                            'style': 'width: 120px;',
+                        },
                     ]
                     
                     # Preparar linhas
@@ -244,9 +297,6 @@ def prazos():
                         status = prazo.get('status', 'pendente')
                         status_label = STATUS_LABELS.get(status, status)
                         
-                        recorrente = prazo.get('recorrente', False)
-                        recorrente_texto = 'Sim' if recorrente else 'Não'
-                        
                         # Determina se está concluído
                         is_concluido = status.lower() in ['concluido', 'concluído']
 
@@ -259,7 +309,6 @@ def prazos():
                             'prazo_fatal': prazo_fatal_texto,
                             'status': status_label,
                             'status_value': status,
-                            'recorrente': recorrente_texto,
                             'acoes': prazo.get('_id'),
                         })
                     
@@ -268,7 +317,7 @@ def prazos():
                         columns=columns,
                         rows=rows,
                         row_key='id'
-                    ).classes('w-full').props('flat dense')
+                    ).classes('w-full tabela-prazos').props('flat dense')
 
                     # Slot para checkbox arredondado (marcar como concluído)
                     table.add_slot('body-cell-concluido', '''

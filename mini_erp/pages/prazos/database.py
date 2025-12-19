@@ -18,6 +18,13 @@ from ...core import (
     get_cases_list,
     get_display_name as get_display_name_core,
 )
+from .parcelamento_backend import (
+    ErroParcelamentoPrazo,
+    gerar_parcelas_automaticas,
+    obter_status_parcelamento as _obter_status_parcelamento_backend,
+    editar_parcela_individual as _editar_parcela_individual_backend,
+    excluir_parcelamento_completo as _excluir_parcelamento_completo_backend,
+)
 
 
 # =============================================================================
@@ -42,6 +49,82 @@ _cache_casos_select_ts = None
 # Cache de 15 minutos - otimizado para poucos registros
 # Invalidação manual ocorre após operações de escrita (salvar/deletar)
 CACHE_SELECT_DURATION = 900  # 15 minutos em segundos
+
+
+def _normalizar_e_validar_tipo_prazo(dados: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normaliza e valida os campos de tipo de prazo (mutuamente exclusivos).
+
+    Regras:
+        - tipo_prazo: 'simples' | 'recorrente' | 'parcelado'
+        - Se tipo_prazo='parcelado' -> recorrente=False e config_recorrencia=None
+        - Se tipo_prazo='recorrente' -> recorrente=True
+        - Se tipo_prazo='simples' -> recorrente=False e config_recorrencia=None
+
+    Observação:
+        - Para compatibilidade, se tipo_prazo não vier, inferimos:
+            * se recorrente=True -> 'recorrente'
+            * se existe parcela_de/total_parcelas -> 'parcelado'
+            * caso contrário -> 'simples'
+    """
+    prazo = dict(dados or {})
+    tipo_informado = (prazo.get("tipo_prazo") or "").strip().lower()
+    recorrente = bool(prazo.get("recorrente", False))
+
+    tem_campos_parcelamento = bool(
+        prazo.get("parcela_de")
+        or prazo.get("total_parcelas")
+        or prazo.get("intervalo_parcelas")
+        or prazo.get("numero_parcela_atual")
+    )
+
+    if not tipo_informado:
+        if recorrente:
+            tipo_informado = "recorrente"
+        elif tem_campos_parcelamento:
+            tipo_informado = "parcelado"
+        else:
+            tipo_informado = "simples"
+
+    if tipo_informado not in {"simples", "recorrente", "parcelado"}:
+        raise ValueError(
+            "tipo_prazo inválido. Use: simples, recorrente ou parcelado."
+        )
+
+    # Valida coerência e normaliza campos
+    if tipo_informado == "parcelado":
+        if recorrente:
+            raise ValueError(
+                "Prazo parcelado não pode ser recorrente ao mesmo tempo."
+            )
+        prazo["tipo_prazo"] = "parcelado"
+        prazo["recorrente"] = False
+        prazo["config_recorrencia"] = None
+
+    elif tipo_informado == "recorrente":
+        if tem_campos_parcelamento:
+            raise ValueError(
+                "Prazo recorrente não pode ter campos de parcelamento."
+            )
+        prazo["tipo_prazo"] = "recorrente"
+        prazo["recorrente"] = True
+
+    else:
+        # simples
+        if recorrente:
+            raise ValueError(
+                "Prazo simples não pode ser recorrente. "
+                "Defina tipo_prazo='recorrente' ou recorrente=False."
+            )
+        if tem_campos_parcelamento:
+            raise ValueError(
+                "Prazo simples não pode ter campos de parcelamento."
+            )
+        prazo["tipo_prazo"] = "simples"
+        prazo["recorrente"] = False
+        prazo["config_recorrencia"] = None
+
+    return prazo
 
 
 def listar_prazos() -> List[Dict[str, Any]]:
@@ -116,20 +199,38 @@ def buscar_prazo_por_id(prazo_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dicionário com dados do prazo ou None se não encontrado
     """
+    # Validação defensiva: ID deve ser string não vazia
+    if not prazo_id or not isinstance(prazo_id, str):
+        print(f"[DEBUG] buscar_prazo_por_id: ID inválido recebido: {prazo_id}")
+        return None
+    
+    prazo_id = prazo_id.strip()
+    if not prazo_id:
+        print(f"[DEBUG] buscar_prazo_por_id: ID vazio após strip")
+        return None
+    
     try:
+        print(f"[DEBUG] buscar_prazo_por_id: Buscando prazo ID: {prazo_id}")
         db = get_db()
         doc_ref = db.collection('prazos').document(prazo_id)
         doc = doc_ref.get()
 
         if doc.exists:
             prazo = doc.to_dict()
+            if prazo is None:
+                print(f"[DEBUG] buscar_prazo_por_id: doc.to_dict() retornou None para ID: {prazo_id}")
+                return None
             prazo['_id'] = doc.id
+            print(f"[DEBUG] buscar_prazo_por_id: Prazo encontrado - Título: {prazo.get('titulo', 'Sem título')}")
             return prazo
         else:
+            print(f"[DEBUG] buscar_prazo_por_id: Documento não existe no Firestore: {prazo_id}")
             return None
 
     except Exception as e:
         print(f"[ERROR] Erro ao buscar prazo {prazo_id} do Firestore: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -148,6 +249,7 @@ def criar_prazo(dados: Dict[str, Any]) -> str:
 
         # Remove _id dos dados (é metadado)
         prazo_para_salvar = {k: v for k, v in dados.items() if k != '_id'}
+        prazo_para_salvar = _normalizar_e_validar_tipo_prazo(prazo_para_salvar)
 
         # Adiciona timestamps
         now = time.time()
@@ -184,6 +286,7 @@ def atualizar_prazo(prazo_id: str, dados: Dict[str, Any]) -> bool:
 
         # Remove _id dos dados (é metadado)
         prazo_para_salvar = {k: v for k, v in dados.items() if k != '_id'}
+        prazo_para_salvar = _normalizar_e_validar_tipo_prazo(prazo_para_salvar)
 
         # Atualiza timestamp
         prazo_para_salvar['atualizado_em'] = time.time()
@@ -665,6 +768,7 @@ def criar_proximo_prazo_recorrente(prazo_concluido: Dict[str, Any]) -> Optional[
             'prazo_fatal': novo_prazo_fatal_ts,
             'status': 'pendente',
             'recorrente': True,
+            'tipo_prazo': 'recorrente',
             'config_recorrencia': prazo_concluido.get('config_recorrencia', {}),
             'observacoes': prazo_concluido.get('observacoes', ''),
             'prazo_origem_id': prazo_concluido.get('_id'),  # Referência ao prazo original
@@ -686,6 +790,104 @@ def criar_proximo_prazo_recorrente(prazo_concluido: Dict[str, Any]) -> Optional[
         import traceback
         traceback.print_exc()
         return None
+
+
+# =============================================================================
+# PARCELAMENTO DE PRAZOS (BACKEND)
+# =============================================================================
+
+def criar_prazo_parcelado(
+    prazo_base: Dict[str, Any],
+    numero_parcelas: int,
+    data_inicial: Any,
+    intervalo: str,
+    dias_customizado: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Cria um novo parcelamento: prazo pai + N parcelas (atômico).
+
+    Args:
+        prazo_base: Dados base (titulo, responsaveis, clientes, casos...).
+        numero_parcelas: Total de parcelas (>= 2).
+        data_inicial: Data da 1ª parcela (timestamp/date/datetime).
+        intervalo: semanal|quinzenal|mensal|anual|customizado.
+        dias_customizado: Obrigatório se intervalo=customizado.
+
+    Returns:
+        {'prazo_pai_id': str, 'parcelas_ids': [str]}
+    """
+    try:
+        db = get_db()
+        resultado = gerar_parcelas_automaticas(
+            db=db,
+            prazo_base=prazo_base,
+            numero_parcelas=numero_parcelas,
+            data_inicial=data_inicial,
+            intervalo=intervalo,
+            dias_customizado=dias_customizado,
+            collection_name="prazos",
+        )
+        invalidar_cache_prazos()
+        return resultado
+    except ErroParcelamentoPrazo as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def editar_parcela_individual(
+    parcela_id: str,
+    dados_atualizados: Dict[str, Any],
+) -> bool:
+    """
+    Edita uma parcela específica (sem alterar as demais).
+    """
+    try:
+        db = get_db()
+        ok = _editar_parcela_individual_backend(
+            db=db,
+            parcela_id=parcela_id,
+            dados_atualizados=dados_atualizados,
+            collection_name="prazos",
+        )
+        invalidar_cache_prazos()
+        return ok
+    except ErroParcelamentoPrazo as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def excluir_parcelamento_completo(prazo_pai_id: str) -> Dict[str, Any]:
+    """
+    Exclui prazo pai e todas as parcelas ligadas a ele.
+    """
+    try:
+        db = get_db()
+        resultado = _excluir_parcelamento_completo_backend(
+            db=db,
+            prazo_pai_id=prazo_pai_id,
+            collection_name="prazos",
+        )
+        invalidar_cache_prazos()
+        return resultado
+    except ErroParcelamentoPrazo as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def obter_status_parcelamento(prazo_pai_id: str) -> Dict[str, Any]:
+    """
+    Retorna quantas parcelas foram concluídas (e quantas faltam).
+
+    Observação:
+        - Para uso mais avançado (ex.: filtros por status), pode ser útil
+          criar índice no Firestore envolvendo campo 'parcela_de' e 'status'.
+    """
+    try:
+        db = get_db()
+        return _obter_status_parcelamento_backend(
+            db=db,
+            prazo_pai_id=prazo_pai_id,
+            collection_name="prazos",
+        )
+    except ErroParcelamentoPrazo as exc:
+        raise ValueError(str(exc)) from exc
 
 
 # =============================================================================

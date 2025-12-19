@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Tuple
 from nicegui import ui
 from ...core import layout, get_display_name
 from ...auth import is_authenticated
+from ...firebase_config import get_db
 from .database import (
     listar_prazos,
     listar_prazos_por_status,
@@ -26,6 +27,10 @@ from .database import (
 )
 from .modal_prazo import render_prazo_dialog
 from .models import STATUS_LABELS
+from .parcelamento_backend import (
+    excluir_parcelamento_completo,
+    ErroParcelamentoPrazo,
+)
 
 
 def formatar_data_prazo(timestamp: Any) -> str:
@@ -107,7 +112,9 @@ def verificar_prazo_atrasado(timestamp: Any, status: str) -> bool:
 
 def formatar_titulo_prazo(prazo: Dict[str, Any]) -> str:
     """
-    Formata o título do prazo, adicionando emoji 🔁 se for recorrente.
+    Formata o título do prazo, adicionando:
+    - sufixo [Parcela X/N] quando for parcela
+    - emoji 🔁 quando for recorrente
 
     Args:
         prazo: Dicionário com dados do prazo
@@ -115,12 +122,59 @@ def formatar_titulo_prazo(prazo: Dict[str, Any]) -> str:
     Returns:
         Título formatado com emoji se recorrente
     """
-    titulo = prazo.get('titulo', 'Sem título')
-    is_recorrente = prazo.get('recorrente', False)
+    # Validação defensiva: prazo deve ser dict não None
+    if prazo is None or not isinstance(prazo, dict):
+        print(f"[DEBUG] formatar_titulo_prazo: prazo inválido recebido: {type(prazo)}")
+        return 'Sem título'
     
-    if is_recorrente:
+    titulo = prazo.get('titulo', 'Sem título') or 'Sem título'
+    is_recorrente = prazo.get('recorrente', False)
+
+    # ---------------------------------------------------------
+    # Detecção de parcela/parcelamento
+    # ---------------------------------------------------------
+    # Padrão do backend de parcelamento:
+    # - parcelas têm: parcela_de=<id do pai>, numero_parcela_atual (1..N), total_parcelas
+    # Compatibilidade extra (modal antigo/alternativo):
+    # - parcelas têm: parcelamento_id, parcela_numero, parcela_total
+    parcela_de = prazo.get('parcela_de')
+    numero_parcela = prazo.get('numero_parcela_atual')
+    total_parcelas = prazo.get('total_parcelas')
+
+    if (numero_parcela is None) and prazo.get('parcela_numero') is not None:
+        numero_parcela = prazo.get('parcela_numero')
+    if (total_parcelas is None) and prazo.get('parcela_total') is not None:
+        total_parcelas = prazo.get('parcela_total')
+
+    # Considera "parcela" quando:
+    # - tem parcela_de (backend), ou
+    # - tem número da parcela > 0 (evita marcar o "pai" que tem 0), ou
+    # - (compat) tem parcela_numero informado
+    is_parcela = bool(parcela_de) or (isinstance(numero_parcela, int) and numero_parcela > 0) or bool(prazo.get('parcela_numero'))
+
+    # Adiciona sufixo [Parcela X/N] só quando houver X e N válidos, e não duplicar
+    if is_parcela and numero_parcela and total_parcelas:
+        if '[Parcela' not in str(titulo):
+            titulo = f"{titulo} [Parcela {numero_parcela}/{total_parcelas}]"
+
+    # Recorrente (não conflita com parcelado, mas por segurança evitamos colocar em parcela)
+    if is_recorrente and not is_parcela:
         return f"🔁 {titulo}"
     return titulo
+
+
+def _prazo_e_parcela(prazo: Dict[str, Any]) -> bool:
+    """Retorna True se o prazo é uma parcela (não o pai do parcelamento)."""
+    if not prazo:
+        return False
+    if prazo.get('parcela_de'):
+        return True
+    # Compatibilidade: parcelamento_id + parcela_numero
+    if prazo.get('parcelamento_id') and prazo.get('parcela_numero'):
+        return True
+    # Campo numérico do backend: numero_parcela_atual (1..N)
+    n = prazo.get('numero_parcela_atual')
+    return isinstance(n, int) and n > 0
 
 
 # =============================================================================
@@ -364,16 +418,25 @@ def prazos():
     <style>
         /* Cores alternadas nas linhas */
         .tabela-prazos tbody tr:nth-child(even) {
-            background-color: #FFFFFF !important;
+            background-color: #ffffff !important;
         }
         .tabela-prazos tbody tr:nth-child(odd) {
-            background-color: #F5F5F5 !important;
+            background-color: #fafafa !important;
         }
         
         /* Prazos atrasados sobrepõem a alternância */
         .tabela-prazos tbody tr.linha-atrasada,
         .tabela-prazos tbody tr.linha-atrasada td {
             background-color: #FFCDD2 !important;
+        }
+
+        /*
+         * Checkbox arredondado:
+         * - O slot já usa `round` no q-checkbox, mas este CSS garante
+         *   visual circular mesmo se a lib mudar detalhes internos.
+         */
+        .tabela-prazos .q-checkbox__bg {
+            border-radius: 999px !important;
         }
         
         /* Cores das células de prazo */
@@ -428,22 +491,24 @@ def prazos():
             try {
                 const containers = document.querySelectorAll('.tabela-prazos');
                 if (containers && containers.length > 0) {
-                    const observer = new MutationObserver(aplicarClasseAtrasado);
                     containers.forEach(function(container) {
-                        // Tripla verificação: existe, é Node, está no DOM
-                        if (container && 
-                            container instanceof Node && 
-                            document.contains(container)) {
-                            try {
-                                observer.observe(container, { childList: true, subtree: true });
-                            } catch (e) {
-                                console.log('Observer error (prazos):', e.message);
-                            }
+                        // Verificação rigorosa: existe, é Node válido, está no DOM
+                        if (!container) return;
+                        if (!(container instanceof Node)) return;
+                        if (!document.contains(container)) return;
+                        
+                        try {
+                            const observer = new MutationObserver(aplicarClasseAtrasado);
+                            observer.observe(container, { childList: true, subtree: true });
+                        } catch (e) {
+                            // Silenciosamente ignora erros de observer (elemento pode ter sido removido)
+                            console.debug('Observer error (prazos):', e.message);
                         }
                     });
                 }
             } catch (e) {
-                console.log('Observer setup skipped (prazos):', e.message);
+                // Silenciosamente ignora erros de setup (não crítico)
+                console.debug('Observer setup skipped (prazos):', e.message);
             }
         }
         
@@ -480,6 +545,12 @@ def prazos():
     casos_opcoes = opcoes.get('casos', {})
 
     print(f"[PRAZOS] Opções carregadas: {len(usuarios_opcoes)} usuários, {len(clientes_opcoes)} clientes, {len(casos_opcoes)} casos")
+
+    # Estado de filtros adicionais (frontend)
+    filtros_extras = {
+        # Quando True, mostra somente prazos que são parcelas (numero_parcela_atual > 0 / parcela_de preenchido)
+        'mostrar_apenas_parcelas': False,
+    }
 
     # Referências para as funções refreshable (serão definidas depois)
     refresh_funcs = {'pendentes': None, 'concluidos': None, 'semana': None}
@@ -523,6 +594,10 @@ def prazos():
     def abrir_modal_edicao(prazo_id: str):
         """Abre modal de edição com dados do prazo."""
         try:
+            if not prazo_id:
+                ui.notify('ID do prazo não informado!', type='negative')
+                return
+            
             prazo = buscar_prazo_por_id(prazo_id)
             if not prazo:
                 ui.notify('Prazo não encontrado!', type='negative')
@@ -539,25 +614,56 @@ def prazos():
             open_edit()
         except Exception as e:
             print(f"[ERROR] Erro ao abrir modal de edição: {e}")
-            ui.notify('Erro ao carregar dados do prazo. Tente novamente.', type='negative')
+            import traceback
+            traceback.print_exc()
+            ui.notify(f'Erro ao carregar dados do prazo: {str(e)}', type='negative')
 
     # Função para excluir prazo
-    def excluir_prazo_com_confirmacao(prazo_id: str, titulo: str):
-        """Exclui prazo com diálogo de confirmação."""
+    def excluir_prazo_com_confirmacao(prazo_row: Dict[str, Any]):
+        """
+        Exclui prazo com diálogo inteligente.
+        
+        Regras:
+        - Se for parcela (tem 'parcela_de'): oferece "Excluir apenas esta" ou "Excluir todas"
+        - Caso contrário: confirmação normal
+        """
+        prazo_id = prazo_row.get('id') or prazo_row.get('_id')
+        titulo = prazo_row.get('titulo', 'este prazo')
+        parcela_de = prazo_row.get('parcela_de')
+        numero_parcela_atual = prazo_row.get('numero_parcela_atual')
+        total_parcelas = prazo_row.get('total_parcelas')
+
+        eh_parcela = bool(parcela_de) or (isinstance(numero_parcela_atual, int) and numero_parcela_atual > 0)
+
+        # Evita consulta extra: usa cache de listar_prazos para estimar total de parcelas
+        total_parcelas_est = 0
+        if eh_parcela:
+            try:
+                todos = listar_prazos()  # usa cache
+                total_parcelas_est = len([p for p in (todos or []) if p.get('parcela_de') == parcela_de])
+            except Exception:
+                total_parcelas_est = int(total_parcelas or 0) if total_parcelas else 0
+
         with ui.dialog() as dialog_excluir, ui.card().classes('w-full max-w-md'):
             with ui.column().classes('w-full gap-4 p-4'):
                 ui.label('Confirmar Exclusão').classes('text-lg font-bold')
-                ui.label(f'Tem certeza que deseja excluir o prazo "{titulo}"?').classes('text-gray-700')
+                if eh_parcela:
+                    ui.label('Este prazo é uma parcela de um parcelamento.').classes('text-gray-700')
+                    if numero_parcela_atual and (total_parcelas or total_parcelas_est):
+                        ui.label(f'Parcela {numero_parcela_atual}/{total_parcelas or total_parcelas_est}').classes('text-sm text-gray-600')
+                    ui.label('O que você deseja excluir?').classes('text-gray-700')
+                else:
+                    ui.label(f'Tem certeza que deseja excluir o prazo "{titulo}"?').classes('text-gray-700')
 
                 with ui.row().classes('w-full justify-end gap-2'):
                     def on_cancel():
                         dialog_excluir.close()
 
-                    def on_confirm():
+                    def on_confirm_excluir_apenas():
                         try:
                             sucesso = excluir_prazo(prazo_id)
                             if sucesso:
-                                ui.notify('Prazo excluído com sucesso!', type='positive')
+                                ui.notify('Parcela excluída com sucesso!' if eh_parcela else 'Prazo excluído com sucesso!', type='positive')
                                 invalidar_cache_prazos()
                                 atualizar_tabelas()
                             else:
@@ -569,7 +675,32 @@ def prazos():
                         dialog_excluir.close()
 
                     ui.button('Cancelar', on_click=on_cancel).props('flat')
-                    ui.button('Excluir', on_click=on_confirm).props('color=red')
+                    if eh_parcela:
+                        ui.button('Excluir apenas esta parcela', on_click=on_confirm_excluir_apenas).props('color=red')
+
+                        def on_confirm_excluir_todas():
+                            try:
+                                db = get_db()
+                                resultado = excluir_parcelamento_completo(db=db, prazo_pai_id=parcela_de)
+                                if resultado.get('sucesso'):
+                                    total = resultado.get('total_excluidos') or 0
+                                    ui.notify(f'Todas as {total_parcelas_est or total_parcelas or ""} parcelas foram excluídas', type='positive')
+                                    invalidar_cache_prazos()
+                                    atualizar_tabelas()
+                                else:
+                                    ui.notify('Erro ao excluir parcelamento completo', type='negative')
+                            except ErroParcelamentoPrazo as e:
+                                ui.notify(f'Erro ao excluir parcelamento completo: {str(e)}', type='negative')
+                            except Exception as e:
+                                print(f"[ERROR] Erro ao excluir parcelamento completo: {e}")
+                                ui.notify('Erro ao excluir parcelamento completo', type='negative')
+
+                            dialog_excluir.close()
+
+                        btn_todas = ui.button('Excluir todas as parcelas', on_click=on_confirm_excluir_todas).props('color=red')
+                        btn_todas.tooltip(f'Isso irá excluir todas as {total_parcelas_est or total_parcelas or "?"} parcelas deste parcelamento.')
+                    else:
+                        ui.button('Excluir', on_click=on_confirm_excluir_apenas).props('color=red')
 
         dialog_excluir.open()
 
@@ -673,7 +804,16 @@ def prazos():
 
     with layout('Prazos', breadcrumbs=[('Prazos', None)]):
         # Header com botão (título removido - já vem do layout())
-        with ui.row().classes('w-full gap-4 mb-6 items-center justify-end'):
+        with ui.row().classes('w-full gap-4 mb-6 items-center justify-end flex-wrap'):
+            chk_apenas_parcelas = ui.checkbox(
+                'Mostrar apenas parcelas',
+                value=filtros_extras.get('mostrar_apenas_parcelas', False),
+                on_change=lambda e: (
+                    filtros_extras.__setitem__('mostrar_apenas_parcelas', bool(e.value)),
+                    atualizar_tabelas(),
+                ),
+            )
+            chk_apenas_parcelas.tooltip('Quando ativo, mostra somente prazos que são parcelas de um parcelamento.')
             ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props(
                 'color=primary'
             ).classes('font-bold')
@@ -705,6 +845,10 @@ def prazos():
         # Função para criar tabela de prazos (sem coluna de status)
         def criar_tabela_prazos(prazos_lista: List[Dict[str, Any]], status_filtro: str):
             """Cria tabela de prazos com os dados fornecidos."""
+            # Filtro extra: mostrar apenas parcelas (não afeta outros filtros)
+            if filtros_extras.get('mostrar_apenas_parcelas'):
+                prazos_lista = [p for p in (prazos_lista or []) if _prazo_e_parcela(p)]
+
             if not prazos_lista:
                 # Mensagem quando não há prazos
                 if status_filtro == 'pendente':
@@ -736,15 +880,14 @@ def prazos():
                         )
                 return
 
-            # Definir colunas da tabela (sem coluna de status para abas Pendentes/Concluídos)
+            # Definir colunas da tabela (sem coluna "Status" e sem "Recorrente")
             columns = [
                 {'name': 'concluido', 'label': '', 'field': 'concluido', 'align': 'center', 'style': 'width: 50px;'},
                 {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 200px;'},
-                {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left', 'style': 'width: 200px;'},
-                {'name': 'prazo_seguranca', 'label': 'Prazo de Segurança', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 140px;'},
+                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 230px;'},
+                {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left', 'style': 'width: 230px;'},
+                {'name': 'prazo_seguranca', 'label': 'Prazo de Segurança', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 150px;'},
                 {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 120px;'},
-                {'name': 'recorrente', 'label': 'Recorrente', 'field': 'recorrente', 'align': 'center', 'style': 'width: 100px;'},
                 {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 120px;'},
             ]
 
@@ -768,8 +911,12 @@ def prazos():
                 esta_concluido = status.lower() == 'concluido'
                 esta_atrasado = verificar_prazo_atrasado(prazo_fatal_ts, status)
 
-                recorrente = prazo.get('recorrente', False)
-                recorrente_texto = 'Sim' if recorrente else 'Não'
+                # Detecção de parcelamento (badge) - usa campos do backend
+                is_parcelado = bool(
+                    prazo.get('parcela_de') is not None or
+                    prazo.get('numero_parcela_atual') is not None or
+                    prazo.get('total_parcelas') is not None
+                )
 
                 rows.append({
                     'id': prazo.get('_id'),
@@ -777,11 +924,15 @@ def prazos():
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
                     'titulo': titulo,
+                    # Campos extras para UI/ações
+                    'is_parcelado': is_parcelado,
+                    'parcela_de': prazo.get('parcela_de'),
+                    'numero_parcela_atual': prazo.get('numero_parcela_atual'),
+                    'total_parcelas': prazo.get('total_parcelas'),
                     'responsaveis': responsaveis_texto,
                     'clientes': clientes_texto,
                     'prazo_seguranca': prazo_seguranca_texto,
                     'prazo_fatal': prazo_fatal_texto,
-                    'recorrente': recorrente_texto,
                     'acoes': prazo.get('_id'),
                 })
 
@@ -812,7 +963,16 @@ def prazos():
             # Slot para Título
             table.add_slot('body-cell-titulo', '''
                 <q-td :props="props" style="vertical-align: middle;">
-                    {{ props.value }}
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>{{ props.value }}</span>
+                        <q-badge
+                            v-if="props.row.is_parcelado"
+                            style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
+                            class="px-2 py-1"
+                        >
+                            Parcelado
+                        </q-badge>
+                    </div>
                 </q-td>
             ''')
 
@@ -841,13 +1001,6 @@ def prazos():
             table.add_slot('body-cell-prazo_fatal', '''
                 <q-td :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
                     <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.value }}</span>
-                </q-td>
-            ''')
-
-            # Slot para Recorrente
-            table.add_slot('body-cell-recorrente', '''
-                <q-td :props="props" style="vertical-align: middle; text-align: center;">
-                    {{ props.value }}
                 </q-td>
             ''')
 
@@ -898,6 +1051,11 @@ def prazos():
             # Handlers para ações
             def on_edit_tb(prazo_row):
                 """Handler para editar prazo."""
+                # Validação defensiva
+                if prazo_row is None or not isinstance(prazo_row, dict):
+                    ui.notify('Erro: Dados do prazo não recebidos', type='negative')
+                    return
+                
                 prazo_id = prazo_row.get('id')
                 if prazo_id:
                     abrir_modal_edicao(prazo_id)
@@ -906,10 +1064,13 @@ def prazos():
 
             def on_delete_tb(prazo_row):
                 """Handler para excluir prazo."""
+                if prazo_row is None or not isinstance(prazo_row, dict):
+                    ui.notify('Erro: Dados do prazo não recebidos', type='negative')
+                    return
+                
                 prazo_id = prazo_row.get('id')
-                titulo = prazo_row.get('titulo', 'este prazo')
                 if prazo_id:
-                    excluir_prazo_com_confirmacao(prazo_id, titulo)
+                    excluir_prazo_com_confirmacao(prazo_row)
                 else:
                     ui.notify('Erro: ID do prazo não encontrado', type='negative')
 
@@ -920,6 +1081,10 @@ def prazos():
         # Função para criar tabela COM coluna de status (para aba Por Semana)
         def criar_tabela_prazos_com_status(prazos_lista: List[Dict[str, Any]]):
             """Cria tabela de prazos com coluna de status (para visualização Por Semana)."""
+            # Filtro extra: mostrar apenas parcelas
+            if filtros_extras.get('mostrar_apenas_parcelas'):
+                prazos_lista = [p for p in (prazos_lista or []) if _prazo_e_parcela(p)]
+
             if not prazos_lista:
                 with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
                     ui.icon('event_busy', size='48px').classes('text-gray-300 mb-4')
@@ -969,12 +1134,22 @@ def prazos():
                     status_label = 'Pendente'
                     status_value = 'pendente'
 
+                is_parcelado = bool(
+                    prazo.get('parcela_de') is not None or
+                    prazo.get('numero_parcela_atual') is not None or
+                    prazo.get('total_parcelas') is not None
+                )
+
                 rows.append({
                     'id': prazo.get('_id'),
                     '_indice': indice,
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
                     'titulo': titulo,
+                    'is_parcelado': is_parcelado,
+                    'parcela_de': prazo.get('parcela_de'),
+                    'numero_parcela_atual': prazo.get('numero_parcela_atual'),
+                    'total_parcelas': prazo.get('total_parcelas'),
                     'responsaveis': responsaveis_texto,
                     'prazo_seguranca': prazo_seguranca_texto,
                     'prazo_fatal': prazo_fatal_texto,
@@ -1010,7 +1185,16 @@ def prazos():
             # Slot para Título
             table.add_slot('body-cell-titulo', '''
                 <q-td :props="props" style="vertical-align: middle;">
-                    {{ props.value }}
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>{{ props.value }}</span>
+                        <q-badge
+                            v-if="props.row.is_parcelado"
+                            style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
+                            class="px-2 py-1"
+                        >
+                            Parcelado
+                        </q-badge>
+                    </div>
                 </q-td>
             ''')
 
@@ -1091,6 +1275,11 @@ def prazos():
                         confirmar_reabertura_prazo(prazo_id, titulo)
 
             def on_edit_tb(prazo_row):
+                """Handler para editar prazo (tabela com status)."""
+                if prazo_row is None or not isinstance(prazo_row, dict):
+                    ui.notify('Erro: Dados do prazo não recebidos', type='negative')
+                    return
+                
                 prazo_id = prazo_row.get('id')
                 if prazo_id:
                     abrir_modal_edicao(prazo_id)
@@ -1098,10 +1287,14 @@ def prazos():
                     ui.notify('Erro: ID do prazo não encontrado', type='negative')
 
             def on_delete_tb(prazo_row):
+                """Handler para excluir prazo (tabela com status)."""
+                if prazo_row is None or not isinstance(prazo_row, dict):
+                    ui.notify('Erro: Dados do prazo não recebidos', type='negative')
+                    return
+                
                 prazo_id = prazo_row.get('id')
-                titulo = prazo_row.get('titulo', 'este prazo')
                 if prazo_id:
-                    excluir_prazo_com_confirmacao(prazo_id, titulo)
+                    excluir_prazo_com_confirmacao(prazo_row)
                 else:
                     ui.notify('Erro: ID do prazo não encontrado', type='negative')
 

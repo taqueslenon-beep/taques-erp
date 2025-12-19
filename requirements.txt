@@ -7,4 +7,5 @@ python-dotenv
 requests
 pytest
 python-dateutil
+flet>=0.24.0
 

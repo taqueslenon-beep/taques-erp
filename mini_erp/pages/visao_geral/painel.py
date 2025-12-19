@@ -8,7 +8,8 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 from nicegui import ui, app
-from mini_erp.core import layout, PRIMARY_COLOR, get_processes_list
+from mini_erp.core import layout, PRIMARY_COLOR
+from .processos.database import listar_processos
 from mini_erp.auth import is_authenticated
 from mini_erp.gerenciadores.gerenciador_workspace import definir_workspace
 from mini_erp.models.prioridade import get_cor_por_prioridade
@@ -216,7 +217,7 @@ def painel():
                 executor.submit(listar_parceiros): 'todos_parceiros',
                 executor.submit(listar_entregaveis_service): 'todos_entregaveis',
                 executor.submit(get_oportunidades): 'todas_oportunidades',
-                executor.submit(get_processes_list): 'todos_processos',
+                executor.submit(listar_processos): 'todos_processos',
             }
             
             results = {}
@@ -268,10 +269,11 @@ def painel():
             oportunidades_aguardando = sum(1 for op in oportunidades_ativas if op.get('status') == 'aguardando')
             oportunidades_monitorando = sum(1 for op in oportunidades_ativas if op.get('status') == 'monitorando')
             
-            # Calcular estatísticas de processos
+            # Calcular estatísticas de processos (VG usa status diferentes)
             total_processos = len(todos_processos)
-            processos_em_andamento = sum(1 for p in todos_processos if p.get('status') == 'Em andamento')
-            processos_concluidos = sum(1 for p in todos_processos if p.get('status') in ['Concluído', 'Concluído com pendências'])
+            # Status VG: Ativo, Suspenso, Arquivado, Baixado, Encerrado
+            processos_em_andamento = sum(1 for p in todos_processos if p.get('status') in ['Ativo', 'Suspenso'])
+            processos_concluidos = sum(1 for p in todos_processos if p.get('status') in ['Encerrado', 'Baixado', 'Arquivado'])
             
             tempo_carregamento = time.time() - _inicio_carregamento
             print(f"[PAINEL] ✅ Dados carregados em paralelo com sucesso. Tempo: {tempo_carregamento:.2f}s")

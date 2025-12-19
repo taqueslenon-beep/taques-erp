@@ -6,9 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from ....firebase_config import get_db
 from .models import validar_processo
-
-# Nome da coleção Firebase para este workspace
-COLECAO_PROCESSOS = 'vg_processos'
+from .constants import COLECAO_PROCESSOS
 
 
 def _converter_timestamps(documento: Dict[str, Any]) -> Dict[str, Any]:
@@ -335,6 +333,8 @@ def listar_processos_pais() -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"Erro ao listar processos pais: {e}")
         return []
+
+
 
 
 

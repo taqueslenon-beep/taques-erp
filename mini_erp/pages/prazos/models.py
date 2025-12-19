@@ -67,6 +67,40 @@ OPCOES_DIA_SEMANA_LABELS = {
 
 
 # =============================================================================
+# CONSTANTES - TIPOS DE PRAZO (MUTUAMENTE EXCLUSIVOS)
+# =============================================================================
+
+TIPOS_PRAZO = ['simples', 'recorrente', 'parcelado']
+
+TIPOS_PRAZO_LABELS = {
+    'simples': 'Simples',
+    'recorrente': 'Recorrente',
+    'parcelado': 'Parcelado',
+}
+
+
+# =============================================================================
+# CONSTANTES - INTERVALOS DE PARCELAMENTO
+# =============================================================================
+
+INTERVALOS_PARCELAS = [
+    'semanal',
+    'quinzenal',
+    'mensal',
+    'anual',
+    'customizado',
+]
+
+INTERVALOS_PARCELAS_LABELS = {
+    'semanal': 'Semanal',
+    'quinzenal': 'Quinzenal',
+    'mensal': 'Mensal',
+    'anual': 'Anual',
+    'customizado': 'Customizado',
+}
+
+
+# =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
 # =============================================================================
 
@@ -88,11 +122,22 @@ class Prazo(TypedDict, total=False):
     prazo_fatal: float  # Timestamp (time.time())
     status: str  # 'pendente' | 'concluido'
     recorrente: bool
+    tipo_prazo: str  # 'simples' | 'recorrente' | 'parcelado'
     config_recorrencia: Optional[ConfigRecorrencia]
     observacoes: str
+    # === Parcelamento (tipo_prazo='parcelado') ===
+    total_parcelas: int
+    numero_parcela_atual: int
+    parcela_de: Optional[str]
+    intervalo_parcelas: str  # semanal|quinzenal|mensal|anual|customizado
+    dias_customizado: Optional[int]
     criado_em: float  # Timestamp
     atualizado_em: float  # Timestamp
     criado_por: str  # user_id
+
+
+
+
 
 
 

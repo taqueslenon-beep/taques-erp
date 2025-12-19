@@ -95,3 +95,17 @@
 - `mini_erp/pages/painel/painel_page.py` - Lógica condicional baseada no workspace
 - `mini_erp/gerenciadores/gerenciador_workspace.py` - Revertido rota_inicial do area_cliente
 - `mini_erp/pages/login.py` - Ajustes no redirecionamento pós-login
+
+
+## [v1.11.0] - 2025-12-19
+
+### Adicionado
+- **Prazos - Parcelamento (lista)**:
+  - Badge visual "Parcelado" na coluna Título
+  - Sufixo automático no título: `[Parcela X/N]` quando o prazo é uma parcela
+  - Filtro: "Mostrar apenas parcelas"
+  - Exclusão inteligente: "Excluir apenas esta parcela" ou "Excluir todas as parcelas"
+
+### Modificado
+- `mini_erp/pages/prazos/prazos.py`: Ajustes de UI/filtros/diálogo de exclusão para suporte a prazos parcelados
+- `mini_erp/pages/prazos/modal_prazo.py`: Correção de UI do modal (botões compactos de tipo de prazo e rodapé com Cancelar/Salvar)

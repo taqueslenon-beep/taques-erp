@@ -1,5 +1,42 @@
 # REGISTRO DE MUDANÇAS - TAQUES ERP
 
+## 2025-12-19 - Ajustes Visuais no Módulo de Prazos
+
+### Alterações Realizadas
+
+**Arquivos:**
+- `mini_erp/pages/prazos/prazos.py`
+- `mini_erp/pages/prazos/prazos_page.py` (legado, mantido consistente)
+
+**Descrição (somente visual):**
+- Linhas zebradas na tabela de Prazos (cores sutis para legibilidade).
+- Checkbox de conclusão com visual arredondado.
+- Remoção da coluna **"Recorrente"** da tabela (o dado continua no backend).
+
+**Detalhes técnicos (UI/CSS):**
+- Zebra: alternância entre `#ffffff` e `#fafafa`.
+- Checkbox: CSS para forçar borda arredondada no componente Quasar.
+
+**Backup gerado antes da alteração:**
+- `backups/ui_prazos_20251219_101732/`
+
+### Screenshots
+
+- Antes:
+  - `docs/screenshots/prazos/2025-12-19_antes.png`
+- Depois:
+  - `docs/screenshots/prazos/2025-12-19_depois.png`
+
+### 🔴 Ações Fora do IDE (Ordem Cronológica)
+
+1. Suba o servidor do ERP normalmente.
+2. Acesse a tela **Prazos**.
+3. Tire 2 prints (antes/depois) e salve exatamente nestes caminhos:
+   - `docs/screenshots/prazos/2025-12-19_antes.png`
+   - `docs/screenshots/prazos/2025-12-19_depois.png`
+
+---
+
 ## 2025-12-01 - Destaque Visual para Processos Concluídos
 
 ### Alterações Realizadas
