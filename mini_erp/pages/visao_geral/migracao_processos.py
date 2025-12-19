@@ -1,10 +1,7 @@
 """
 Página de migração/vinculação de Processos → Casos (Visão Geral).
 
-Inclui:
-- Importação de planilha do Eproc (XLSX/CSV) com preview;
-- Criação/atualização em lote de vg_processos;
-- Vinculação em lote de processos a um Caso (vg_casos).
+Dados do Eproc já carregados automaticamente (106 processos).
 
 Rota: /visao-geral/migracao-processos
 """
@@ -13,16 +10,10 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from nicegui import ui
-from nicegui import events
 
-import asyncio
-import io
-import inspect
-import os
 import re
 import unicodedata
 import difflib
-from pathlib import Path
 
 from ...core import layout
 from ...auth import is_authenticated
@@ -34,33 +25,15 @@ from ...storage import obter_display_name
 from .processos.database import listar_processos, atualizar_campos_processo, buscar_processo_por_numero, criar_processo
 from .casos.database import listar_casos
 from .pessoas.database import listar_pessoas, listar_envolvidos, listar_parceiros
-
-try:
-    import pandas as pd  # type: ignore
-except Exception:  # pragma: no cover
-    pd = None
+from .dados_processos_eproc import PROCESSOS_EPROC_2025
 
 
 def _fmt_text(v: Any) -> str:
     return (str(v).strip() if v is not None else '').strip()
 
-def _fix_mojibake(s: str) -> str:
-    """
-    Tenta corrigir textos quebrados (ex: 'DestruÃ­...' / 'ExecuÃ§Ã£o').
-    Resolve boa parte dos exports do Eproc/Excel.
-    """
-    if not s:
-        return s
-    if 'Ã' in s or 'Â' in s or '�' in s:
-        try:
-            return s.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore').strip()
-        except Exception:
-            return s
-    return s
-
 
 def _norm(s: str) -> str:
-    s = _fix_mojibake(_fmt_text(s)).lower()
+    s = _fmt_text(s).lower()
     s = unicodedata.normalize('NFKD', s)
     s = ''.join([c for c in s if not unicodedata.combining(c)])
     s = re.sub(r'\s+', ' ', s).strip()
@@ -68,18 +41,16 @@ def _norm(s: str) -> str:
 
 
 def _split_names(raw: Any) -> List[str]:
-    """Divide autores/réus vindos da planilha em lista de nomes."""
+    """Divide autores/réus em lista de nomes."""
     text = _fmt_text(raw)
     if not text:
         return []
-    # separadores comuns
     parts = re.split(r'[;\n]| \| |, (?=[A-ZÁÉÍÓÚÃÕÇ])', text)
     cleaned = []
     for p in parts:
         p = _fmt_text(p)
         if p:
             cleaned.append(p)
-    # remove duplicados preservando ordem
     seen = set()
     out = []
     for p in cleaned:
@@ -91,11 +62,10 @@ def _split_names(raw: Any) -> List[str]:
 
 
 def _parse_date_to_ddmmyyyy(raw: Any) -> str:
-    """Converte várias entradas para DD/MM/AAAA (ou mantém texto)."""
+    """Converte para DD/MM/AAAA."""
     v = raw
     if v is None or v == '':
         return ''
-    # pandas Timestamp / datetime
     try:
         if hasattr(v, 'strftime'):
             return v.strftime('%d/%m/%Y')
@@ -104,22 +74,15 @@ def _parse_date_to_ddmmyyyy(raw: Any) -> str:
     s = _fmt_text(v)
     if not s:
         return ''
-    # Formatos comuns do Eproc: "29/08/2025 18:48:51" ou "29/08/2025"
+    # YYYY-MM-DD HH:MM:SS -> DD/MM/YYYY
+    m = re.search(r'(\d{4})-(\d{2})-(\d{2})', s)
+    if m:
+        return f'{m.group(3)}/{m.group(2)}/{m.group(1)}'
+    # DD/MM/YYYY
     m = re.search(r'(\d{2})/(\d{2})/(\d{4})', s)
     if m:
         return f'{m.group(1)}/{m.group(2)}/{m.group(3)}'
-    # fallback: mantém (ex: "2025" ou "09/2025")
     return s
-
-
-def _detectar_coluna(cols: List[str], chaves: List[str]) -> str:
-    """Tenta escolher uma coluna pelo nome (heurística simples)."""
-    cols_norm = {c: _norm(c) for c in cols}
-    for key in chaves:
-        for original, n in cols_norm.items():
-            if key in n:
-                return original
-    return ''
 
 
 def _uid_lenon() -> str:
@@ -184,427 +147,218 @@ def migracao_processos():
         with ui.card().classes('w-full mb-4'):
             ui.label('Migração de Processos → Casos').classes('text-2xl font-bold text-gray-800 mb-2')
             ui.label(
-                'Aqui você vincula processos já cadastrados aos seus respectivos Casos. '
-                'Selecione um Caso e marque os processos na lista para vincular em lote.'
+                'Dados do relatório Eproc já carregados (106 processos). '
+                'Selecione os processos para criar/atualizar e vincular aos Casos.'
             ).classes('text-gray-600')
 
-        estado: Dict[str, Any] = {
-            'caso_selecionado': None,
-            'somente_sem_caso': True,
-            'df': None,
-            'import_rows': [],
-        }
+        # Defaults
+        default_sistema = 'eproc - TJSC - 1ª instância'
+        default_responsavel_nome = 'Lenon'
+        default_nucleo = 'Ambiental'
 
-        # ---------------------------------------------------------------------
-        # 1) IMPORTAÇÃO DE PLANILHA (EPROC)
-        # ---------------------------------------------------------------------
+        # Carrega bases para matching
+        pessoas = listar_pessoas()
+        envolvidos = listar_envolvidos()
+        parceiros = listar_parceiros()
+        
+        candidatos_autores = []
+        for p in pessoas:
+            dn = _fmt_text(p.get('nome_exibicao') or p.get('nome_completo') or p.get('full_name') or p.get('name') or '')
+            if dn:
+                candidatos_autores.append({'_id': p.get('_id', ''), '_display_name': dn})
+        
+        candidatos_reus = []
+        for x in (envolvidos + parceiros):
+            dn = _fmt_text(x.get('nome_exibicao') or x.get('nome_completo') or x.get('full_name') or x.get('name') or '')
+            if dn:
+                candidatos_reus.append({'_id': x.get('_id', ''), '_display_name': dn})
+
+        lenon_uid = _uid_lenon()
+
+        # Processos do Eproc (já carregados)
         with ui.card().classes('w-full mb-4'):
-            ui.label('1) Importar planilha do Eproc').classes('text-xl font-bold text-gray-800 mb-2')
-            ui.label(
-                'Faça upload do XLSX/CSV exportado do Eproc. Depois escolha quais colunas representam número, autores, réus, '
-                'data de distribuição (vira a data de abertura) e núcleo.'
-            ).classes('text-gray-600 mb-3')
+            ui.label('1) Processos do Eproc (pré-carregados)').classes('text-xl font-bold text-gray-800 mb-2')
+            ui.label(f'Total: {len(PROCESSOS_EPROC_2025)} processos').classes('text-gray-600 mb-3')
 
-            if pd is None:
-                ui.label('⚠️ pandas/openpyxl não estão disponíveis neste ambiente.').classes('text-red-600')
-            else:
-                # Defaults pedidos
-                default_sistema = 'eproc - TJSC - 1ª instância'
-                default_responsavel_nome = 'Lenon'
-                default_nucleo = 'Ambiental'
+            sobrescrever = ui.checkbox('Sobrescrever campos existentes do processo', value=False)
 
-                # Carrega bases para matching (uma vez)
-                pessoas = listar_pessoas()
-                envolvidos = listar_envolvidos()
-                parceiros = listar_parceiros()
-                candidatos_autores = []
-                for p in pessoas:
-                    dn = _fmt_text(p.get('nome_exibicao') or p.get('nome_completo') or p.get('full_name') or p.get('name') or '')
-                    if dn:
-                        candidatos_autores.append({'_id': p.get('_id', ''), '_display_name': dn})
-                candidatos_reus = []
-                for x in (envolvidos + parceiros):
-                    dn = _fmt_text(x.get('nome_exibicao') or x.get('nome_completo') or x.get('full_name') or x.get('name') or '')
-                    if dn:
-                        candidatos_reus.append({'_id': x.get('_id', ''), '_display_name': dn})
+            # Monta linhas de preview
+            rows_preview = []
+            for proc in PROCESSOS_EPROC_2025:
+                numero = _fmt_text(proc.get('numero'))
+                if not numero:
+                    continue
+                
+                classe = _fmt_text(proc.get('classe'))
+                assunto = _fmt_text(proc.get('assunto'))
+                titulo = ' - '.join([x for x in [classe, assunto] if x]) or f'Processo {numero}'
+                
+                data_dist = _fmt_text(proc.get('data_distribuicao'))
+                data_abertura = _parse_date_to_ddmmyyyy(data_dist)
+                
+                autores_raw = _fmt_text(proc.get('autores'))
+                reus_raw = _fmt_text(proc.get('reus'))
+                localidade = _fmt_text(proc.get('localidade'))
+                
+                autores_list = _split_names(autores_raw)
+                reus_list = _split_names(reus_raw)
+                
+                sug_autor = _melhor_match(autores_list[0], candidatos_autores) if autores_list else {}
+                sug_reu = _melhor_match(reus_list[0], candidatos_reus) if reus_list else {}
+                
+                # Detecta núcleo pelo assunto/classe
+                nucleo_auto = default_nucleo
+                texto_check = _norm(classe + ' ' + assunto)
+                if any(x in texto_check for x in ['ambiental', 'flora', 'degradacao', 'desmatamento', 'poluicao', 'app', 'area de preservacao']):
+                    nucleo_auto = 'Ambiental'
+                elif any(x in texto_check for x in ['cobranca', 'execucao fiscal', 'divida']):
+                    nucleo_auto = 'Cobranças'
+                else:
+                    nucleo_auto = 'Generalista'
+                
+                rows_preview.append({
+                    '_key': numero,
+                    'numero': numero,
+                    'titulo': titulo[:80] + '...' if len(titulo) > 80 else titulo,
+                    'titulo_full': titulo,
+                    'data_abertura': data_abertura or '—',
+                    'localidade': localidade or '—',
+                    'nucleo': nucleo_auto,
+                    'autor': autores_list[0][:40] + '...' if autores_list and len(autores_list[0]) > 40 else (autores_list[0] if autores_list else '—'),
+                    'autor_full': autores_list[0] if autores_list else '',
+                    'sug_autor': sug_autor.get('nome', '—') if sug_autor else '—',
+                    'reu': reus_list[0][:40] + '...' if reus_list and len(reus_list[0]) > 40 else (reus_list[0] if reus_list else '—'),
+                    'reu_full': reus_list[0] if reus_list else '',
+                    'sug_reu': sug_reu.get('nome', '—') if sug_reu else '—',
+                    'autores_raw': autores_raw,
+                    'reus_raw': reus_raw,
+                })
 
-                lenon_uid = _uid_lenon()
+            tabela_imp = ui.table(
+                columns=[
+                    {'name': 'numero', 'label': 'Número', 'field': 'numero', 'align': 'left', 'sortable': True},
+                    {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
+                    {'name': 'data_abertura', 'label': 'Data', 'field': 'data_abertura', 'align': 'left'},
+                    {'name': 'localidade', 'label': 'Localidade', 'field': 'localidade', 'align': 'left'},
+                    {'name': 'nucleo', 'label': 'Núcleo', 'field': 'nucleo', 'align': 'left'},
+                    {'name': 'autor', 'label': 'Autor (1º)', 'field': 'autor', 'align': 'left'},
+                    {'name': 'sug_autor', 'label': 'Sug. autor', 'field': 'sug_autor', 'align': 'left'},
+                    {'name': 'reu', 'label': 'Réu (1º)', 'field': 'reu', 'align': 'left'},
+                    {'name': 'sug_reu', 'label': 'Sug. réu', 'field': 'sug_reu', 'align': 'left'},
+                ],
+                rows=rows_preview,
+                row_key='_key',
+                selection='multiple',
+                pagination={'rowsPerPage': 15},
+            ).classes('w-full')
 
-                # Estado da UI
-                mapping = {
-                    'numero': None,
-                    'titulo': None,
-                    'autores': None,
-                    'reus': None,
-                    'data_dist': None,
-                    'nucleo': None,
-                }
+            def _importar_selecionados():
+                selecionados = tabela_imp.selected_rows or []
+                if not selecionados:
+                    ui.notify('Selecione ao menos 1 processo.', type='warning')
+                    return
 
-                sobrescrever = ui.checkbox('Sobrescrever campos existentes do processo', value=False)
+                ok = 0
+                atualizados = 0
+                erros = 0
 
-                with ui.row().classes('w-full items-center gap-3 flex-wrap'):
-                    upload = ui.upload(
-                        label='Upload planilha (XLSX/CSV)',
-                        auto_upload=True,
-                        max_files=1,
-                    ).props('flat color=primary')
+                for item in selecionados:
+                    numero = item.get('numero', '')
+                    titulo = item.get('titulo_full') or item.get('titulo') or f'Processo {numero}'
+                    data_abertura = item.get('data_abertura', '')
+                    if data_abertura == '—':
+                        data_abertura = ''
+                    nucleo_val = item.get('nucleo') or default_nucleo
+                    autores_raw = item.get('autores_raw', '')
+                    reus_raw = item.get('reus_raw', '')
 
-                    sheet_name_input = ui.input('Aba (opcional)', placeholder='Ex: Planilha1').props('dense outlined').classes('w-56')
+                    autores_list = _split_names(autores_raw)
+                    reus_list = _split_names(reus_raw)
 
-                preview_container = ui.column().classes('w-full mt-2')
-                # Carregar arquivo local (sem upload) — atende quem não quer fazer upload pelo browser
-                default_path = os.environ.get('EPROC_IMPORT_PATH', 'relatorio-processos-2025-lenon.xls')
-                with ui.row().classes('w-full items-center gap-3 flex-wrap mt-2'):
-                    path_input = ui.input('Arquivo local (opcional)', value=default_path, placeholder='Ex: imports/eproc.xlsx').props('dense outlined').classes('flex-grow min-w-[320px]')
-                    btn_load_local = ui.button('Carregar arquivo local', icon='folder_open').props('dense color=secondary')
+                    # Monta clientes (autores) com match
+                    clientes = []
+                    clientes_nomes = []
+                    for nome in autores_list:
+                        m = _melhor_match(nome, candidatos_autores)
+                        if m:
+                            clientes.append(m.get('id') or m.get('nome'))
+                            clientes_nomes.append(m.get('nome') or nome)
+                        else:
+                            clientes.append(nome)
+                            clientes_nomes.append(nome)
 
-                def _ler_planilha(nome_arquivo: str, content: bytes):
-                    ext = (nome_arquivo or '').lower()
-                    raw = content or b''
-                    raw_head = raw[:8000].lower()
-                    looks_like_html = (b'<table' in raw_head) or (b'<html' in raw_head) or (b'<!doctype' in raw_head)
+                    # Monta parte contrária (réus)
+                    reus_final = []
+                    for nome in reus_list:
+                        m = _melhor_match(nome, candidatos_reus)
+                        reus_final.append(m.get('nome') if m else nome)
+                    parte_contraria = reus_final  # lista de strings
 
-                    def _postprocess_df(df_in):
-                        try:
-                            df2 = df_in.copy()
-                            for c in df2.columns:
-                                df2[c] = df2[c].astype(str).map(_fix_mojibake)
-                            return df2
-                        except Exception:
-                            return df_in
+                    patch = {
+                        'numero': numero,
+                        'titulo': titulo,
+                        'data_abertura': data_abertura,
+                        'nucleo': nucleo_val,
+                        'clientes': clientes,
+                        'clientes_nomes': clientes_nomes,
+                        'parte_contraria': parte_contraria,
+                        'responsavel': lenon_uid,
+                        'responsavel_nome': default_responsavel_nome,
+                        'sistema_processual': default_sistema,
+                        'status': 'Em andamento',
+                    }
 
-                    buf = io.BytesIO(raw)
-                    if ext.endswith('.csv'):
-                        # tenta ; e ,
-                        try:
-                            return _postprocess_df(pd.read_csv(buf, sep=';', dtype=str))
-                        except Exception:
-                            buf.seek(0)
-                            return _postprocess_df(pd.read_csv(buf, sep=',', dtype=str))
-
-                    # HTML disfarçado (comum em relatórios .xls do Eproc)
-                    if looks_like_html:
-                        text = ''
-                        for enc in ['utf-8', 'cp1252', 'latin-1']:
-                            try:
-                                text = raw.decode(enc)
-                                break
-                            except Exception:
-                                continue
-                        if not text:
-                            text = raw.decode('latin-1', errors='ignore')
-                        dfs = pd.read_html(text)
-                        if dfs:
-                            return _postprocess_df(dfs[0].astype(str))
-
-                    # xlsx/xls "de verdade"
                     try:
-                        if sheet_name_input.value and sheet_name_input.value.strip():
-                            return _postprocess_df(pd.read_excel(buf, sheet_name=sheet_name_input.value.strip(), dtype=str))
-                        return _postprocess_df(pd.read_excel(buf, dtype=str))
-                    except Exception:
-                        # fallback final: tenta como HTML mesmo se não detectou
-                        try:
-                            text = raw.decode('latin-1', errors='ignore')
-                            dfs = pd.read_html(text)
-                            if dfs:
-                                return _postprocess_df(dfs[0].astype(str))
-                        except Exception:
-                            pass
-                        raise
-
-                def _montar_rows(df):
-                    cols = list(df.columns)
-                    # auto-detect
-                    mapping['numero'] = mapping['numero'] or _detectar_coluna(cols, ['nº do processo', 'no do processo', 'numero do processo', 'número do processo', 'processo'])
-                    mapping['data_dist'] = mapping['data_dist'] or _detectar_coluna(cols, ['data de autuacao', 'data de autuação', 'data de distribuicao', 'data de distribuição', 'data'])
-                    mapping['autores'] = mapping['autores'] or _detectar_coluna(cols, ['autor', 'autores', 'parte autora'])
-                    mapping['reus'] = mapping['reus'] or _detectar_coluna(cols, ['reu', 'réu', 'acusado', 'demandado', 'parte re'])
-                    mapping['titulo'] = mapping['titulo'] or _detectar_coluna(cols, ['classe', 'classe da acao', 'classe da ação', 'assunto', 'titulo'])
-                    mapping['nucleo'] = mapping['nucleo'] or _detectar_coluna(cols, ['nucleo', 'núcleo'])
-
-                    # UI de mapping
-                    preview_container.clear()
-                    with preview_container:
-                        ui.label('Mapeamento de colunas').classes('text-sm font-bold text-gray-700')
-                        with ui.row().classes('w-full gap-3 flex-wrap'):
-                            sel_numero = ui.select(cols, label='Coluna: Número', value=mapping['numero']).props('dense outlined').classes('w-64')
-                            sel_titulo = ui.select(['(auto)'] + cols, label='Coluna: Título/Classe', value=mapping['titulo'] or '(auto)').props('dense outlined').classes('w-64')
-                            sel_data = ui.select(['(vazio)'] + cols, label='Coluna: Data distribuição', value=mapping['data_dist'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_autores = ui.select(['(vazio)'] + cols, label='Coluna: Autores', value=mapping['autores'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_reus = ui.select(['(vazio)'] + cols, label='Coluna: Réus', value=mapping['reus'] or '(vazio)').props('dense outlined').classes('w-64')
-                            sel_nucleo = ui.select(['(padrão)'] + cols, label='Coluna: Núcleo', value=mapping['nucleo'] or '(padrão)').props('dense outlined').classes('w-64')
-
-                        ui.separator().classes('my-2')
-                        ui.label('Preview (selecione linhas para importar/atualizar)').classes('text-sm font-bold text-gray-700')
-
-                        # Monta preview rows (limitado)
-                        rows = []
-                        for _, r in df.head(200).iterrows():
-                            numero = _fmt_text(r.get(sel_numero.value))
-                            if not numero:
-                                continue
-                            titulo_raw = ''
-                            if sel_titulo.value and sel_titulo.value != '(auto)':
-                                titulo_raw = _fmt_text(r.get(sel_titulo.value))
-                            else:
-                                # auto: classe + assunto (se existirem)
-                                classe = _fmt_text(r.get(_detectar_coluna(cols, ['classe'])))
-                                assunto = _fmt_text(r.get(_detectar_coluna(cols, ['assunto'])))
-                                titulo_raw = ' - '.join([x for x in [classe, assunto] if x]) or f'Processo {numero}'
-
-                            data_raw = _fmt_text(r.get(sel_data.value)) if sel_data.value and sel_data.value != '(vazio)' else ''
-                            data_abertura = _parse_date_to_ddmmyyyy(data_raw)
-
-                            autores_raw = _fmt_text(r.get(sel_autores.value)) if sel_autores.value and sel_autores.value != '(vazio)' else ''
-                            reus_raw = _fmt_text(r.get(sel_reus.value)) if sel_reus.value and sel_reus.value != '(vazio)' else ''
-                            nucleo_raw = _fmt_text(r.get(sel_nucleo.value)) if sel_nucleo.value and sel_nucleo.value not in ['(padrão)'] else default_nucleo
-
-                            # sugestões rápidas (somente 1º nome)
-                            autores_list = _split_names(autores_raw)
-                            reus_list = _split_names(reus_raw)
-                            sug_autor = _melhor_match(autores_list[0], candidatos_autores) if autores_list else {}
-                            sug_reu = _melhor_match(reus_list[0], candidatos_reus) if reus_list else {}
-
-                            rows.append({
-                                '_key': numero,
+                        existente = buscar_processo_por_numero(numero)
+                        if existente:
+                            if not sobrescrever.value:
+                                patch_limpo = {}
+                                for k, v in patch.items():
+                                    atual = existente.get(k)
+                                    vazio = (atual is None) or (isinstance(atual, str) and not atual.strip()) or (isinstance(atual, list) and len(atual) == 0)
+                                    if vazio and v not in [None, '', [], {}]:
+                                        patch_limpo[k] = v
+                                patch = patch_limpo
+                            if patch:
+                                atualizar_campos_processo(existente['_id'], patch)
+                                atualizados += 1
+                            ok += 1
+                        else:
+                            dados_novos = {
+                                'titulo': titulo,
                                 'numero': numero,
-                                'titulo': titulo_raw,
-                                'data_abertura': data_abertura or '—',
-                                'nucleo': nucleo_raw or '—',
-                                'autor': autores_list[0] if autores_list else '—',
-                                'sug_autor': (sug_autor.get('nome') if sug_autor else '—'),
-                                'reu': reus_list[0] if reus_list else '—',
-                                'sug_reu': (sug_reu.get('nome') if sug_reu else '—'),
-                            })
+                                'tipo': 'Judicial',
+                                'status': 'Em andamento',
+                                'resultado': 'Pendente',
+                                'area': '',
+                                'estado': 'Santa Catarina',
+                                'data_abertura': data_abertura,
+                                'nucleo': nucleo_val,
+                                'sistema_processual': default_sistema,
+                                'clientes': clientes,
+                                'clientes_nomes': clientes_nomes,
+                                'parte_contraria': parte_contraria,
+                                'responsavel': lenon_uid,
+                                'responsavel_nome': default_responsavel_nome,
+                            }
+                            pid = criar_processo(dados_novos)
+                            if pid:
+                                ok += 1
+                            else:
+                                erros += 1
+                    except Exception as e:
+                        print(f"[MIGRACAO_PROCESSOS] Erro ao importar {numero}: {e}")
+                        erros += 1
 
-                        tabela_imp = ui.table(
-                            columns=[
-                                {'name': 'numero', 'label': 'Número', 'field': 'numero', 'align': 'left', 'sortable': True},
-                                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                                {'name': 'data_abertura', 'label': 'Data abertura', 'field': 'data_abertura', 'align': 'left'},
-                                {'name': 'nucleo', 'label': 'Núcleo', 'field': 'nucleo', 'align': 'left'},
-                                {'name': 'autor', 'label': 'Autor (1º)', 'field': 'autor', 'align': 'left'},
-                                {'name': 'sug_autor', 'label': 'Sugestão autor', 'field': 'sug_autor', 'align': 'left'},
-                                {'name': 'reu', 'label': 'Réu (1º)', 'field': 'reu', 'align': 'left'},
-                                {'name': 'sug_reu', 'label': 'Sugestão réu', 'field': 'sug_reu', 'align': 'left'},
-                            ],
-                            rows=rows,
-                            row_key='_key',
-                            selection='multiple',
-                            pagination={'rowsPerPage': 10},
-                        ).classes('w-full')
+                ui.notify(f'Importação: OK {ok} | Atualizados {atualizados} | Erros {erros}',
+                          type='positive' if erros == 0 else 'warning')
+                render_tabela.refresh()
 
-                        def _importar_selecionados():
-                            selecionados = tabela_imp.selected_rows or []
-                            if not selecionados:
-                                ui.notify('Selecione ao menos 1 linha do preview.', type='warning')
-                                return
+            with ui.row().classes('w-full items-center gap-3 mt-3'):
+                ui.button('Selecionar todos', icon='select_all', on_click=lambda: setattr(tabela_imp, 'selected', rows_preview)).props('color=secondary dense')
+                ui.button('Criar/Atualizar processos selecionados', icon='cloud_upload', on_click=_importar_selecionados).props('color=primary')
 
-                            ok = 0
-                            atualizados = 0
-                            erros = 0
-
-                            for item in selecionados:
-                                numero = item.get('numero', '')
-                                # pega linha original do df pelo numero (primeira ocorrência)
-                                try:
-                                    linha = df[df[sel_numero.value].astype(str).str.strip() == numero].head(1).to_dict('records')[0]
-                                except Exception:
-                                    linha = {}
-
-                                titulo = _fmt_text(item.get('titulo') or f'Processo {numero}')
-                                data_abertura = _fmt_text(item.get('data_abertura'))
-                                nucleo_val = _fmt_text(item.get('nucleo')) or default_nucleo
-
-                                autores_list = _split_names(linha.get(sel_autores.value)) if sel_autores.value and sel_autores.value != '(vazio)' else []
-                                reus_list = _split_names(linha.get(sel_reus.value)) if sel_reus.value and sel_reus.value != '(vazio)' else []
-
-                                # Monta clientes (autores) com match
-                                clientes = []
-                                clientes_nomes = []
-                                for nome in autores_list:
-                                    m = _melhor_match(nome, candidatos_autores)
-                                    if m:
-                                        clientes.append(m.get('id') or m.get('nome'))
-                                        clientes_nomes.append(m.get('nome') or nome)
-                                    else:
-                                        clientes.append(nome)
-                                        clientes_nomes.append(nome)
-
-                                # Monta parte contrária (réus) com match (texto)
-                                reus_final = []
-                                for nome in reus_list:
-                                    m = _melhor_match(nome, candidatos_reus)
-                                    reus_final.append(m.get('nome') if m else nome)
-                                parte_contraria = ', '.join([x for x in reus_final if _fmt_text(x)])
-
-                                patch = {
-                                    'numero': numero,
-                                    'titulo': titulo,
-                                    'data_abertura': data_abertura if data_abertura != '—' else '',
-                                    'nucleo': nucleo_val,
-                                    'clientes': clientes,
-                                    'clientes_nomes': clientes_nomes,
-                                    'parte_contraria': parte_contraria,
-                                    'responsavel': lenon_uid,
-                                    'responsavel_nome': default_responsavel_nome,
-                                    'sistema_processual': default_sistema,
-                                    'status': 'Em andamento',
-                                }
-
-                                try:
-                                    existente = buscar_processo_por_numero(numero)
-                                    if existente:
-                                        # se não sobrescrever, só preenche vazios
-                                        if not sobrescrever.value:
-                                            patch_limpo = {}
-                                            for k, v in patch.items():
-                                                atual = existente.get(k)
-                                                vazio = (atual is None) or (isinstance(atual, str) and not atual.strip()) or (isinstance(atual, list) and len(atual) == 0)
-                                                if vazio and v not in [None, '', [], {}]:
-                                                    patch_limpo[k] = v
-                                            patch = patch_limpo
-                                        if patch:
-                                            atualizar_campos_processo(existente['_id'], patch)
-                                            atualizados += 1
-                                        ok += 1
-                                    else:
-                                        # cria novo (mínimo necessário)
-                                        dados_novos = {
-                                            'titulo': titulo,
-                                            'numero': numero,
-                                            'tipo': 'Judicial',
-                                            'status': 'Em andamento',
-                                            'resultado': 'Pendente',
-                                            'area': '',
-                                            'estado': 'Santa Catarina',
-                                            'data_abertura': patch.get('data_abertura', ''),
-                                            'nucleo': nucleo_val,
-                                            'sistema_processual': default_sistema,
-                                            'clientes': clientes,
-                                            'clientes_nomes': clientes_nomes,
-                                            'parte_contraria': parte_contraria,
-                                            'responsavel': lenon_uid,
-                                            'responsavel_nome': default_responsavel_nome,
-                                        }
-                                        pid = criar_processo(dados_novos)
-                                        if pid:
-                                            ok += 1
-                                        else:
-                                            erros += 1
-                                except Exception as e:
-                                    print(f"[MIGRACAO_PROCESSOS] Erro ao importar {numero}: {e}")
-                                    erros += 1
-
-                            ui.notify(f'Importação concluída: OK {ok} | Atualizados {atualizados} | Erros {erros}',
-                                      type='positive' if erros == 0 else 'warning')
-                            render_tabela.refresh()
-
-                        ui.button('Criar/Atualizar processos selecionados', icon='cloud_upload', on_click=_importar_selecionados).props('color=primary').classes('mt-3')
-
-                async def handle_upload(e: events.UploadEventArguments):
-                    try:
-                        if not hasattr(e, 'file') or e.file is None:
-                            ui.notify('Upload inválido.', type='negative')
-                            return
-
-                        file_name = getattr(e.file, 'name', '') or getattr(e, 'name', '') or 'arquivo'
-                        file_bytes = None
-
-                        if hasattr(e.file, 'read'):
-                            try:
-                                if callable(e.file.read):
-                                    res = e.file.read()
-                                    # UploadFile.read() pode ser coroutine
-                                    if inspect.isawaitable(res):
-                                        res = await res
-                                    file_bytes = res
-                            except Exception:
-                                file_bytes = None
-
-                        # Fallbacks (algumas versões expõem content/data/bytes)
-                        if file_bytes is None:
-                            for attr in ['content', 'data', 'bytes']:
-                                if hasattr(e.file, attr):
-                                    res = getattr(e.file, attr)
-                                    # pode ser coroutine/awaitable também
-                                    if inspect.isawaitable(res):
-                                        res = await res
-                                    file_bytes = res
-                                    break
-
-                        # Se ainda veio como coroutine por qualquer motivo
-                        if inspect.isawaitable(file_bytes):
-                            file_bytes = await file_bytes
-
-                        if not file_bytes:
-                            ui.notify('Não foi possível ler o arquivo.', type='negative')
-                            upload.reset()
-                            return
-
-                        df = _ler_planilha(file_name, file_bytes)
-                        estado['df'] = df
-                        _montar_rows(df)
-                        ui.notify('Planilha carregada! Ajuste o mapeamento e selecione linhas.', type='positive')
-                    except Exception as ex:
-                        print(f"[MIGRACAO_PROCESSOS] Erro ao ler planilha: {type(ex).__name__}: {ex}")
-                        import traceback
-                        traceback.print_exc()
-                        ui.notify(f'Erro ao ler planilha: {str(ex)}', type='negative')
-                    finally:
-                        upload.reset()
-
-                upload.on_upload(handle_upload)
-
-                def _carregar_arquivo_local():
-                    try:
-                        raw_path = (path_input.value or '').strip()
-                        if not raw_path:
-                            ui.notify('Informe o caminho do arquivo.', type='warning')
-                            return
-
-                        # aceita relativo ao projeto
-                        base = Path(__file__).resolve().parents[3]  # .../mini_erp/pages/visao_geral -> projeto
-                        p = Path(raw_path)
-                        if not p.is_absolute():
-                            p = (base / p).resolve()
-
-                        if not p.exists():
-                            ui.notify(f'Arquivo não encontrado: {p}', type='negative')
-                            return
-
-                        content = p.read_bytes()
-                        df = _ler_planilha(p.name, content)
-                        estado['df'] = df
-                        _montar_rows(df)
-                        ui.notify(f'Arquivo carregado: {p.name}', type='positive')
-                    except Exception as ex:
-                        print(f"[MIGRACAO_PROCESSOS] Erro ao carregar arquivo local: {type(ex).__name__}: {ex}")
-                        import traceback
-                        traceback.print_exc()
-                        ui.notify(f'Erro ao carregar arquivo local: {str(ex)}', type='negative')
-
-                btn_load_local.on_click(_carregar_arquivo_local)
-
-                # Auto-carrega se o arquivo default existir (para “já entrar e estar lá”)
-                def _auto_try_load():
-                    try:
-                        raw_path = (path_input.value or '').strip()
-                        if not raw_path:
-                            return
-                        base = Path(__file__).resolve().parents[3]
-                        p = Path(raw_path)
-                        if not p.is_absolute():
-                            p = (base / p).resolve()
-                        if p.exists():
-                            _carregar_arquivo_local()
-                    except Exception:
-                        return
-
-                ui.timer(0.3, _auto_try_load, once=True)
-
-        # Carrega casos (para dropdown)
+        # Carrega casos
         casos = listar_casos()
         casos_opts: Dict[str, str] = {}
         for c in casos:
@@ -614,13 +368,13 @@ def migracao_processos():
             label = titulo
             if nucleo:
                 label = f'{titulo} — {nucleo}'
-            # Ajuda quando existem títulos iguais
             label = f'{label} ({cid[:6]})' if cid else label
             if cid:
                 casos_opts[cid] = label
 
-        # Controles
+        # Controles de vinculação
         with ui.card().classes('w-full mb-4'):
+            ui.label('2) Vincular processos a Casos').classes('text-xl font-bold text-gray-800 mb-2')
             with ui.row().classes('w-full items-center gap-3 flex-wrap'):
                 caso_select = ui.select(
                     options=casos_opts,
@@ -633,9 +387,9 @@ def migracao_processos():
                     value=True,
                 ).classes('mt-1')
 
-        # Tabela de processos
+        # Tabela de processos já cadastrados
         with ui.card().classes('w-full mb-4'):
-            ui.label('Processos (marque e vincule)').classes('text-xl font-bold text-gray-800 mb-3')
+            ui.label('Processos cadastrados (marque e vincule ao Caso)').classes('text-lg font-bold text-gray-800 mb-3')
 
             @ui.refreshable
             def render_tabela():
@@ -656,10 +410,10 @@ def migracao_processos():
 
                     linhas.append({
                         '_id': pid,
-                        'titulo': titulo,
+                        'titulo': titulo[:60] + '...' if len(titulo) > 60 else titulo,
                         'numero': numero or '-',
                         'caso_atual': caso_titulo or ('—' if not caso_id else f'({caso_id[:6]})'),
-                        'clientes': clientes_txt or '—',
+                        'clientes': clientes_txt[:40] + '...' if len(clientes_txt) > 40 else clientes_txt or '—',
                     })
 
                 colunas = [
@@ -702,7 +456,6 @@ def migracao_processos():
                     caso_label = casos_opts.get(caso_id, '')
                     caso_titulo = caso_label.split(' — ')[0].strip() if caso_label else ''
                     if not caso_titulo:
-                        # fallback: pega antes do " (xxxxxx)"
                         caso_titulo = caso_label.split(' (')[0].strip() if caso_label else ''
 
                     tabela = tabela_ref.get('table')
@@ -734,11 +487,3 @@ def migracao_processos():
                     render_tabela.refresh()
 
                 ui.button('Vincular processos selecionados ao Caso', icon='link', on_click=vincular_em_lote).props('color=primary').classes('whitespace-nowrap')
-
-        with ui.card().classes('w-full'):
-            ui.label('Dica').classes('text-lg font-bold text-gray-800 mb-1')
-            ui.label(
-                'Depois de importar a planilha, você pode usar a seção abaixo para vincular processos aos Casos em lote.'
-            ).classes('text-gray-600')
-
-

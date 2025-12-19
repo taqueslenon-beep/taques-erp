@@ -1,0 +1,136 @@
+2025-12-19 20:17:52,722 - __main__ - INFO - =========================================================
+2025-12-19 20:17:52,722 - __main__ - INFO - >>> INICIANDO APLICAÇÃO TAQUES ERP...
+2025-12-19 20:17:52,722 - __main__ - INFO - =========================================================
+2025-12-19 20:17:52,722 - __main__ - DEBUG - Verificando compatibilidade de 'importlib.metadata'...
+2025-12-19 20:17:52,731 - __main__ - WARNING - Atributo 'packages_distributions' não encontrado. Tentando shim de compatibilidade...
+2025-12-19 20:17:52,736 - __main__ - INFO - ✅ Shim de compatibilidade aplicado com sucesso usando 'importlib_metadata'.
+2025-12-19 20:17:52,736 - __main__ - DEBUG - Importando NiceGUI...
+2025-12-19 20:17:53,184 - __main__ - DEBUG - NiceGUI importado com sucesso.
+2025-12-19 20:17:53,184 - __main__ - DEBUG - __package__ = 'None'
+2025-12-19 20:17:53,184 - __main__ - INFO - Executando como script. Adicionando diretório pai ao sys.path e importando 'mini_erp.pages'.
+/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/google/api_core/_python_version_support.py:252: FutureWarning: You are using a Python version (3.9.6) past its end of life. Google will update google.api_core with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade to the latest Python version, or at least Python 3.10, and then update google.api_core.
+  warnings.warn(message, FutureWarning)
+2025-12-19 20:17:53,898 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2025-12-19 20:17:54,169 - __main__ - INFO - Módulos de páginas importados. As rotas devem estar registradas.
+2025-12-19 20:17:54,169 - __main__ - INFO - Ponto de entrada (__name__='__main__') alcançado. Chamando start_server_safe().
+2025-12-19 20:17:54,169 - __main__ - INFO - Iniciando o procedimento para iniciar o servidor seguro (start_server_safe)...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Registrando handler para sinal SIGSEGV (Segmentation Fault)...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Variável de ambiente APP_PORT='8085'.
+2025-12-19 20:17:54,169 - __main__ - INFO - Procurando porta disponível a partir de 8085...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Verificando disponibilidade da porta 8085...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Tentando conectar a 127.0.0.1:8085 para ver se está ocupada...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Conexão à porta 8085 falhou com código 61. Isso é bom. Tentando fazer bind...
+2025-12-19 20:17:54,169 - __main__ - INFO - ✅ Porta 8085 está disponível (bind bem-sucedido).
+2025-12-19 20:17:54,169 - __main__ - INFO - ✅ Porta 8085 está disponível.
+2025-12-19 20:17:54,169 - __main__ - INFO - 🚀 Porta 8085 confirmada como disponível. Configurando o servidor NiceGUI...
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Modo dev_server: True
+2025-12-19 20:17:54,169 - __main__ - INFO - 🔄 Hot Reload gerenciado pelo dev_server.py (watchfiles)
+2025-12-19 20:17:54,169 - __main__ - INFO - ✅ Middleware anti-cache configurado
+2025-12-19 20:17:54,169 - __main__ - DEBUG - Configurações do ui.run: {'title': 'TAQUES-ERP - Sistema de Advocacia', 'favicon': '💼', 'port': 8085, 'host': '0.0.0.0', 'reload': False, 'show': False, 'show_welcome_message': False, 'storage_secret': 'taques-erp-secret-key-2024', 'binding_refresh_interval': 3.0, 'reconnect_timeout': 60.0}
+2025-12-19 20:17:54,169 - __main__ - INFO - >>> ✨ Iniciando servidor NiceGUI em http://localhost:8085 ✨ <<<
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1766186274.196668   88925 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+2025-12-19 20:17:54,238 - urllib3.connectionpool - DEBUG - https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/google/cloud/firestore_v1/base_collection.py:304: UserWarning: Detected filter using positional arguments. Prefer using the 'filter' keyword argument instead.
+  return query.where(field_path, op_string, value)
+2025-12-19 20:18:31,649 - urllib3.util.retry - DEBUG - Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
+2025-12-19 20:18:31,665 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): identitytoolkit.googleapis.com:443
+2025-12-19 20:18:32,169 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "GET /v1/projects/taques-erp/accounts:batchGet?maxResults=1000 HTTP/1.1" 200 None
+2025-12-19 20:18:32,426 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "POST /v1/projects/taques-erp/accounts:lookup HTTP/1.1" 200 None
+2025-12-19 20:18:32,744 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "POST /v1/projects/taques-erp/accounts:lookup HTTP/1.1" 200 None
+2025-12-19 20:18:33,070 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "POST /v1/projects/taques-erp/accounts:lookup HTTP/1.1" 200 None
+2025-12-19 20:18:33,385 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "POST /v1/projects/taques-erp/accounts:lookup HTTP/1.1" 200 None
+2025-12-19 20:18:33,740 - urllib3.connectionpool - DEBUG - https://identitytoolkit.googleapis.com:443 "POST /v1/projects/taques-erp/accounts:lookup HTTP/1.1" 200 None
+/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py:309: FutureWarning: Passing literal html to 'read_html' is deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  dfs = pd.read_html(text)
+Traceback (most recent call last):
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 135, in import_optional_dependency
+    module = importlib.import_module(name)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1030, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 984, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'xlrd'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 578, in _carregar_arquivo_local
+    df = _ler_planilha(p.name, content)
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 304, in _ler_planilha
+    return _postprocess_df(pd.read_excel(buf, dtype=str))
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 495, in read_excel
+    io = ExcelFile(
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 1567, in __init__
+    self._reader = self._engines[engine](
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_xlrd.py", line 45, in __init__
+    import_optional_dependency("xlrd", extra=err_msg)
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 138, in import_optional_dependency
+    raise ImportError(msg)
+ImportError: Missing optional dependency 'xlrd'. Install xlrd >= 2.0.1 for xls Excel support Use pip or conda to install xlrd.
+2025-12-19 20:18:42,941 - nicegui - WARNING - http://localhost:8085/.well-known/appspecific/com.chrome.devtools.json not found
+Traceback (most recent call last):
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 135, in import_optional_dependency
+    module = importlib.import_module(name)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1030, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 984, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'xlrd'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 578, in _carregar_arquivo_local
+    df = _ler_planilha(p.name, content)
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 304, in _ler_planilha
+    return _postprocess_df(pd.read_excel(buf, dtype=str))
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 495, in read_excel
+    io = ExcelFile(
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 1567, in __init__
+    self._reader = self._engines[engine](
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_xlrd.py", line 45, in __init__
+    import_optional_dependency("xlrd", extra=err_msg)
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 138, in import_optional_dependency
+    raise ImportError(msg)
+ImportError: Missing optional dependency 'xlrd'. Install xlrd >= 2.0.1 for xls Excel support Use pip or conda to install xlrd.
+2025-12-19 20:19:25,332 - python_multipart.multipart - DEBUG - Calling on_part_begin with no data
+2025-12-19 20:19:25,332 - python_multipart.multipart - DEBUG - Calling on_header_field with data[42:61]
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_header_value with data[63:162]
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_header_field with data[164:176]
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_header_value with data[178:202]
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_headers_finished with no data
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_part_data with data[206:89818]
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_part_end with no data
+2025-12-19 20:19:25,333 - python_multipart.multipart - DEBUG - Calling on_end with no data
+Traceback (most recent call last):
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 135, in import_optional_dependency
+    module = importlib.import_module(name)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py", line 127, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1030, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1007, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 984, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'xlrd'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 546, in handle_upload
+    df = _ler_planilha(file_name, file_bytes)
+  File "/Users/lenontaques/Documents/taques-erp/mini_erp/pages/visao_geral/migracao_processos.py", line 304, in _ler_planilha
+    return _postprocess_df(pd.read_excel(buf, dtype=str))
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 495, in read_excel
+    io = ExcelFile(
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_base.py", line 1567, in __init__
+    self._reader = self._engines[engine](
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/io/excel/_xlrd.py", line 45, in __init__
+    import_optional_dependency("xlrd", extra=err_msg)
+  File "/Users/lenontaques/Library/Python/3.9/lib/python/site-packages/pandas/compat/_optional.py", line 138, in import_optional_dependency
+    raise ImportError(msg)
+ImportError: Missing optional dependency 'xlrd'. Install xlrd >= 2.0.1 for xls Excel support Use pip or conda to install xlrd.
+2025-12-19 20:19:44,208 - nicegui - DEBUG - Pruning stale client ff42adf9-2c5a-44a9-b77e-b96cb07dc3f7

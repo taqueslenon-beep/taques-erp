@@ -274,3 +274,4 @@ def excluir_processo_interno(processo_id: str) -> bool:
         traceback.print_exc()
         return False
 
+
