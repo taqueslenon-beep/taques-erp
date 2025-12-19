@@ -15,10 +15,14 @@ from typing import Dict, Any, List
 from nicegui import ui
 from nicegui import events
 
+import asyncio
 import io
+import inspect
+import os
 import re
 import unicodedata
 import difflib
+from pathlib import Path
 
 from ...core import layout
 from ...auth import is_authenticated
@@ -234,6 +238,11 @@ def migracao_processos():
                     sheet_name_input = ui.input('Aba (opcional)', placeholder='Ex: Planilha1').props('dense outlined').classes('w-56')
 
                 preview_container = ui.column().classes('w-full mt-2')
+                # Carregar arquivo local (sem upload) — atende quem não quer fazer upload pelo browser
+                default_path = os.environ.get('EPROC_IMPORT_PATH', 'imports/eproc.xlsx')
+                with ui.row().classes('w-full items-center gap-3 flex-wrap mt-2'):
+                    path_input = ui.input('Arquivo local (opcional)', value=default_path, placeholder='Ex: imports/eproc.xlsx').props('dense outlined').classes('flex-grow min-w-[320px]')
+                    btn_load_local = ui.button('Carregar arquivo local', icon='folder_open').props('dense color=secondary')
 
                 def _ler_planilha(nome_arquivo: str, content: bytes):
                     ext = (nome_arquivo or '').lower()
@@ -452,15 +461,28 @@ def migracao_processos():
                         if hasattr(e.file, 'read'):
                             try:
                                 if callable(e.file.read):
-                                    file_bytes = e.file.read()
+                                    res = e.file.read()
+                                    # UploadFile.read() pode ser coroutine
+                                    if inspect.isawaitable(res):
+                                        res = await res
+                                    file_bytes = res
                             except Exception:
                                 file_bytes = None
-                        if hasattr(e.file, 'content'):
-                            file_bytes = e.file.content
-                        elif hasattr(e.file, 'data'):
-                            file_bytes = e.file.data
-                        elif hasattr(e.file, 'bytes'):
-                            file_bytes = e.file.bytes
+
+                        # Fallbacks (algumas versões expõem content/data/bytes)
+                        if file_bytes is None:
+                            for attr in ['content', 'data', 'bytes']:
+                                if hasattr(e.file, attr):
+                                    res = getattr(e.file, attr)
+                                    # pode ser coroutine/awaitable também
+                                    if inspect.isawaitable(res):
+                                        res = await res
+                                    file_bytes = res
+                                    break
+
+                        # Se ainda veio como coroutine por qualquer motivo
+                        if inspect.isawaitable(file_bytes):
+                            file_bytes = await file_bytes
 
                         if not file_bytes:
                             ui.notify('Não foi possível ler o arquivo.', type='negative')
@@ -480,6 +502,53 @@ def migracao_processos():
                         upload.reset()
 
                 upload.on_upload(handle_upload)
+
+                def _carregar_arquivo_local():
+                    try:
+                        raw_path = (path_input.value or '').strip()
+                        if not raw_path:
+                            ui.notify('Informe o caminho do arquivo.', type='warning')
+                            return
+
+                        # aceita relativo ao projeto
+                        base = Path(__file__).resolve().parents[3]  # .../mini_erp/pages/visao_geral -> projeto
+                        p = Path(raw_path)
+                        if not p.is_absolute():
+                            p = (base / p).resolve()
+
+                        if not p.exists():
+                            ui.notify(f'Arquivo não encontrado: {p}', type='negative')
+                            return
+
+                        content = p.read_bytes()
+                        df = _ler_planilha(p.name, content)
+                        estado['df'] = df
+                        _montar_rows(df)
+                        ui.notify(f'Arquivo carregado: {p.name}', type='positive')
+                    except Exception as ex:
+                        print(f"[MIGRACAO_PROCESSOS] Erro ao carregar arquivo local: {type(ex).__name__}: {ex}")
+                        import traceback
+                        traceback.print_exc()
+                        ui.notify(f'Erro ao carregar arquivo local: {str(ex)}', type='negative')
+
+                btn_load_local.on_click(_carregar_arquivo_local)
+
+                # Auto-carrega se o arquivo default existir (para “já entrar e estar lá”)
+                def _auto_try_load():
+                    try:
+                        raw_path = (path_input.value or '').strip()
+                        if not raw_path:
+                            return
+                        base = Path(__file__).resolve().parents[3]
+                        p = Path(raw_path)
+                        if not p.is_absolute():
+                            p = (base / p).resolve()
+                        if p.exists():
+                            _carregar_arquivo_local()
+                    except Exception:
+                        return
+
+                ui.timer(0.3, _auto_try_load, once=True)
 
         # Carrega casos (para dropdown)
         casos = listar_casos()
