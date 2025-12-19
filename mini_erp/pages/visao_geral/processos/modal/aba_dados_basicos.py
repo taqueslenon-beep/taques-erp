@@ -129,7 +129,7 @@ def render_aba_dados_basicos(
                     number_input = ui.input(make_required_label('Número do Processo')).classes('w-48').props('outlined dense')
                 
                 with ui.row().classes('w-full gap-4 items-center'):
-                    link_input = ui.input('Link do Processo').classes('flex-grow').props('outlined dense')
+                    link_input = ui.input('Link interno do Eproc (advogado)').classes('flex-grow').props('outlined dense')
                     
                     def open_link():
                         link = link_input.value.strip()

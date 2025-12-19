@@ -2,6 +2,8 @@
 Módulo de páginas do workspace "Visão geral do escritório".
 """
 from . import painel, processos, acordos, configuracoes, dashboard_oportunidades
+# Telas de migração
+from . import migracao_casos, migracao_processos
 # Módulos que são subpacotes completos
 from .pessoas import pessoas_visao_geral
 # Importa módulo pessoas completo para registrar todas as rotas (incluindo migracao_clientes)

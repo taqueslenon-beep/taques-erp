@@ -237,6 +237,33 @@ def atualizar_processo(processo_id: str, dados: Dict[str, Any]) -> bool:
         return False
 
 
+def atualizar_campos_processo(processo_id: str, campos: Dict[str, Any]) -> bool:
+    """
+    Atualiza apenas alguns campos de um processo (sem exigir o dicionário completo).
+
+    Usado em telas de migração/vinculação em lote, onde queremos atualizar campos
+    como caso_id/caso_titulo sem precisar preencher todo o processo.
+    """
+    try:
+        db = get_db()
+        if not db:
+            print("Erro: Conexão com Firebase não disponível")
+            return False
+
+        dados = dict(campos or {})
+        dados['updated_at'] = datetime.now()
+        dados.pop('_id', None)
+        dados.pop('created_at', None)
+
+        db.collection(COLECAO_PROCESSOS).document(processo_id).update(dados)
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar campos do processo {processo_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def excluir_processo(processo_id: str) -> bool:
     """
     Exclui um processo da coleção.
