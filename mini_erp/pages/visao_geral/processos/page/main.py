@@ -1,6 +1,7 @@
 """
 Página principal do módulo Processos do workspace Visão Geral.
 Rota: /visao-geral/processos
+# Removido ambiente de migração (19/12/2025) - será recriado do zero
 """
 from nicegui import ui
 from mini_erp.core import layout
@@ -78,7 +79,6 @@ def _renderizar_pagina_processos():
                     abrir_modal_processo(on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
                 ui.button('Novo Processo', icon='add', on_click=novo_processo).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
-                ui.button('Migração', icon='sync_alt', on_click=lambda: ui.navigate.to('/visao-geral/migracao-processos')).props('color=secondary').classes('whitespace-nowrap w-full sm:w-auto')
 
             # Linha de filtros
             with ui.row().classes('w-full items-center mb-4 gap-3 flex-wrap'):

@@ -176,3 +176,4 @@ O bug foi causado por falta de tratamento de erro e validação de dados no flux
 3. ✅ Validação de dados antes de popular campos
 4. ✅ Tratamento robusto de exceções
 
+

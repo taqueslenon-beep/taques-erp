@@ -94,3 +94,4 @@ def diagnostico():
 if __name__ == '__main__':
     diagnostico()
 
+

@@ -185,10 +185,19 @@ def criar_processo(dados: Dict[str, Any]) -> Optional[str]:
     """
     try:
         # Valida dados
+        print(f"[CRIAR_PROCESSO] Validando dados do processo...")
+        print(f"[CRIAR_PROCESSO] Título: {dados.get('titulo', 'VAZIO')}")
+        print(f"[CRIAR_PROCESSO] Número: {dados.get('numero', 'VAZIO')}")
+        print(f"[CRIAR_PROCESSO] Tipo: {dados.get('tipo', 'VAZIO')}")
+        print(f"[CRIAR_PROCESSO] Status: {dados.get('status', 'VAZIO')}")
+        print(f"[CRIAR_PROCESSO] Área: {dados.get('area', 'VAZIO')}")
+        
         valido, mensagem_erro = validar_processo(dados)
         if not valido:
-            print(f"Erro de validação: {mensagem_erro}")
+            print(f"[CRIAR_PROCESSO] ❌ Erro de validação: {mensagem_erro}")
             return None
+        
+        print(f"[CRIAR_PROCESSO] ✅ Validação passou!")
 
         db = get_db()
         if not db:
