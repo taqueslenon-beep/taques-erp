@@ -54,9 +54,11 @@ class Processo(TypedDict, total=False):
     grupo_id: str                # ID do grupo de relacionamento
     grupo_nome: str              # Nome do grupo (ex: "Schmidmeier")
     
-    # Hierarquia
-    processo_pai_id: str         # ID do processo pai (para recursos, agravos, etc.)
-    processo_pai_titulo: str     # Título do processo pai
+    # Hierarquia (suporta múltiplos pais e filhos)
+    processos_pai_ids: List[str]     # IDs dos processos pai (um processo pode ter múltiplos pais)
+    processos_pai_titulos: List[str] # Títulos dos processos pai para exibição
+    processo_pai_id: str             # ID do processo pai principal (legado/compatibilidade)
+    processo_pai_titulo: str         # Título do processo pai principal (legado/compatibilidade)
     processos_filhos_ids: List[str]  # IDs dos processos filhos
     
     # Cenários
@@ -79,6 +81,9 @@ class Processo(TypedDict, total=False):
     
     # Observações
     observacoes: str             # Observações gerais (texto livre)
+    
+    # Chaves de acesso
+    chaves_acesso: List[dict]    # Lista de chaves de acesso do E-PROC
 
 
 # =============================================================================
@@ -142,6 +147,8 @@ def criar_processo_vazio() -> dict:
         'parte_contraria_tipo': 'PF',
         'grupo_id': '',
         'grupo_nome': '',
+        'processos_pai_ids': [],
+        'processos_pai_titulos': [],
         'processo_pai_id': '',
         'processo_pai_titulo': '',
         'processos_filhos_ids': [],
@@ -154,6 +161,7 @@ def criar_processo_vazio() -> dict:
         'responsavel_nome': '',
         'prioridade': PRIORIDADE_PADRAO,  # P4 por padrão
         'observacoes': '',
+        'chaves_acesso': [],  # Lista de chaves de acesso do E-PROC
     }
 
 
@@ -180,33 +188,30 @@ def validar_processo(dados: dict) -> tuple:
     if tipo and tipo not in TIPOS_PROCESSO:
         return False, 'Tipo de processo inválido.'
 
-    # Status válido (se informado)
-    status = dados.get('status', 'Ativo')
-    if status and status not in STATUS_PROCESSO:
+    # Status válido (se informado) - aceita status antigos para migração
+    status = dados.get('status', 'Em andamento')
+    status_validos = STATUS_PROCESSO + ['Ativo', 'Suspenso', 'Arquivado', 'Baixado', 'Encerrado']
+    if status and status not in status_validos:
         return False, 'Status inválido.'
 
-    # Área válida (se informada)
+    # Área válida (se informada) - permite vazio
     area = dados.get('area', '')
     if area and area not in AREAS_PROCESSO:
         return False, 'Área inválida.'
 
-    # Estado válido (se informado)
+    # Estado válido (se informado) - permite vazio
     estado = dados.get('estado', '')
     if estado and estado not in ESTADOS:
         return False, 'Estado inválido.'
 
-    # Resultado válido (se informado)
-    resultado = dados.get('resultado', 'Pendente')
+    # Resultado válido (se informado) - permite vazio
+    resultado = dados.get('resultado', '')
     if resultado and resultado not in RESULTADOS_PROCESSO:
         return False, 'Resultado inválido.'
 
-    # Prioridade válida (se informada)
-    prioridade = dados.get('prioridade', PRIORIDADE_PADRAO)
+    # Prioridade válida (se informada) - permite vazio
+    prioridade = dados.get('prioridade', '')
     if prioridade and not validar_prioridade(prioridade):
         return False, 'Prioridade inválida. Deve ser P1, P2, P3 ou P4.'
 
     return True, None
-
-
-
-

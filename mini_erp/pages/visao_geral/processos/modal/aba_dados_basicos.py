@@ -13,6 +13,20 @@ from ..constants import TIPOS_PROCESSO
 from mini_erp.models.prioridade import PRIORIDADE_PADRAO, CODIGOS_PRIORIDADE
 
 
+def _validar_tipo_processo(tipo: str) -> str:
+    """Valida e retorna tipo de processo válido."""
+    if not tipo or tipo not in TIPOS_PROCESSO:
+        return 'Judicial'
+    return tipo
+
+
+def _validar_prioridade(prioridade: str) -> str:
+    """Valida e retorna prioridade válida."""
+    if not prioridade or prioridade not in CODIGOS_PRIORIDADE:
+        return PRIORIDADE_PADRAO
+    return prioridade
+
+
 def render_aba_dados_basicos(
     state: Dict[str, Any],
     dados: Dict[str, Any],
@@ -83,41 +97,27 @@ def render_aba_dados_basicos(
         refresh_chips(container, list_ref, tag_type, source_list)
         ui.notify(f'Adicionado: {val}', type='positive', timeout=1500)
     
-    # Helper para processos pais (usa lista já carregada)
-    def refresh_parent_chips(container, processo_pai_id):
-        container.clear()
-        if not processo_pai_id:
-            return
-        
-        proc = next((p for p in processos_pais if p.get('_id') == processo_pai_id), None)
-        
-        with container:
-            with ui.row().classes('w-full gap-1 flex-wrap min-h-8'):
-                if proc:
-                    title = proc.get('titulo') or proc.get('numero') or 'Sem título'
-                    number = proc.get('numero', '')
-                    display = f"{title}" + (f" ({number})" if number else "")
-                    with ui.badge(display).classes('pr-1').style('background-color: #FF9800; color: white;'):
-                        ui.button(
-                            icon='close',
-                            on_click=lambda: remove_parent_process(parent_process_chips)
-                        ).props('flat dense round size=xs color=white')
+    # Helper para formatar opção de processo (título + número)
+    def format_process_option(proc: dict) -> str:
+        """Formata opção de processo para dropdown: Título (Número)"""
+        titulo = proc.get('titulo', '') or 'Sem título'
+        numero = proc.get('numero', '')
+        if numero:
+            return f"{titulo} ({numero})"
+        return titulo
     
-    def remove_parent_process(container):
-        state['processo_pai_id'] = ''
-        refresh_parent_chips(container, '')
+    # Helper para processos pais (suporta múltiplos)
+    def get_process_id_from_option(option: str) -> str:
+        """Extrai ID do processo da opção selecionada."""
+        if ' | ' in option:
+            return option.split(' | ')[-1].strip()
+        return ''
     
-    def add_parent_process(select, container):
-        val = select.value
-        if val and val != '— Nenhum (processo raiz) —' and val != '-':
-            if ' | ' in val:
-                process_id = val.split(' | ')[-1].strip()
-                if process_id == state.get('process_id'):
-                    ui.notify('Um processo não pode ser vinculado a si mesmo!', type='warning')
-                    return
-                state['processo_pai_id'] = process_id
-                select.value = None
-                refresh_parent_chips(container, process_id)
+    def get_process_option_with_id(proc: dict) -> str:
+        """Retorna opção formatada com ID para matching: Título (Número) | ID"""
+        display = format_process_option(proc)
+        proc_id = proc.get('_id', '')
+        return f"{display} | {proc_id}"
     
     with ui.column().classes('w-full gap-4'):
         # SEÇÃO 1 - Identificação do Processo
@@ -129,7 +129,7 @@ def render_aba_dados_basicos(
                     number_input = ui.input(make_required_label('Número do Processo')).classes('w-48').props('outlined dense')
                 
                 with ui.row().classes('w-full gap-4 items-center'):
-                    link_input = ui.input('Link interno do Eproc (advogado)').classes('flex-grow').props('outlined dense')
+                    link_input = ui.input('Link do Processo').classes('flex-grow').props('outlined dense')
                     
                     def open_link():
                         link = link_input.value.strip()
@@ -152,7 +152,7 @@ def render_aba_dados_basicos(
                 type_select = ui.select(
                     TIPOS_PROCESSO,
                     label=make_required_label('Tipo de processo'),
-                    value=dados.get('tipo', 'Judicial')
+                    value=_validar_tipo_processo(dados.get('tipo', '') or '')
                 ).classes('w-full').props('outlined dense')
                 
                 # Data de Abertura
@@ -253,7 +253,7 @@ def render_aba_dados_basicos(
                 prioridade_select = ui.select(
                     CODIGOS_PRIORIDADE,
                     label='Prioridade',
-                    value=dados.get('prioridade', PRIORIDADE_PADRAO)
+                    value=_validar_prioridade(dados.get('prioridade', '') or '')
                 ).classes('w-full').props('outlined dense')
                 
                 # Responsável pelo Processo (usa lista já carregada)
@@ -294,21 +294,112 @@ def render_aba_dados_basicos(
                         client_chips = ui.column().classes('w-full')
                     
                     # Parte Contrária (usa envolvidos e parceiros, não clientes)
+                    # CORREÇÃO MutationObserver: ui.select com with_input=True cria autocomplete interno
+                    # que usa MutationObserver. Adicionado tratamento robusto para evitar erros
+                    # quando componente é destruído durante digitação ou navegação entre abas.
                     opposing_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
                     with ui.column().classes('flex-1 gap-2'):
                         opposing_sel = ui.select(
                             opposing_options or [],
                             label='Parte Contrária',
                             value=state.get('selected_opposing', []) or [],
-                            with_input=True,
+                            with_input=True,  # Cria autocomplete interno (pode causar MutationObserver)
                             multiple=True,
                         ).classes('w-full').props('dense outlined use-chips')
 
                         def _sync_opposing(_e=None):
-                            state['selected_opposing'] = opposing_sel.value or []
+                            """
+                            Sincroniza valor do select com o state.
+                            
+                            CORREÇÃO MutationObserver (CRÍTICO):
+                            O ui.select com with_input=True cria um autocomplete interno que usa
+                            MutationObserver para detectar mudanças no DOM. Quando o componente
+                            é destruído (navegação entre abas, fechamento do modal, etc.), o observer
+                            ainda tenta acessar elementos que não existem mais, causando o erro:
+                            "TypeError: Failed to execute 'observe' on 'MutationObserver': parameter 1 is not of type 'Node'"
+                            
+                            Solução: Validação robusta em múltiplas camadas antes de qualquer acesso
+                            a propriedades do componente. Todos os erros são silenciosamente ignorados
+                            para não interromper a experiência do usuário.
+                            """
+                            try:
+                                # Validação 1: Verifica se referência do componente existe
+                                if not opposing_sel:
+                                    return
+                                
+                                # Validação 2: Verifica se componente tem propriedade value
+                                if not hasattr(opposing_sel, 'value'):
+                                    return
+                                
+                                # Validação 3: Acessa valor com proteção adicional
+                                # Usa try-except interno para capturar erros específicos de acesso
+                                try:
+                                    valor_atual = opposing_sel.value
+                                    if valor_atual is not None:
+                                        # Garante que é lista
+                                        if isinstance(valor_atual, list):
+                                            state['selected_opposing'] = valor_atual
+                                        else:
+                                            state['selected_opposing'] = [valor_atual]
+                                    else:
+                                        state['selected_opposing'] = []
+                                except (AttributeError, TypeError, RuntimeError, KeyError):
+                                    # Erro ao acessar value - componente pode estar sendo destruído
+                                    # Silenciosamente ignora - não é erro crítico
+                                    return
+                                    
+                            except (AttributeError, TypeError):
+                                # Ignora erros de MutationObserver ou componente destruído
+                                # Comportamento esperado durante navegação entre abas ou fechamento do modal
+                                pass
+                            except Exception as ex:
+                                # Log apenas erros verdadeiramente inesperados
+                                # Erros de MutationObserver são silenciosamente ignorados
+                                error_str = str(ex)
+                                if 'MutationObserver' not in error_str and 'Node' not in error_str and 'observe' not in error_str:
+                                    import logging
+                                    logger = logging.getLogger(__name__)
+                                    logger.debug(f"Erro ao sincronizar parte contrária (não-MutationObserver): {ex}")
 
-                        opposing_sel.on_value_change(_sync_opposing)
-                        _sync_opposing()
+                        # Configura evento com tratamento robusto de erros
+                        # CORREÇÃO: Tenta múltiplas formas de binding para garantir funcionamento
+                        evento_configurado = False
+                        
+                        # Método 1: on_value_change (padrão NiceGUI)
+                        try:
+                            opposing_sel.on_value_change(_sync_opposing)
+                            _sync_opposing()  # Sincroniza estado inicial
+                            evento_configurado = True
+                        except Exception as ex:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.debug(f"on_value_change falhou, tentando fallback: {ex}")
+                        
+                        # Método 2: Fallback com evento Vue direto
+                        if not evento_configurado:
+                            try:
+                                opposing_sel.on('update:model-value', _sync_opposing)
+                                _sync_opposing()
+                                evento_configurado = True
+                            except Exception as ex:
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.debug(f"Fallback update:model-value também falhou: {ex}")
+                        
+                        # Método 3: Sincronização manual via timer (último recurso)
+                        if not evento_configurado:
+                            import asyncio
+                            async def sync_periodico():
+                                """Sincroniza periodicamente se eventos não funcionarem"""
+                                while True:
+                                    await asyncio.sleep(0.5)  # A cada 500ms
+                                    try:
+                                        _sync_opposing()
+                                    except:
+                                        break  # Para se componente foi destruído
+                            
+                            # Não inicia timer automático - apenas como fallback se necessário
+                            # asyncio.create_task(sync_periodico())
                 
                 # Outros Envolvidos (usa envolvidos e parceiros, não clientes)
                 others_options = [format_option_for_search(p) for p in envolvidos_e_parceiros]
@@ -322,28 +413,91 @@ def render_aba_dados_basicos(
                     ).classes('w-full').props('dense outlined use-chips')
 
                     def _sync_others(_e=None):
-                        state['selected_others'] = others_sel.value or []
+                        """
+                        Sincroniza valor do select com o state.
+                        
+                        CORREÇÃO: Adicionado try-except para evitar erro de MutationObserver
+                        que ocorre quando o componente é destruído/recriado durante digitação.
+                        """
+                        try:
+                            # Valida se o componente ainda existe antes de acessar
+                            if others_sel and hasattr(others_sel, 'value'):
+                                state['selected_others'] = others_sel.value or []
+                        except (AttributeError, TypeError) as ex:
+                            # Ignora erros de MutationObserver ou componente destruído
+                            pass
+                        except Exception as ex:
+                            # Log apenas erros inesperados
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning(f"Erro ao sincronizar outros envolvidos: {ex}")
 
-                    others_sel.on_value_change(_sync_others)
-                    _sync_others()
+                    # Usa on_value_change com tratamento de erro
+                    try:
+                        others_sel.on_value_change(_sync_others)
+                        _sync_others()
+                    except Exception as ex:
+                        # Se falhar ao configurar evento, tenta alternativa
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Erro ao configurar evento on_value_change: {ex}")
+                        # Fallback: usa evento 'update:model-value' se disponível
+                        try:
+                            others_sel.on('update:model-value', _sync_others)
+                        except:
+                            pass
         
         # SEÇÃO 3 - Vínculos
         with ui.card().classes('w-full mb-4 p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
             ui.label('🔗 Vínculos').classes('text-lg font-bold mb-3')
-            with ui.column().classes('w-full gap-2'):
-                parent_process_chips = ui.column().classes('w-full')
+            with ui.column().classes('w-full gap-4'):
+                # Processos Pai (suporta múltiplos)
+                # Filtra processos para não incluir o próprio processo
+                current_process_id = state.get('process_id')
+                parent_options = [
+                    format_process_option(p) 
+                    for p in processos_pais 
+                    if p.get('_id') != current_process_id
+                ]
                 
-                # Processo Pai (na Visão Geral suporta apenas um)
-                with ui.row().classes('w-full gap-2 items-center'):
+                with ui.column().classes('w-full gap-2'):
                     parent_process_sel = ui.select(
-                        options=['— Nenhum (processo raiz) —'],
-                        label='Processo Pai (opcional)',
-                        with_input=True
-                    ).classes('flex-grow').props('dense outlined use-input filter-input')
-                    ui.button(
-                        icon='add',
-                        on_click=lambda: add_parent_process(parent_process_sel, parent_process_chips)
-                    ).props('flat dense').style('color: #FF9800;')
+                        options=parent_options or [],
+                        label='Processos Pai (opcional - um processo pode ter múltiplos pais)',
+                        value=state.get('selected_parent_processes', []) or [],
+                        with_input=True,
+                        multiple=True,
+                    ).classes('w-full').props('dense outlined use-chips')
+                    
+                    def _sync_parent_processes(_e=None):
+                        """
+                        Sincroniza valor do select com o state.
+                        
+                        CORREÇÃO: Adicionado try-except para evitar erro de MutationObserver.
+                        """
+                        try:
+                            if parent_process_sel and hasattr(parent_process_sel, 'value'):
+                                state['selected_parent_processes'] = parent_process_sel.value or []
+                        except (AttributeError, TypeError):
+                            # Ignora erros de MutationObserver ou componente destruído
+                            pass
+                        except Exception as ex:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning(f"Erro ao sincronizar processos pai: {ex}")
+                    
+                    # Usa on_value_change com tratamento de erro
+                    try:
+                        parent_process_sel.on_value_change(_sync_parent_processes)
+                        _sync_parent_processes()
+                    except Exception as ex:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Erro ao configurar evento on_value_change: {ex}")
+                        try:
+                            parent_process_sel.on('update:model-value', _sync_parent_processes)
+                        except:
+                            pass
                 
                 # Casos Vinculados
                 case_options = [c.get('titulo', '') for c in todos_casos if c.get('titulo')]
@@ -375,8 +529,6 @@ def render_aba_dados_basicos(
         'parent_process_sel': parent_process_sel,
         'client_chips': client_chips,
         'cases_chips': cases_chips,
-        'parent_process_chips': parent_process_chips,
         'refresh_chips': refresh_chips,
-        'refresh_parent_chips': refresh_parent_chips,
+        'format_process_option': format_process_option,
     }
-

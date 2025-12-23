@@ -374,3 +374,5 @@ def inicializar_grupo_schmidmeier() -> Optional[str]:
 
 
 
+
+

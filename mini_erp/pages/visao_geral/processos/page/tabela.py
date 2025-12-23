@@ -267,6 +267,3 @@ def converter_processo_para_row(processo: dict) -> dict:
         'is_third_party_monitoring': False,
         'is_desdobramento': False,
     }
-
-
-

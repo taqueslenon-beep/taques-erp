@@ -246,3 +246,5 @@ def aplicar_prioridade_padrao_casos_sem_prioridade() -> int:
 
 
 
+
+

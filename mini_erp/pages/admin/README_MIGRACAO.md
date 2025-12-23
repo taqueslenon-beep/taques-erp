@@ -17,6 +17,8 @@ Este módulo permite a migração em lote de processos extraídos do sistema EPR
 - `migracao_models.py`: Definições de tipos para a coleção temporária `processos_migracao`.
 
 ## Coleções Firestore
+
 - `processos_migracao`: Dados temporários e progresso da migração.
 - `vg_processos`: Coleção definitiva onde os processos são criados após a conclusão.
+
 

@@ -43,3 +43,5 @@ class ProcessoMigracao(TypedDict, total=False):
     processo_definitivo_id: str   # ID na coleção 'processos' após conclusão
     atualizado_em: Any
 
+
+

@@ -138,6 +138,3 @@ SCENARIO_STATUS_OPTIONS = ['Mapeado', 'Em análise', 'Próximo de ocorrer', 'Oco
 # =============================================================================
 
 COLECAO_PROCESSOS = "vg_processos"
-
-
-

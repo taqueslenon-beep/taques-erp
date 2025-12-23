@@ -2,7 +2,9 @@ from nicegui import ui
 from datetime import datetime
 from ....core import (
     PRIMARY_COLOR, get_cases_list, get_clients_list, get_opposing_parties_list, 
-    get_processes_list, format_date_br, get_display_name, get_protocols_by_process
+    get_processes_list, format_date_br, get_display_name, get_protocols_by_process,
+    save_client as core_save_client, save_opposing_party as core_save_opposing_party,
+    invalidate_cache, get_full_name
 )
 from ..models import (
     PROCESS_TYPE_OPTIONS, SYSTEM_OPTIONS, NUCLEO_OPTIONS, AREA_OPTIONS,
@@ -395,6 +397,258 @@ def render_process_dialog(on_success=None):
                             # SEÇÃO 2 - Partes Envolvidas
                             with ui.card().classes('w-full mb-4 p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):
                                 ui.label('👥 Partes Envolvidas').classes('text-lg font-bold mb-3')
+                                
+                                # Referências para selects e chips (serão preenchidas depois)
+                                # Usamos dicionário para permitir acesso por closure nas funções
+                                refs = {
+                                    'client_sel': None,
+                                    'client_chips': None,
+                                    'opposing_sel': None,
+                                    'opposing_chips': None,
+                                    'others_sel': None,
+                                    'others_chips': None
+                                }
+                                
+                                # Estado para saber se é para parte contrária ou outros
+                                envolvido_destino = {'tipo': 'opposing'}
+                                
+                                # =====================================================
+                                # FUNÇÕES DE SALVAMENTO - Definidas antes dos modais
+                                # =====================================================
+                                
+                                def salvar_novo_cliente_handler():
+                                    """Salva o novo cliente e atualiza o dropdown."""
+                                    try:
+                                        # Validação
+                                        nome_val = nc_nome_completo.value
+                                        if not nome_val or not nome_val.strip():
+                                            ui.notify('Nome Completo é obrigatório!', type='warning')
+                                            return
+                                        
+                                        nome_limpo = nome_val.strip()
+                                        
+                                        # Verifica duplicata
+                                        for c in get_clients_list():
+                                            if get_full_name(c) == nome_limpo:
+                                                ui.notify('Cliente com este nome já existe!', type='warning')
+                                                return
+                                        
+                                        # Monta dados do cliente
+                                        nome_exib = nc_nome_exibicao.value.strip() if nc_nome_exibicao.value else ''
+                                        novo_cliente = {
+                                            'full_name': nome_limpo,
+                                            'nome_exibicao': nome_exib,
+                                            'display_name': nome_exib,
+                                            'client_type': nc_tipo.value,
+                                            'cpf': nc_cpf.value.replace('.', '').replace('-', '') if nc_cpf.value and nc_tipo.value == 'PF' else '',
+                                            'cnpj': nc_cnpj.value.replace('.', '').replace('/', '').replace('-', '') if nc_cnpj.value and nc_tipo.value == 'PJ' else '',
+                                            'email': nc_email.value.strip() if nc_email.value else '',
+                                            'phone': nc_telefone.value.strip() if nc_telefone.value else '',
+                                            'bonds': []
+                                        }
+                                        
+                                        # Salva no Firestore
+                                        print(f"[CLIENTE] Salvando: {nome_limpo}")
+                                        core_save_client(novo_cliente)
+                                        invalidate_cache('clients')
+                                        
+                                        # Atualiza dropdown de clientes IMEDIATAMENTE
+                                        nova_lista = get_clients_list()
+                                        print(f"[CLIENTE] Lista atualizada: {len(nova_lista)} clientes")
+                                        
+                                        if refs['client_sel']:
+                                            refs['client_sel'].options = [format_option_for_search(c) for c in nova_lista] or ['-']
+                                            refs['client_sel'].update()
+                                            print("[CLIENTE] Dropdown atualizado")
+                                        
+                                        # Nome para exibição nos chips
+                                        nome_exibir = nome_exib if nome_exib else nome_limpo
+                                        
+                                        # Adiciona à lista de selecionados
+                                        if nome_exibir not in state['selected_clients']:
+                                            state['selected_clients'].append(nome_exibir)
+                                            if refs['client_chips']:
+                                                refresh_chips(refs['client_chips'], state['selected_clients'], 'clients', nova_lista)
+                                            print(f"[CLIENTE] Adicionado aos chips: {nome_exibir}")
+                                        
+                                        # Fecha modal e limpa campos
+                                        modal_novo_cliente.close()
+                                        nc_nome_completo.value = ''
+                                        nc_nome_exibicao.value = ''
+                                        nc_tipo.value = 'PF'
+                                        nc_cpf.value = ''
+                                        nc_cnpj.value = ''
+                                        nc_email.value = ''
+                                        nc_telefone.value = ''
+                                        nc_cnpj.set_visibility(False)
+                                        nc_cpf.set_visibility(True)
+                                        
+                                        ui.notify(f'Cliente "{nome_exibir}" cadastrado e vinculado!', type='positive')
+                                        print(f"[CLIENTE] Sucesso: {nome_exibir}")
+                                        
+                                    except Exception as e:
+                                        print(f"[CLIENTE] ERRO: {e}")
+                                        import traceback
+                                        traceback.print_exc()
+                                        ui.notify(f'Erro ao salvar cliente: {str(e)}', type='negative')
+                                
+                                def salvar_novo_envolvido_handler():
+                                    """Salva o novo envolvido e atualiza os dropdowns."""
+                                    try:
+                                        # Validação
+                                        nome_val = ne_nome_completo.value
+                                        if not nome_val or not nome_val.strip():
+                                            ui.notify('Nome Completo é obrigatório!', type='warning')
+                                            return
+                                        
+                                        nome_limpo = nome_val.strip()
+                                        
+                                        # Verifica duplicata
+                                        for op in get_opposing_parties_list():
+                                            if get_full_name(op) == nome_limpo:
+                                                ui.notify('Envolvido com este nome já existe!', type='warning')
+                                                return
+                                        
+                                        # Monta dados do envolvido
+                                        nome_exib = ne_nome_exibicao.value.strip() if ne_nome_exibicao.value else ''
+                                        novo_envolvido = {
+                                            'full_name': nome_limpo,
+                                            'nome_exibicao': nome_exib,
+                                            'display_name': nome_exib,
+                                            'entity_type': ne_tipo_entidade.value,
+                                            'cpf_cnpj': ne_cpf_cnpj.value.strip() if ne_cpf_cnpj.value else '',
+                                            'email': ne_email.value.strip() if ne_email.value else '',
+                                            'phone': ne_telefone.value.strip() if ne_telefone.value else ''
+                                        }
+                                        
+                                        # Salva no Firestore
+                                        print(f"[ENVOLVIDO] Salvando: {nome_limpo}")
+                                        core_save_opposing_party(novo_envolvido)
+                                        invalidate_cache('opposing_parties')
+                                        
+                                        # Atualiza dropdowns de envolvidos IMEDIATAMENTE
+                                        nova_lista_opp = get_opposing_parties_list()
+                                        novas_opcoes = [format_option_for_search(op) for op in nova_lista_opp] or ['-']
+                                        print(f"[ENVOLVIDO] Lista atualizada: {len(nova_lista_opp)} envolvidos")
+                                        
+                                        if refs['opposing_sel']:
+                                            refs['opposing_sel'].options = novas_opcoes
+                                            refs['opposing_sel'].update()
+                                        if refs['others_sel']:
+                                            refs['others_sel'].options = novas_opcoes
+                                            refs['others_sel'].update()
+                                        print("[ENVOLVIDO] Dropdowns atualizados")
+                                        
+                                        # Nome para exibição nos chips
+                                        nome_exibir = nome_exib if nome_exib else nome_limpo
+                                        
+                                        # Adiciona à lista correta baseado no destino
+                                        if envolvido_destino['tipo'] == 'opposing':
+                                            if nome_exibir not in state['selected_opposing']:
+                                                state['selected_opposing'].append(nome_exibir)
+                                                if refs['opposing_chips']:
+                                                    refresh_chips(refs['opposing_chips'], state['selected_opposing'], 'opposing', nova_lista_opp)
+                                            print(f"[ENVOLVIDO] Adicionado à parte contrária: {nome_exibir}")
+                                        else:
+                                            if nome_exibir not in state['selected_others']:
+                                                state['selected_others'].append(nome_exibir)
+                                                if refs['others_chips']:
+                                                    refresh_chips(refs['others_chips'], state['selected_others'], 'others', nova_lista_opp)
+                                            print(f"[ENVOLVIDO] Adicionado a outros: {nome_exibir}")
+                                        
+                                        # Fecha modal e limpa campos
+                                        modal_novo_envolvido.close()
+                                        ne_nome_completo.value = ''
+                                        ne_nome_exibicao.value = ''
+                                        ne_tipo_entidade.value = 'PF'
+                                        ne_cpf_cnpj.value = ''
+                                        ne_email.value = ''
+                                        ne_telefone.value = ''
+                                        
+                                        ui.notify(f'Envolvido "{nome_exibir}" cadastrado e vinculado!', type='positive')
+                                        print(f"[ENVOLVIDO] Sucesso: {nome_exibir}")
+                                        
+                                    except Exception as e:
+                                        print(f"[ENVOLVIDO] ERRO: {e}")
+                                        import traceback
+                                        traceback.print_exc()
+                                        ui.notify(f'Erro ao salvar envolvido: {str(e)}', type='negative')
+                                
+                                # =====================================================
+                                # MODAL CADASTRO RÁPIDO - NOVO CLIENTE
+                                # =====================================================
+                                with ui.dialog() as modal_novo_cliente, ui.card().classes('w-full max-w-md p-6'):
+                                    ui.label('➕ Novo Cliente').classes('text-lg font-bold mb-4')
+                                    
+                                    # Campos do formulário
+                                    nc_nome_completo = ui.input('Nome Completo *').classes('w-full mb-2').props('outlined dense')
+                                    nc_nome_exibicao = ui.input('Nome de Exibição').classes('w-full mb-2').props('outlined dense')
+                                    nc_nome_exibicao.tooltip('Nome curto para exibição no sistema')
+                                    
+                                    nc_tipo = ui.select(
+                                        options={'PF': 'Pessoa Física', 'PJ': 'Pessoa Jurídica'},
+                                        label='Tipo *',
+                                        value='PF'
+                                    ).classes('w-full mb-2').props('outlined dense')
+                                    
+                                    nc_cpf = ui.input('CPF').classes('w-full mb-2').props('outlined dense')
+                                    nc_cnpj = ui.input('CNPJ').classes('w-full mb-2').props('outlined dense')
+                                    nc_email = ui.input('Email').classes('w-full mb-2').props('outlined dense')
+                                    nc_telefone = ui.input('Telefone').classes('w-full mb-4').props('outlined dense')
+                                    
+                                    # Toggle de campos CPF/CNPJ baseado no tipo
+                                    def toggle_docs_cliente():
+                                        is_pj = nc_tipo.value == 'PJ'
+                                        nc_cpf.set_visibility(not is_pj)
+                                        nc_cnpj.set_visibility(is_pj)
+                                    
+                                    nc_tipo.on_value_change(toggle_docs_cliente)
+                                    nc_cnpj.set_visibility(False)
+                                    
+                                    with ui.row().classes('w-full justify-end gap-2'):
+                                        ui.button('Cancelar', on_click=modal_novo_cliente.close).props('flat')
+                                        ui.button('Salvar', on_click=salvar_novo_cliente_handler).props('color=primary')
+                                
+                                # =====================================================
+                                # MODAL CADASTRO RÁPIDO - NOVO ENVOLVIDO
+                                # =====================================================
+                                with ui.dialog() as modal_novo_envolvido, ui.card().classes('w-full max-w-md p-6'):
+                                    ui.label('➕ Novo Envolvido').classes('text-lg font-bold mb-4')
+                                    
+                                    # Campos do formulário
+                                    ne_nome_completo = ui.input('Nome Completo *').classes('w-full mb-2').props('outlined dense')
+                                    ne_nome_exibicao = ui.input('Nome de Exibição').classes('w-full mb-2').props('outlined dense')
+                                    ne_nome_exibicao.tooltip('Nome curto para exibição no sistema')
+                                    
+                                    ne_tipo_entidade = ui.select(
+                                        options={'PF': 'Pessoa Física', 'PJ': 'Pessoa Jurídica', 'ORGAO': 'Órgão Público'},
+                                        label='Tipo de Entidade',
+                                        value='PF'
+                                    ).classes('w-full mb-2').props('outlined dense')
+                                    
+                                    ne_cpf_cnpj = ui.input('CPF/CNPJ').classes('w-full mb-2').props('outlined dense')
+                                    ne_email = ui.input('Email').classes('w-full mb-2').props('outlined dense')
+                                    ne_telefone = ui.input('Telefone').classes('w-full mb-4').props('outlined dense')
+                                    
+                                    with ui.row().classes('w-full justify-end gap-2'):
+                                        ui.button('Cancelar', on_click=modal_novo_envolvido.close).props('flat')
+                                        ui.button('Salvar', on_click=salvar_novo_envolvido_handler).props('color=primary')
+                                
+                                # Funções para abrir modais
+                                def abrir_modal_novo_cliente():
+                                    modal_novo_cliente.open()
+                                
+                                def abrir_modal_novo_envolvido_parte_contraria():
+                                    envolvido_destino['tipo'] = 'opposing'
+                                    modal_novo_envolvido.open()
+                                
+                                def abrir_modal_novo_envolvido_outros():
+                                    envolvido_destino['tipo'] = 'others'
+                                    modal_novo_envolvido.open()
+                                
+                                # =====================================================
+                                # CRIAÇÃO DOS SELECTS E CHIPS
+                                # =====================================================
                                 with ui.column().classes('w-full gap-4'):
                                     # Clients
                                     client_options = [format_option_for_search(c) for c in get_clients_list()]
@@ -404,7 +658,11 @@ def render_process_dialog(on_success=None):
                                                 client_sel = ui.select(client_options or ['-'], label=make_required_label('Clientes'), with_input=True).classes('flex-grow').props('dense outlined')
                                                 client_sel.tooltip('Pessoas ou empresas que você representa neste processo')
                                                 ui.button(icon='add', on_click=lambda: add_item(client_sel, state['selected_clients'], client_chips, 'clients', get_clients_list())).props('flat dense').style('color: #4CAF50;')
+                                                ui.button(icon='person_add', on_click=abrir_modal_novo_cliente).props('flat dense').style('color: #4CAF50;').tooltip('Cadastrar novo cliente')
                                             client_chips = ui.column().classes('w-full')
+                                            # Salva referências para uso nas funções de salvamento
+                                            refs['client_sel'] = client_sel
+                                            refs['client_chips'] = client_chips
 
                                         # Opposing
                                         opposing_options = [format_option_for_search(op) for op in get_opposing_parties_list()]
@@ -413,7 +671,10 @@ def render_process_dialog(on_success=None):
                                                 opposing_sel = ui.select(opposing_options or ['-'], label='Parte Contrária', with_input=True).classes('flex-grow').props('dense outlined')
                                                 opposing_sel.tooltip('Pessoa, empresa ou órgão do lado oposto do processo')
                                                 ui.button(icon='add', on_click=lambda: add_item(opposing_sel, state['selected_opposing'], opposing_chips, 'opposing', get_opposing_parties_list())).props('flat dense').style('color: #F44336;')
+                                                ui.button(icon='person_add', on_click=abrir_modal_novo_envolvido_parte_contraria).props('flat dense').style('color: #F44336;').tooltip('Cadastrar novo envolvido')
                                             opposing_chips = ui.column().classes('w-full')
+                                            refs['opposing_sel'] = opposing_sel
+                                            refs['opposing_chips'] = opposing_chips
 
                                     # Others
                                     with ui.column().classes('w-full gap-2'):
@@ -421,7 +682,10 @@ def render_process_dialog(on_success=None):
                                             others_sel = ui.select(opposing_options or ['-'], label='Outros Envolvidos', with_input=True).classes('flex-grow').props('dense outlined')
                                             others_sel.tooltip('Terceiros interessados, assistentes, litisconsortes, etc')
                                             ui.button(icon='add', on_click=lambda: add_item(others_sel, state['selected_others'], others_chips, 'others', get_opposing_parties_list())).props('flat dense').style('color: #2196F3;')
+                                            ui.button(icon='person_add', on_click=abrir_modal_novo_envolvido_outros).props('flat dense').style('color: #2196F3;').tooltip('Cadastrar novo envolvido')
                                         others_chips = ui.column().classes('w-full')
+                                        refs['others_sel'] = others_sel
+                                        refs['others_chips'] = others_chips
 
                             # SEÇÃO 3 - Vínculos
                             with ui.card().classes('w-full mb-4 p-4').style('border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'):

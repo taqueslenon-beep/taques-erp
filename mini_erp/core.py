@@ -2275,6 +2275,12 @@ def layout(page_title: str, breadcrumbs: list = None):
             
             # DIREITA - Elementos alinhados
             with ui.row().style('align-items: center; gap: 16px; color: white;'):
+                # Ícone de desenvolvedor (versão minimalista)
+                ui.button(
+                    icon='terminal',
+                    on_click=lambda: ui.navigate.to('/developer')
+                ).props('flat dense round').classes('text-white').tooltip('Dev')
+                
                 # Workspace - Dropdown de seleção
                 from .componentes.dropdown_workspace import render_workspace_dropdown
                 render_workspace_dropdown()

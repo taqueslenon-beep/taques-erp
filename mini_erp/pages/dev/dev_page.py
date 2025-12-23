@@ -103,15 +103,21 @@ def _render_dev_content():
         # Título da página
         ui.label('Painel do Desenvolvedor').classes('text-2xl font-bold mb-6')
         
-        # Carrega dados
-        workspaces = obter_todos_workspaces()
-        usuarios = obter_todos_usuarios()
+        # Carrega dados com tratamento de erro robusto
+        try:
+            workspaces = obter_todos_workspaces()
+            card_workspaces(workspaces)
+        except Exception as e:
+            ui.label(f'Erro ao carregar workspaces: {str(e)}').classes('text-red-500')
         
-        # Card de Workspaces
-        card_workspaces(workspaces)
-        
-        # Card de Usuários
-        card_usuarios(usuarios)
+        try:
+            usuarios = obter_todos_usuarios()
+            card_usuarios(usuarios)
+        except Exception as e:
+            ui.label(f'Erro ao carregar usuários: {str(e)}').classes('text-red-500')
+            # Log do erro sem usar print dentro de callback
+            import logging
+            logging.error(f"Erro ao carregar usuários: {e}", exc_info=True)
 
 
 

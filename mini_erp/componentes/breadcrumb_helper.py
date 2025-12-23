@@ -73,3 +73,5 @@ def gerar_breadcrumbs(
     return breadcrumbs
 
 
+
+

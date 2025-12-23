@@ -209,10 +209,13 @@ def agrupar_processos_por_status(processos: List[Dict[str, Any]]) -> Dict[str, i
     return dict(contador)
 
 
-def agrupar_processos_por_data(processos: List[Dict[str, Any]]) -> Dict[str, int]:
+def agrupar_processos_por_ano(processos: List[Dict[str, Any]]) -> Dict[int, int]:
     """
-    Agrupa processos por data de abertura (mês/ano).
+    Agrupa processos por ano de abertura.
     Usa data_abertura se disponível, caso contrário created_at.
+    
+    Returns:
+        Dicionário com ano como chave (int) e quantidade como valor (int)
     """
     contador = Counter()
     
@@ -221,7 +224,7 @@ def agrupar_processos_por_data(processos: List[Dict[str, Any]]) -> Dict[str, int
         data_abertura = processo.get('data_abertura', '')
         data_criacao = processo.get('created_at', '')
         
-        mes_ano = None
+        ano = None
         
         # Processa data_abertura (pode estar em vários formatos)
         if data_abertura:
@@ -229,36 +232,39 @@ def agrupar_processos_por_data(processos: List[Dict[str, Any]]) -> Dict[str, int
                 # Formato ISO (datetime do Firebase)
                 if isinstance(data_abertura, str) and 'T' in data_abertura:
                     dt = datetime.fromisoformat(data_abertura.replace('Z', '+00:00'))
-                    mes_ano = dt.strftime('%m/%Y')
+                    ano = dt.year
                 # Formato DD/MM/AAAA
                 elif isinstance(data_abertura, str) and len(data_abertura) == 10 and data_abertura.count('/') == 2:
                     partes = data_abertura.split('/')
                     if len(partes) == 3:
-                        mes_ano = f"{partes[1]}/{partes[2]}"
+                        ano = int(partes[2])
                 # Formato MM/AAAA
                 elif isinstance(data_abertura, str) and len(data_abertura) == 7 and data_abertura.count('/') == 1:
-                    mes_ano = data_abertura
+                    partes = data_abertura.split('/')
+                    if len(partes) == 2:
+                        ano = int(partes[1])
                 # Formato AAAA (apenas ano)
                 elif isinstance(data_abertura, str) and len(data_abertura) == 4 and data_abertura.isdigit():
-                    mes_ano = f"01/{data_abertura}"  # Assume janeiro
+                    ano = int(data_abertura)
+                # Se for objeto datetime
+                elif hasattr(data_abertura, 'year'):
+                    ano = data_abertura.year
             except Exception:
                 pass
         
         # Se não conseguiu processar data_abertura, tenta created_at
-        if not mes_ano and data_criacao:
+        if not ano and data_criacao:
             try:
                 if isinstance(data_criacao, str) and 'T' in data_criacao:
                     dt = datetime.fromisoformat(data_criacao.replace('Z', '+00:00'))
-                    mes_ano = dt.strftime('%m/%Y')
-                elif hasattr(data_criacao, 'strftime'):
-                    mes_ano = data_criacao.strftime('%m/%Y')
+                    ano = dt.year
+                elif hasattr(data_criacao, 'year'):
+                    ano = data_criacao.year
             except Exception:
                 pass
         
-        if mes_ano:
-            contador[mes_ano] += 1
-        else:
-            contador['Sem data'] += 1
+        if ano:
+            contador[ano] += 1
     
     return dict(contador)
 
@@ -274,6 +280,62 @@ def agrupar_processos_por_sistema_processual(processos: List[Dict[str, Any]]) ->
             contador['Não informado'] += 1
     # Ordena do maior para o menor
     return dict(sorted(contador.items(), key=lambda x: x[1], reverse=True))
+
+
+def agrupar_processos_por_cliente(processos: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Agrupa processos por cliente (conta cada cliente individualmente)."""
+    contador = Counter()
+    for processo in processos:
+        clientes = processo.get('clientes_nomes', [])
+        if isinstance(clientes, list):
+            for cliente in clientes:
+                if cliente and cliente.strip():
+                    contador[cliente.strip()] += 1
+        elif isinstance(clientes, str) and clientes.strip():
+            contador[clientes.strip()] += 1
+    return dict(sorted(contador.items(), key=lambda x: x[1], reverse=True))
+
+
+def agrupar_processos_por_parte_contraria(processos: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Agrupa processos por parte contrária."""
+    contador = Counter()
+    for processo in processos:
+        parte = processo.get('parte_contraria', '')
+        if parte and parte.strip():
+            # Normaliza para evitar duplicatas
+            nome_normalizado = parte.strip()
+            contador[nome_normalizado] += 1
+    return dict(sorted(contador.items(), key=lambda x: x[1], reverse=True))
+
+
+def filtrar_processos_por_status(processos: List[Dict[str, Any]], status_filtro: str) -> List[Dict[str, Any]]:
+    """
+    Filtra processos por status.
+    
+    Considera mapeamento de status antigos para compatibilidade:
+    - Status antigos: 'Ativo', 'Suspenso', 'Arquivado', 'Baixado', 'Encerrado'
+    - Status novos: 'Em andamento', 'Concluído', 'Concluído com pendências', 'Em monitoramento', 'Futuro/Previsto'
+    
+    Args:
+        processos: Lista de processos a filtrar
+        status_filtro: Status para filtrar ('todos', 'em_andamento', 'concluido', 'arquivado', 'suspenso')
+    
+    Returns:
+        Lista filtrada de processos
+    """
+    if status_filtro == 'todos':
+        return processos
+    
+    # Mapeamento de status do filtro para valores no banco (incluindo status antigos)
+    status_map = {
+        'em_andamento': ['Em andamento', 'Ativo'],
+        'concluido': ['Concluído', 'Concluído com pendências', 'Encerrado', 'Baixado'],
+        'arquivado': ['Arquivado'],
+        'suspenso': ['Suspenso', 'Em monitoramento']  # Suspenso pode estar como 'Em monitoramento' no banco
+    }
+    
+    status_validos = status_map.get(status_filtro, [])
+    return [p for p in processos if p.get('status') in status_validos]
 
 
 def contar_entregaveis_concluidos_mes(entregaveis: List[Dict[str, Any]]) -> int:
@@ -390,9 +452,10 @@ def painel():
             oportunidades_monitorando = sum(1 for op in oportunidades_ativas if op.get('status') == 'monitorando')
             
             # Calcular estatísticas de processos (VG usa status diferentes)
-            total_processos = len(todos_processos)
-            # Status VG: Ativo, Suspenso, Arquivado, Baixado, Encerrado
-            processos_em_andamento = sum(1 for p in todos_processos if p.get('status') in ['Ativo', 'Suspenso'])
+            # MODIFICAÇÃO: Card de processos agora mostra APENAS processos em andamento (ativos)
+            processos_em_andamento_lista = filtrar_processos_por_status(todos_processos, 'em_andamento')
+            total_processos = len(processos_em_andamento_lista)  # Total de processos ativos para exibição no card
+            processos_em_andamento = len(processos_em_andamento_lista)
             processos_concluidos = sum(1 for p in todos_processos if p.get('status') in ['Encerrado', 'Baixado', 'Arquivado'])
             
             tempo_carregamento = time.time() - _inicio_carregamento
@@ -605,20 +668,14 @@ def painel():
                         ui.icon('gavel', size='24px').style(f'color: {COR_VERDE_SISTEMA}; flex-shrink: 0;')
                         ui.label('Processos').classes('text-sm font-medium').style(f'color: {COR_CINZA_MEDIO};')
                     
-                    # Valor principal
+                    # Valor principal: mostra apenas processos em andamento (ativos)
                     ui.label(str(total_processos)).classes('text-3xl font-bold mb-2').style(f'color: {COR_CINZA_ESCURO};')
                     
-                    # Subtítulo mostra distribuição: em andamento, concluídos
-                    subtitulo_partes = []
-                    if processos_em_andamento > 0:
-                        subtitulo_partes.append(f'{processos_em_andamento} em andamento')
-                    if processos_concluidos > 0:
-                        subtitulo_partes.append(f'{processos_concluidos} concluído{"s" if processos_concluidos != 1 else ""}')
-                    
-                    if subtitulo_partes:
-                        ui.label(', '.join(subtitulo_partes)).classes('text-xs mt-auto').style('color: #999999;')
+                    # Subtítulo: mostra "Processos em andamento" ou "Nenhum processo ativo"
+                    if total_processos > 0:
+                        ui.label('Processos em andamento').classes('text-xs mt-auto').style('color: #999999;')
                     else:
-                        ui.label('Nenhum processo cadastrado').classes('text-xs mt-auto').style('color: #999999;')
+                        ui.label('Nenhum processo ativo').classes('text-xs mt-auto').style('color: #999999;')
                     
                     processos_card.on('click', selecionar_processos)
 
@@ -1497,57 +1554,125 @@ def painel():
             with ui.row().classes('w-full gap-4 flex-wrap'):
                 # 1. Gráfico de Processos por Núcleo
                 with ui.card().classes('flex-1 min-w-80 p-4'):
-                    ui.label('Processos por Núcleo').classes('text-lg font-semibold text-gray-700 mb-4')
-
-                    dados_nucleo = agrupar_processos_por_nucleo(todos_processos)
-                    if dados_nucleo:
-                        nucleos_ordenados = sorted(dados_nucleo.items(), key=lambda x: x[1], reverse=True)
-                        categories = [nucleo for nucleo, _ in nucleos_ordenados]
-                        values = [count for _, count in nucleos_ordenados]
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Processos por Núcleo').classes('text-lg font-semibold text-gray-700')
                         
-                        # Obtém cores dos núcleos
-                        colors = []
-                        for nucleo in categories:
-                            cor_info = NUCLEO_CORES.get(nucleo, {'bg': '#6b7280'})
-                            colors.append(cor_info.get('bg', '#6b7280'))
+                        # Estado reativo para o filtro
+                        filter_status_nucleo = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_nucleo = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_nucleo():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_nucleo['value'])
+                        dados_nucleo = agrupar_processos_por_nucleo(processos_filtrados)
+                        
+                        if dados_nucleo:
+                            nucleos_ordenados = sorted(dados_nucleo.items(), key=lambda x: x[1], reverse=True)
+                            categories = [nucleo for nucleo, _ in nucleos_ordenados]
+                            values = [count for _, count in nucleos_ordenados]
+                            
+                            # Obtém cores dos núcleos
+                            colors = []
+                            for nucleo in categories:
+                                cor_info = NUCLEO_CORES.get(nucleo, {'bg': '#6b7280'})
+                                colors.append(cor_info.get('bg', '#6b7280'))
 
-                        config = build_bar_chart_config(
-                            categories=categories,
-                            values=values,
-                            colors=colors,
-                            series_name='Processos',
-                            horizontal=True
-                        )
-                        ui.echart(config).classes('w-full h-80')
-                    else:
-                        create_empty_chart_state('Nenhum processo cadastrado ainda.')
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum processo cadastrado ainda.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_nucleo():
+                        filter_status_nucleo['value'] = status_select_nucleo.value or 'em_andamento'
+                        grafico_nucleo.refresh()
+                    
+                    status_select_nucleo.on('update:model-value', lambda: on_filter_change_nucleo())
+                    grafico_nucleo()
 
                 # 2. Gráfico de Processos por Área
                 with ui.card().classes('flex-1 min-w-80 p-4'):
-                    ui.label('Processos por Área').classes('text-lg font-semibold text-gray-700 mb-4')
-
-                    dados_area = agrupar_processos_por_area(todos_processos)
-                    if dados_area:
-                        areas_ordenadas = sorted(dados_area.items(), key=lambda x: x[1], reverse=True)
-                        categories = [area for area, _ in areas_ordenadas]
-                        values = [count for _, count in areas_ordenadas]
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Processos por Área').classes('text-lg font-semibold text-gray-700')
                         
-                        # Obtém cores das áreas
-                        colors = []
-                        for area in categories:
-                            cor_info = AREA_CORES.get(area, {'bg': '#6b7280'})
-                            colors.append(cor_info.get('bg', '#6b7280'))
+                        # Estado reativo para o filtro
+                        filter_status_area = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_area = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_area():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_area['value'])
+                        dados_area = agrupar_processos_por_area(processos_filtrados)
+                        
+                        if dados_area:
+                            areas_ordenadas = sorted(dados_area.items(), key=lambda x: x[1], reverse=True)
+                            categories = [area for area, _ in areas_ordenadas]
+                            values = [count for _, count in areas_ordenadas]
+                            
+                            # Obtém cores das áreas
+                            colors = []
+                            for area in categories:
+                                cor_info = AREA_CORES.get(area, {'bg': '#6b7280'})
+                                colors.append(cor_info.get('bg', '#6b7280'))
 
-                        config = build_bar_chart_config(
-                            categories=categories,
-                            values=values,
-                            colors=colors,
-                            series_name='Processos',
-                            horizontal=True
-                        )
-                        ui.echart(config).classes('w-full h-80')
-                    else:
-                        create_empty_chart_state('Nenhum processo cadastrado ainda.')
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full h-80')
+                        else:
+                            create_empty_chart_state('Nenhum processo cadastrado ainda.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_area():
+                        filter_status_area['value'] = status_select_area.value or 'em_andamento'
+                        grafico_area.refresh()
+                    
+                    status_select_area.on('update:model-value', lambda: on_filter_change_area())
+                    grafico_area()
 
                 # 3. Gráfico de Processos por Status (Pizza)
                 with ui.card().classes('flex-1 min-w-80 p-4'):
@@ -1600,116 +1725,309 @@ def painel():
             with ui.row().classes('w-full gap-4 flex-wrap mt-4'):
                 # 4. Gráfico de Processos por Responsável
                 with ui.card().classes('flex-1 min-w-80 p-4'):
-                    ui.label('Processos por Responsável').classes('text-lg font-semibold text-gray-700 mb-4')
-
-                    dados_responsavel = agrupar_processos_por_responsavel(todos_processos)
-                    if dados_responsavel:
-                        # Limita aos 10 primeiros para não ficar muito grande
-                        responsaveis_limite = dict(list(dados_responsavel.items())[:10])
-                        categories = list(responsaveis_limite.keys())
-                        values = list(responsaveis_limite.values())
-                        chart_height = max(300, len(categories) * 40)
-
-                        # Cores alternadas
-                        cores_alternadas = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-                        colors = [cores_alternadas[i % len(cores_alternadas)] for i in range(len(categories))]
-
-                        config = build_bar_chart_config(
-                            categories=categories,
-                            values=values,
-                            colors=colors,
-                            series_name='Processos',
-                            horizontal=True
-                        )
-                        ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
-                    else:
-                        create_empty_chart_state('Nenhum processo com responsável cadastrado.')
-
-                # 5. Gráfico de Evolução Temporal (por Data)
-                with ui.card().classes('flex-1 min-w-80 p-4'):
-                    ui.label('Evolução dos Processos por Data').classes('text-lg font-semibold text-gray-700 mb-4')
-
-                    dados_temporal = agrupar_processos_por_data(todos_processos)
-                    if dados_temporal and len(dados_temporal) > 0:
-                        # Remove "Sem data" se houver
-                        dados_temporal_limpo = {k: v for k, v in dados_temporal.items() if k != 'Sem data'}
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Processos por Responsável').classes('text-lg font-semibold text-gray-700')
                         
-                        if dados_temporal_limpo:
-                            # Ordena por data (mês/ano)
-                            meses_ordenados = sorted(
-                                dados_temporal_limpo.items(),
-                                key=lambda x: (
-                                    int(x[0].split('/')[1]),  # Ano primeiro
-                                    int(x[0].split('/')[0])   # Mês depois
-                                )
+                        # Estado reativo para o filtro
+                        filter_status_responsavel = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_responsavel = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_responsavel():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_responsavel['value'])
+                        dados_responsavel = agrupar_processos_por_responsavel(processos_filtrados)
+                        
+                        if dados_responsavel:
+                            # Limita aos 10 primeiros para não ficar muito grande
+                            responsaveis_limite = dict(list(dados_responsavel.items())[:10])
+                            categories = list(responsaveis_limite.keys())
+                            values = list(responsaveis_limite.values())
+                            chart_height = max(300, len(categories) * 40)
+
+                            # Cores alternadas
+                            cores_alternadas = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                            colors = [cores_alternadas[i % len(cores_alternadas)] for i in range(len(categories))]
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+                        else:
+                            create_empty_chart_state('Nenhum processo com responsável cadastrado.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_responsavel():
+                        filter_status_responsavel['value'] = status_select_responsavel.value or 'em_andamento'
+                        grafico_responsavel.refresh()
+                    
+                    status_select_responsavel.on('update:model-value', lambda: on_filter_change_responsavel())
+                    grafico_responsavel()
+
+                # 5. Gráfico de Processos por Ano
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Processos por Ano').classes('text-lg font-semibold text-gray-700')
+                        
+                        # Estado reativo para o filtro
+                        filter_status_ano = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_ano = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_ano():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_ano['value'])
+                        dados_ano = agrupar_processos_por_ano(processos_filtrados)
+                        
+                        if dados_ano:
+                            # Ordena anos em ordem crescente
+                            anos_ordenados = sorted(dados_ano.items())
+                            anos = [str(ano) for ano, _ in anos_ordenados]
+                            valores = [count for _, count in anos_ordenados]
+                            
+                            # Cores azuis consistentes
+                            colors = ['#3b82f6'] * len(anos)
+                            
+                            config = build_bar_chart_config(
+                                categories=anos,
+                                values=valores,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=False,  # Barras verticais
+                                show_label=True,
+                                label_position='top',
+                                label_font_size=12
                             )
                             
-                            # Limita aos últimos 12 meses para não ficar muito grande
-                            if len(meses_ordenados) > 12:
-                                meses_ordenados = meses_ordenados[-12:]
-                            
-                            # Formata meses para exibição (MM/AAAA -> "Jan/24")
-                            meses_labels = []
-                            valores = []
-                            meses_nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-                                           'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-                            
-                            for mes_ano, quantidade in meses_ordenados:
-                                try:
-                                    mes, ano = mes_ano.split('/')
-                                    mes_int = int(mes)
-                                    if 1 <= mes_int <= 12:
-                                        mes_nome = meses_nomes[mes_int - 1]
-                                        meses_labels.append(f'{mes_nome}/{ano[-2:]}')
-                                        valores.append(quantidade)
-                                except:
-                                    continue
-                            
-                            if meses_labels and valores:
-                                # Gráfico de linha para mostrar evolução
-                                config = build_line_chart_config(
-                                    years=meses_labels,
-                                    series_data=[{
-                                        'name': 'Processos',
-                                        'data': valores,
-                                        'color': PRIMARY_COLOR
-                                    }],
-                                    show_area=True
-                                )
-                                ui.echart(config).classes('w-full h-80')
-                            else:
-                                create_empty_chart_state('Formato de datas inválido.')
+                            ui.echart(config).classes('w-full h-80')
                         else:
                             create_empty_chart_state('Nenhum processo com data de abertura cadastrada.')
-                    else:
-                        create_empty_chart_state('Nenhum processo cadastrado ainda.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_ano():
+                        filter_status_ano['value'] = status_select_ano.value or 'em_andamento'
+                        grafico_ano.refresh()
+                    
+                    status_select_ano.on('update:model-value', lambda: on_filter_change_ano())
+                    grafico_ano()
 
                 # 6. Gráfico de Processos por Sistema Processual
                 with ui.card().classes('flex-1 min-w-80 p-4'):
-                    ui.label('Processos por Sistema Processual').classes('text-lg font-semibold text-gray-700 mb-4')
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Processos por Sistema Processual').classes('text-lg font-semibold text-gray-700')
+                        
+                        # Estado reativo para o filtro
+                        filter_status_sistema = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_sistema = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_sistema():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_sistema['value'])
+                        dados_sistema = agrupar_processos_por_sistema_processual(processos_filtrados)
+                        
+                        if dados_sistema:
+                            # Limita aos 10 principais sistemas
+                            sistemas_limite = dict(list(dados_sistema.items())[:10])
+                            categories = list(sistemas_limite.keys())
+                            values = list(sistemas_limite.values())
+                            chart_height = max(300, len(categories) * 40)
 
-                    dados_sistema = agrupar_processos_por_sistema_processual(todos_processos)
-                    if dados_sistema:
-                        # Limita aos 10 principais sistemas
-                        sistemas_limite = dict(list(dados_sistema.items())[:10])
-                        categories = list(sistemas_limite.keys())
-                        values = list(sistemas_limite.values())
-                        chart_height = max(300, len(categories) * 40)
+                            # Cores alternadas
+                            cores_alternadas = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+                            colors = [cores_alternadas[i % len(cores_alternadas)] for i in range(len(categories))]
 
-                        # Cores alternadas
-                        cores_alternadas = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
-                        colors = [cores_alternadas[i % len(cores_alternadas)] for i in range(len(categories))]
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True,
+                                show_percentage=True
+                            )
+                            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+                        else:
+                            create_empty_chart_state('Nenhum processo com sistema processual cadastrado.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_sistema():
+                        filter_status_sistema['value'] = status_select_sistema.value or 'em_andamento'
+                        grafico_sistema.refresh()
+                    
+                    status_select_sistema.on('update:model-value', lambda: on_filter_change_sistema())
+                    grafico_sistema()
 
-                        config = build_bar_chart_config(
-                            categories=categories,
-                            values=values,
-                            colors=colors,
-                            series_name='Processos',
-                            horizontal=True
-                        )
-                        ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
-                    else:
-                        create_empty_chart_state('Nenhum processo com sistema processual cadastrado.')
+            # Terceira linha de gráficos
+            with ui.row().classes('w-full gap-4 flex-wrap mt-4'):
+                # 7. Gráfico de Clientes com Mais Processos
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Clientes com Mais Processos').classes('text-lg font-semibold text-gray-700')
+                        
+                        # Estado reativo para o filtro
+                        filter_status_clientes = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_clientes = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_clientes():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_clientes['value'])
+                        dados_clientes = agrupar_processos_por_cliente(processos_filtrados)
+                        
+                        if dados_clientes:
+                            # Limita aos 10 principais clientes
+                            clientes_limite = dict(list(dados_clientes.items())[:10])
+                            categories = list(clientes_limite.keys())
+                            values = list(clientes_limite.values())
+                            chart_height = max(300, len(categories) * 40)
+
+                            # Gradiente de azul
+                            cores_azuis = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe', '#eff6ff']
+                            colors = [cores_azuis[i % len(cores_azuis)] for i in range(len(categories))]
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True
+                            )
+                            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+                        else:
+                            create_empty_chart_state('Nenhum cliente vinculado a processos.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_clientes():
+                        filter_status_clientes['value'] = status_select_clientes.value or 'em_andamento'
+                        grafico_clientes.refresh()
+                    
+                    status_select_clientes.on('update:model-value', lambda: on_filter_change_clientes())
+                    grafico_clientes()
+
+                # 8. Gráfico de Partes Contrárias Mais Frequentes
+                with ui.card().classes('flex-1 min-w-80 p-4'):
+                    # Cabeçalho com título e filtro
+                    with ui.row().classes('w-full items-center justify-between mb-4'):
+                        ui.label('Partes Contrárias Mais Frequentes').classes('text-lg font-semibold text-gray-700')
+                        
+                        # Estado reativo para o filtro
+                        filter_status_contrarias = {'value': 'em_andamento'}
+                        
+                        # Dropdown de filtro
+                        status_options = {
+                            'em_andamento': 'Em andamento',
+                            'concluido': 'Concluído',
+                            'arquivado': 'Arquivado',
+                            'suspenso': 'Suspenso',
+                            'todos': 'Todos os status'
+                        }
+                        
+                        status_select_contrarias = ui.select(
+                            options=status_options,
+                            value='em_andamento',
+                            label='Filtrar por Status'
+                        ).classes('w-48').props('dense outlined')
+                    
+                    # Gráfico reativo
+                    @ui.refreshable
+                    def grafico_contrarias():
+                        processos_filtrados = filtrar_processos_por_status(todos_processos, filter_status_contrarias['value'])
+                        dados_contrarias = agrupar_processos_por_parte_contraria(processos_filtrados)
+                        
+                        if dados_contrarias:
+                            # Limita aos 10 principais partes contrárias
+                            contrarias_limite = dict(list(dados_contrarias.items())[:10])
+                            categories = list(contrarias_limite.keys())
+                            values = list(contrarias_limite.values())
+                            chart_height = max(300, len(categories) * 40)
+
+                            # Gradiente de vermelho
+                            cores_vermelhas = ['#991b1b', '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#fef2f2']
+                            colors = [cores_vermelhas[i % len(cores_vermelhas)] for i in range(len(categories))]
+
+                            config = build_bar_chart_config(
+                                categories=categories,
+                                values=values,
+                                colors=colors,
+                                series_name='Processos',
+                                horizontal=True
+                            )
+                            ui.echart(config).classes('w-full').style(f'height: {chart_height}px;')
+                        else:
+                            create_empty_chart_state('Nenhuma parte contrária vinculada a processos.')
+                    
+                    # Handler para atualizar ao mudar filtro
+                    def on_filter_change_contrarias():
+                        filter_status_contrarias['value'] = status_select_contrarias.value or 'em_andamento'
+                        grafico_contrarias.refresh()
+                    
+                    status_select_contrarias.on('update:model-value', lambda: on_filter_change_contrarias())
+                    grafico_contrarias()
 
         area_estatisticas()
 

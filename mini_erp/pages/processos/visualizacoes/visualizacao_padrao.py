@@ -659,6 +659,7 @@ def processos():
         filter_parte = {'value': ''}
         filter_opposing = {'value': ''}
         filter_status = {'value': initial_status_filter}  # Vazio por padrão, só preenchido se vier da URL do painel
+        filter_priority = {'value': ''}  # Filtro de prioridade (P1, P2, P3, P4)
         data_cache = {'rows': None}
 
         # Persiste estado do filtro de casos para manter seleção ao navegar
@@ -787,6 +788,9 @@ def processos():
                         print(f"[FILTER_OPTIONS] ⚠️  Erro ao processar status: {e}")
                         continue
                 
+                # Opções fixas de prioridade (P1 a P4)
+                priority_options = ['', 'P1', 'P2', 'P3', 'P4']
+                
                 # Constrói dicionário de opções com validação final
                 options = {
                     'area': [''] + sanitize_list_values(areas, 'area'),
@@ -794,10 +798,11 @@ def processos():
                     'clients': [''] + sanitize_list_values(clients, 'clients'),
                     'parte': [''] + sanitize_list_values(parte, 'parte'),
                     'opposing': [''] + sanitize_list_values(opposing, 'opposing'),
-                    'status': [''] + sanitize_list_values(statuses, 'status')
+                    'status': [''] + sanitize_list_values(statuses, 'status'),
+                    'priority': priority_options  # Prioridades fixas
                 }
                 
-                print(f"[FILTER_OPTIONS] ✓ Opções construídas: área={len(options['area'])}, casos={len(options['cases'])}, clientes={len(options['clients'])}, status={len(options['status'])}")
+                print(f"[FILTER_OPTIONS] ✓ Opções construídas: área={len(options['area'])}, casos={len(options['cases'])}, clientes={len(options['clients'])}, status={len(options['status'])}, prioridade={len(options['priority'])}")
                 return options
                 
             except Exception as exc:
@@ -811,7 +816,8 @@ def processos():
                     'clients': [''],
                     'parte': [''],
                     'opposing': [''],
-                    'status': ['']
+                    'status': [''],
+                    'priority': ['', 'P1', 'P2', 'P3', 'P4']  # Prioridades fixas
                 }
         
         # Filtros discretos em uma linha
@@ -1045,6 +1051,7 @@ def processos():
             filter_selects['parte'] = create_filter_dropdown('Parte', filter_options['parte'], filter_parte, 'w-full sm:w-auto min-w-[100px] sm:min-w-[140px]')
             filter_selects['opposing'] = create_filter_dropdown('Parte Contrária', filter_options['opposing'], filter_opposing, 'w-full sm:w-auto min-w-[100px] sm:min-w-[170px]')
             filter_selects['status'] = create_filter_dropdown('Status', filter_options['status'], filter_status, 'w-full sm:w-auto min-w-[100px] sm:min-w-[140px]', initial_status_filter)
+            filter_selects['priority'] = create_filter_dropdown('Prioridade', filter_options['priority'], filter_priority, 'w-full sm:w-auto min-w-[80px] sm:min-w-[100px]')
             
             # Aplica filtro APENAS se vier explicitamente da URL do painel (filter=futuro_previsto)
             # Se não houver parâmetro na URL, visualização padrão mostra TODOS os processos
@@ -1086,6 +1093,7 @@ def processos():
                 filter_parte['value'] = ''
                 filter_opposing['value'] = ''
                 filter_status['value'] = ''
+                filter_priority['value'] = ''  # Limpa filtro de prioridade
                 search_term['value'] = ''
                 # Limpar valores dos selects
                 filter_selects['area'].value = ''
@@ -1094,6 +1102,7 @@ def processos():
                 filter_selects['parte'].value = ''
                 filter_selects['opposing'].value = ''
                 filter_selects['status'].value = ''
+                filter_selects['priority'].value = ''  # Limpa select de prioridade
                 search_input.value = ''
                 persist_filter_state()
                 refresh_table()
@@ -1126,6 +1135,8 @@ def processos():
                 active_filters.append(f"parte_contrária='{filter_opposing['value']}'")
             if filter_status['value']:
                 active_filters.append(f"status='{filter_status['value']}'")
+            if filter_priority['value']:
+                active_filters.append(f"prioridade='{filter_priority['value']}'")
             
             if active_filters:
                 print(f"[FILTER_ROWS] Aplicando filtros: {', '.join(active_filters)}")
@@ -1244,6 +1255,11 @@ def processos():
             if filter_status['value'] and filter_status['value'].strip():
                 status_filter = filter_status['value'].strip()
                 filtered = [r for r in filtered if (r.get('status') or '').strip() == status_filter]
+            
+            # Filtro de prioridade (P1, P2, P3, P4)
+            if filter_priority['value'] and filter_priority['value'].strip():
+                priority_filter = filter_priority['value'].strip()
+                filtered = [r for r in filtered if (r.get('prioridade') or '').strip() == priority_filter]
             
             # Debug: log final
             if active_filters:

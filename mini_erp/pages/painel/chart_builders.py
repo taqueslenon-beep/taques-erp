@@ -54,6 +54,19 @@ def build_bar_chart_config(
     
     if show_percentage and percentages and total > 0:
         # Prepara dados com labels formatados já calculados
+        # Formatação de porcentagens:
+        # - Se >= 1%: arredondar para inteiro (ex: "47 (90%)")
+        # - Se < 1% e > 0%: 1 casa decimal (ex: "1 (0.5%)")
+        # - Se = 0: mostrar "0 (0%)"
+        def formatar_label_com_percentual(valor, percentual):
+            """Formata label com porcentagem seguindo regras específicas"""
+            if percentual == 0:
+                return f'{valor} (0%)'
+            elif percentual >= 1:
+                return f'{valor} ({percentual:.0f}%)'
+            else:
+                return f'{valor} ({percentual:.1f}%)'
+        
         formatted_data = []
         data_list = chart_data if isinstance(chart_data, list) else [{'value': v} for v in values]
         for i, item in enumerate(data_list):
@@ -62,7 +75,7 @@ def build_bar_chart_config(
                 formatted_item = item.copy()
                 formatted_item['label'] = {
                     'show': True,
-                    'formatter': f'{val} ({percentages[i]:.2f}%)'
+                    'formatter': formatar_label_com_percentual(val, percentages[i])
                 }
                 formatted_data.append(formatted_item)
             else:
@@ -71,7 +84,7 @@ def build_bar_chart_config(
                     'value': val,
                     'label': {
                         'show': True,
-                        'formatter': f'{val} ({percentages[i]:.2f}%)'
+                        'formatter': formatar_label_com_percentual(val, percentages[i])
                     }
                 })
         chart_data = formatted_data

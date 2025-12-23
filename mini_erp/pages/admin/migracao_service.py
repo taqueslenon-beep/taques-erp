@@ -113,7 +113,8 @@ def obter_estatisticas_migracao() -> Dict[str, Any]:
         
         total = len(docs)
         pendentes = sum(1 for d in docs if d.to_dict().get("status_migracao") == "pendente")
-        concluidos = total - pendentes
+        # Considera tanto "migrado" quanto "concluido" para compatibilidade
+        concluidos = sum(1 for d in docs if d.to_dict().get("status_migracao") in ["migrado", "concluido"])
         
         return {
             "total": total,
@@ -126,23 +127,77 @@ def obter_estatisticas_migracao() -> Dict[str, Any]:
         return {"total": 0, "pendentes": 0, "concluidos": 0, "progresso": 0}
 
 def listar_processos_migracao(status: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Lista processos da coleção de migração."""
+    """
+    Lista processos da coleção de migração.
+    
+    Ordenação:
+    - Pendentes primeiro (ordenados por data de distribuição, depois número)
+    - Migrados depois (ordenados por data de distribuição, depois número)
+    """
     try:
         db = get_db()
         query = db.collection(COLECAO_MIGRACAO)
         
         if status and status != "todos":
-            query = query.where("status_migracao", "==", status)
+            # Compatibilidade: "concluido" também busca "migrado"
+            if status == "concluido":
+                # Busca processos migrados ou concluídos (não pendentes)
+                docs_migrados = query.where("status_migracao", "==", "migrado").stream()
+                docs_concluidos = query.where("status_migracao", "==", "concluido").stream()
+                # Converte generators para listas e combina
+                docs = list(docs_migrados) + list(docs_concluidos)
+            else:
+                docs = query.where("status_migracao", "==", status).stream()
+        else:
+            docs = query.stream()
             
-        docs = query.stream()
         lista = []
         for doc in docs:
             d = doc.to_dict()
             d["_id"] = doc.id
             lista.append(d)
         
-        # Ordena: pendentes primeiro
-        lista.sort(key=lambda x: (x.get("status_migracao") != "pendente", x.get("numero_processo")))
+        # Função auxiliar para extrair data de distribuição para ordenação
+        def get_data_ordenacao(processo):
+            """Extrai data para ordenação, retorna datetime ou string vazia"""
+            data_abertura = processo.get("data_abertura")
+            if not data_abertura:
+                return ""
+            
+            # Se for string, tenta converter
+            if isinstance(data_abertura, str):
+                try:
+                    # Tenta vários formatos
+                    formatos = ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y']
+                    for fmt in formatos:
+                        try:
+                            return datetime.strptime(data_abertura.split()[0], fmt)
+                        except:
+                            continue
+                    return data_abertura  # Retorna string se não conseguir converter
+                except:
+                    return data_abertura
+            
+            # Se já for datetime ou DatetimeWithNanoseconds
+            if hasattr(data_abertura, 'isoformat'):
+                try:
+                    dt_str = data_abertura.isoformat()
+                    if 'T' in dt_str:
+                        dt_str_clean = dt_str.split('+')[0].split('Z')[0].split('.')[0]
+                        return datetime.fromisoformat(dt_str_clean)
+                except:
+                    pass
+            
+            return data_abertura if hasattr(data_abertura, 'year') else ""
+        
+        # Ordena: pendentes primeiro, depois migrados
+        # Dentro de cada grupo, ordena por data de distribuição (mais antiga primeiro), depois número
+        lista.sort(key=lambda x: (
+            x.get("status_migracao") not in ["pendente"],  # Pendentes primeiro (False < True)
+            get_data_ordenacao(x) or "",  # Data de distribuição
+            x.get("numero_processo", "")  # Número do processo como desempate
+        ))
+        
         return lista
     except Exception as e:
         logger.error(f"Erro ao listar processos de migração: {e}")
@@ -204,6 +259,82 @@ def salvar_processo_migracao(processo_id: str, dados: Dict[str, Any]) -> bool:
         logger.error(f"Erro ao salvar processo migrado {processo_id}: {e}")
         return False
 
+def atualizar_status_migracao(processo_id: str, novo_status: str) -> bool:
+    """
+    Atualiza apenas o status de migração de um processo.
+    
+    Args:
+        processo_id: ID do documento na coleção processos_migracao
+        novo_status: "pendente" ou "migrado" (lowercase)
+        
+    Returns:
+        True se atualizado com sucesso, False caso contrário
+    """
+    try:
+        if novo_status not in ["pendente", "migrado"]:
+            logger.error(f"Status inválido: {novo_status}. Deve ser 'pendente' ou 'migrado'")
+            return False
+        
+        db = get_db()
+        if not db:
+            logger.error("Conexão com banco de dados indisponível")
+            return False
+        
+        db.collection(COLECAO_MIGRACAO).document(processo_id).update({
+            "status_migracao": novo_status,
+            "atualizado_em": datetime.now()
+        })
+        
+        logger.info(f"Status do processo {processo_id} atualizado para: {novo_status}")
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao atualizar status do processo {processo_id}: {e}")
+        return False
+
+def excluir_processo_migracao(doc_id: str) -> bool:
+    """
+    Exclui permanentemente um processo da coleção processos_migracao.
+    
+    Args:
+        doc_id: ID do documento a ser excluído
+        
+    Returns:
+        True se excluído com sucesso, False caso contrário
+    """
+    try:
+        if not doc_id:
+            logger.error("ID do documento não fornecido")
+            return False
+        
+        db = get_db()
+        if not db:
+            logger.error("Conexão com banco de dados indisponível")
+            return False
+        
+        # Verifica se documento existe antes de deletar
+        doc_ref = db.collection(COLECAO_MIGRACAO).document(doc_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            logger.warning(f"Documento {doc_id} não encontrado na coleção")
+            return False
+        
+        # Obtém número do processo para log antes de deletar
+        dados = doc.to_dict()
+        numero_processo = dados.get('numero_processo', 'N/A')
+        
+        # Deleta o documento
+        doc_ref.delete()
+        
+        logger.info(f"Processo {doc_id} (número: {numero_processo}) excluído da coleção processos_migracao")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erro ao excluir processo {doc_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def finalizar_migracao_completa() -> Dict[str, Any]:
     """Finaliza todo o processo de migração após todos os itens serem concluídos."""
     try:
@@ -219,4 +350,6 @@ def finalizar_migracao_completa() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Erro ao finalizar migração: {e}")
         return {"sucesso": False, "erro": str(e)}
+
+
 

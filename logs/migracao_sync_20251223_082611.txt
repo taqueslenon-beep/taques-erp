@@ -1,0 +1,81 @@
+================================================================================
+RELATÓRIO DE SINCRONIZAÇÃO DE PROCESSOS MIGRADOS
+================================================================================
+
+Data/Hora da Execução: 23/12/2025 08:26:11
+
+--------------------------------------------------------------------------------
+ESTATÍSTICAS
+--------------------------------------------------------------------------------
+Processos encontrados em vg_processos: 55
+Processos pendentes em processos_migracao: 106
+Matches encontrados: 53
+
+--------------------------------------------------------------------------------
+RESULTADO DA ATUALIZAÇÃO
+--------------------------------------------------------------------------------
+Total de processos atualizados: 53
+Total de erros: 0
+
+Arquivo de backup: /Users/lenontaques/Documents/taques-erp/backups/processos_migracao_backup_20251223_082611.json
+
+--------------------------------------------------------------------------------
+PROCESSOS ATUALIZADOS
+--------------------------------------------------------------------------------
+  1. 5007482-83.2024.8.24.0015 (ID: 2B6ovRkXscufEbUp8Ovb)
+  2. 5007625-09.2023.8.24.0015 (ID: 3BvQHZONBqk167SEtjR4)
+  3. 0900003-75.2019.8.24.0015 (ID: 4hCKdKrK86TGMXOsESze)
+  4. 5004348-53.2021.8.24.0015 (ID: 6iW7Tf85LPLBAyGrZMyx)
+  5. 5008582-10.2023.8.24.0015 (ID: 6yeW8prVnSojpHPXs7OO)
+  6. 5007373-06.2023.8.24.0015 (ID: 7JoIQeyg4voRrlASx9Oa)
+  7. 5005494-32.2021.8.24.0015 (ID: 7aqoarqaSxy7urTYiqpk)
+  8. 5000136-23.2020.8.24.0015 (ID: 8KXrEuNnOxfurkrdtWEQ)
+  9. 5009151-45.2022.8.24.0015 (ID: 8i8NXPW3JxWcc9B3SX3N)
+ 10. 5001971-90.2024.8.24.0052 (ID: 8shPxXHUSEsHWnNDWQ3Q)
+ 11. 5007864-47.2022.8.24.0015 (ID: 9xt6eKY1nLZqaVUCF2ET)
+ 12. 5008276-41.2023.8.24.0015 (ID: AaxLs9STARL8mwsc8CeC)
+ 13. 5006545-10.2023.8.24.0015 (ID: BJjVnZPV7kWrWb5mtzfp)
+ 14. 5003387-15.2021.8.24.0015 (ID: Blg0fitU1VvbK6P4grTq)
+ 15. 5006682-89.2023.8.24.0015 (ID: F6swicvojsOi1xYP2cX1)
+ 16. 5003861-78.2024.8.24.0015 (ID: HuOa1FDRBUQJaX1ckENu)
+ 17. 5007339-94.2024.8.24.0015 (ID: KBEunSC8pPBIFlVOPasR)
+ 18. 5004465-44.2021.8.24.0015 (ID: KaNZ9PtpQh7QqLdovknd)
+ 19. 5008400-24.2023.8.24.0015 (ID: NsjysUQFba8qROEaHP5S)
+ 20. 5002931-60.2024.8.24.0015 (ID: OVgOTEsrUCzkYpzoWg4I)
+ 21. 5000200-91.2024.8.24.0015 (ID: RBZ0Uk4DpaTLb10JNNWm)
+ 22. 5000169-08.2023.8.24.0015 (ID: SkPjOq1L4zE4D0z900aM)
+ 23. 5007539-04.2024.8.24.0015 (ID: SypaIgHlphV73rqOPLwi)
+ 24. 5002495-04.2024.8.24.0015 (ID: T5c5dipsPcfJXsBIGpSG)
+ 25. 5006117-28.2023.8.24.0015 (ID: TQdWocufzamADeAstP3d)
+ 26. 5004560-69.2024.8.24.0015 (ID: U8vvtF3IVmwrYP6IK3hi)
+ 27. 5000758-67.2024.8.24.0143 (ID: WJ94RnGUOyG1Cu4u339R)
+ 28. 5001435-30.2023.8.24.0015 (ID: WnYFi9ovNfKGmqGWLtPe)
+ 29. 5002086-33.2021.8.24.0015 (ID: XHX25z0W6i7N2nbK8t94)
+ 30. 5007768-95.2023.8.24.0015 (ID: XaGJ2gBN3IVKZ9svWMe2)
+ 31. 5005751-86.2023.8.24.0015 (ID: Y2tpR3BpBwaNj1HXkKp7)
+ 32. 5005434-88.2023.8.24.0015 (ID: ZZRrs43iiQwaEJIzhBGf)
+ 33. 5003797-20.2025.8.24.0052 (ID: bdH0FVv1q1h7r1o0YeJD)
+ 34. 5008988-65.2022.8.24.0015 (ID: bnS7Blfpe0YbSJbV07XH)
+ 35. 5002670-32.2023.8.24.0015 (ID: dHFWss6aJEfGXaWuHcR9)
+ 36. 5003390-65.2025.8.24.0520 (ID: efRS621R0PgiaaU7uhn2)
+ 37. 5006935-94.2025.8.24.0019 (ID: fwOSjeXloN0fSGDB8GhL)
+ 38. 5006783-92.2024.8.24.0015 (ID: giQf8jDBgeimlWfDdtJG)
+ 39. 5000503-71.2025.8.24.0015 (ID: hmbH6V3Nl8WyJ9jwQfvP)
+ 40. 5002623-24.2024.8.24.0015 (ID: i506XITLcZRvDA8EtnfU)
+ 41. 0900172-96.2018.8.24.0015 (ID: kT5xZOgsrLAorsznEPA5)
+ 42. 5000504-56.2025.8.24.0015 (ID: lziomyx4J7zsXFrzF82o)
+ 43. 5000896-64.2023.8.24.0015 (ID: m7wtsgHqZSyqMecD1YIx)
+ 44. 5009586-53.2021.8.24.0015 (ID: nATNCGcXL93bb1uw7zS6)
+ 45. 0900097-57.2018.8.24.0015 (ID: nff3KJiYHabXri3kfXLu)
+ 46. 5002945-20.2019.8.24.0015 (ID: oduLM1mb0ovoTLqrWAeR)
+ 47. 5003105-26.2022.8.24.0052 (ID: ojsxyi8bTMo8Ulz72gaD)
+ 48. 5002158-15.2024.8.24.0015 (ID: rP8dQwCOma1JnEIyRYZ6)
+ 49. 5008881-55.2021.8.24.0015 (ID: rziqzZOzkQgQTCib3dvb)
+ 50. 5008581-25.2023.8.24.0015 (ID: vzTv81rFHmpt6QvERgok)
+ 51. 5005422-74.2023.8.24.0015 (ID: wlCxRhwmux83ZmW8gl8d)
+ 52. 5007275-84.2024.8.24.0015 (ID: xLnd0gAAAIbfPJrCHUiZ)
+ 53. 5002338-31.2024.8.24.0015 (ID: yoVd5ATgZ45owJwzW9Yr)
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================

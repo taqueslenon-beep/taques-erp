@@ -25,6 +25,7 @@ from .aba_relatorio import render_aba_relatorio
 from .aba_estrategia import render_aba_estrategia
 from .aba_cenarios import render_aba_cenarios
 from .aba_protocolos import render_aba_protocolos
+from .aba_chaves_acesso import render_aba_chaves_acesso
 
 # CSS para sidebar
 PROCESSES_TABLE_CSS = '''
@@ -233,28 +234,80 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
             return [p for p in partes if p]
         return [str(valor).strip()] if str(valor).strip() else []
 
-    # Estado local
-    state = {
-        'is_editing': is_edicao,
-        'process_id': dados.get('_id') if is_edicao else None,
-        'processo_pai_id': dados.get('processo_pai_id', '') or '',
-        'scenarios': [],
-        'protocols': dados.get('protocols', []) if isinstance(dados.get('protocols'), list) else [],
-        'selected_clients': dados.get('clientes', []) if isinstance(dados.get('clientes'), list) else [],
-        # Parte contrária pode vir como string (legado) ou lista
-        'selected_opposing': _normalizar_lista_texto(dados.get('parte_contraria')),
-        # Outros envolvidos (novo campo no VG) pode vir como string (legado) ou lista
-        'selected_others': _normalizar_lista_texto(dados.get('outros_envolvidos')),
-        'selected_cases': [dados.get('caso_titulo')] if dados.get('caso_titulo') else [],
-    }
-    
-    # Carregar dados auxiliares em paralelo (com cache)
+    # Carregar dados auxiliares em paralelo (com cache) - ANTES do state para usar no mapeamento
     dados_carregados = carregar_dados_modal()
     todas_pessoas = dados_carregados['pessoas']
     todos_casos = dados_carregados['casos']
     usuarios_internos = dados_carregados['usuarios']
     processos_pais = dados_carregados['processos_pais']
     envolvidos_e_parceiros = dados_carregados['envolvidos_e_parceiros']
+    
+    # Importa função de mapeamento
+    from .helpers import mapear_valores_para_opcoes, format_option_for_search
+    
+    # Mapeia valores salvos para formato das opções do dropdown
+    # Isso garante sincronização automática ao abrir modal de edição
+    opposing_salvos = _normalizar_lista_texto(dados.get('parte_contraria'))
+    others_salvos = _normalizar_lista_texto(dados.get('outros_envolvidos'))
+    clients_salvos = dados.get('clientes', []) if isinstance(dados.get('clientes'), list) else []
+    
+    # Converte para formato das opções
+    opposing_mapeados = mapear_valores_para_opcoes(opposing_salvos, envolvidos_e_parceiros)
+    others_mapeados = mapear_valores_para_opcoes(others_salvos, envolvidos_e_parceiros)
+    clients_mapeados = mapear_valores_para_opcoes(clients_salvos, todas_pessoas)
+    
+    # Helper para formatar processo pai
+    def _format_process_option(proc: dict) -> str:
+        """Formata opção de processo: Título (Número)"""
+        titulo = proc.get('titulo', '') or 'Sem título'
+        numero = proc.get('numero', '')
+        if numero:
+            return f"{titulo} ({numero})"
+        return titulo
+    
+    # Mapeia processos pai salvos (IDs ou títulos) para formato das opções
+    def _mapear_processos_pai(valores_salvos) -> list:
+        """Converte IDs ou títulos de processos pai para formato de exibição."""
+        if not valores_salvos:
+            return []
+        
+        # Pode vir como string (legado) ou lista
+        if isinstance(valores_salvos, str):
+            valores_salvos = [v.strip() for v in valores_salvos.split(',') if v.strip()]
+        
+        opcoes = []
+        for valor in valores_salvos:
+            if not valor:
+                continue
+            # Busca processo por ID ou título
+            proc = next((p for p in processos_pais if p.get('_id') == valor or p.get('titulo') == valor), None)
+            if proc:
+                opcoes.append(_format_process_option(proc))
+            else:
+                # Valor não encontrado, mantém como está
+                opcoes.append(valor)
+        return opcoes
+    
+    # Carrega processos pai salvos
+    processos_pai_salvos = dados.get('processos_pai_ids', []) or dados.get('processo_pai_id', '')
+    parent_processes_mapeados = _mapear_processos_pai(processos_pai_salvos)
+    
+    # Estado local
+    state = {
+        'is_editing': is_edicao,
+        'process_id': dados.get('_id') if is_edicao else None,
+        'scenarios': [],
+        'protocols': dados.get('protocols', []) if isinstance(dados.get('protocols'), list) else [],
+        'chaves_acesso': dados.get('chaves_acesso', []) if isinstance(dados.get('chaves_acesso'), list) else [],
+        'selected_clients': clients_mapeados,
+        # Parte contrária - mapeada para formato das opções
+        'selected_opposing': opposing_mapeados,
+        # Outros envolvidos - mapeados para formato das opções
+        'selected_others': others_mapeados,
+        'selected_cases': [dados.get('caso_titulo')] if dados.get('caso_titulo') else [],
+        # Processos pai - suporta múltiplos
+        'selected_parent_processes': parent_processes_mapeados,
+    }
     
     # CSS do modal
     ui.add_head_html(f'<style>{PROCESSES_TABLE_CSS}</style>')
@@ -275,6 +328,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         tab_strategy = ui.tab('Estratégia', icon='lightbulb')
                         tab_scenarios = ui.tab('Cenários', icon='analytics')
                         tab_protocols = ui.tab('Protocolos', icon='history')
+                        tab_chaves_acesso = ui.tab('Chaves e acesso', icon='vpn_key')
             
             # Content - LAZY LOADING das abas
             # Variáveis para controlar abas já renderizadas
@@ -284,7 +338,8 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                 'relatory': False,
                 'strategy': False,
                 'scenarios': False,
-                'protocols': False
+                'protocols': False,
+                'chaves_acesso': False
             }
             
             # Containers para referências das abas
@@ -294,6 +349,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
             aba_estrategia_refs = {}
             aba_cenarios_refs = {}
             aba_protocolos_refs = {}
+            aba_chaves_acesso_refs = {}
             
             # Containers para lazy loading
             container_legal = None
@@ -301,6 +357,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
             container_strategy = None
             container_scenarios = None
             container_protocols = None
+            container_chaves_acesso = None
             
             with ui.column().classes('flex-grow h-full overflow-auto bg-gray-50'):
                 with ui.tab_panels(tabs, value=tab_basic).classes('w-full h-full p-4 bg-transparent') as panels:
@@ -359,6 +416,14 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                             print(f"[ERRO] Erro ao renderizar aba Protocolos: {e}")
                             ui.label(f'Erro: {str(e)}').classes('text-red-500')
                     
+                    # TAB 7: CHAVES E ACESSO
+                    with ui.tab_panel(tab_chaves_acesso):
+                        try:
+                            aba_chaves_acesso_refs = render_aba_chaves_acesso(state)
+                        except Exception as e:
+                            print(f"[ERRO] Erro ao renderizar aba Chaves e Acesso: {e}")
+                            ui.label(f'Erro: {str(e)}').classes('text-red-500')
+                    
                     # Todas as abas são renderizadas de uma vez (sem lazy loading)
             
             # Footer Actions
@@ -389,26 +454,41 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                             selected_cases_ids = [caso_obj.get('_id')]
                             caso_titulo = caso_obj.get('titulo', '')
                     
-                    processo_pai_id = state.get('processo_pai_id', '') or ''
-                    processo_pai_titulo = ''
-                    if processo_pai_id:
-                        proc_obj = buscar_processo(processo_pai_id)
-                        if proc_obj:
-                            processo_pai_titulo = proc_obj.get('titulo', '')
+                    # Processa processos pai (múltiplos)
+                    def _find_process_by_option(option: str) -> dict:
+                        """Encontra processo pelo título formatado."""
+                        if not option:
+                            return None
+                        for p in processos_pais:
+                            titulo = p.get('titulo', '') or 'Sem título'
+                            numero = p.get('numero', '')
+                            formatted = f"{titulo} ({numero})" if numero else titulo
+                            if option == formatted or option == titulo:
+                                return p
+                        return None
                     
-                    # Normalizar parte contrária
-                    parte_contraria = ''
-                    if isinstance(state['selected_opposing'], list):
-                        parte_contraria = ', '.join(state['selected_opposing']) if state['selected_opposing'] else ''
-                    else:
-                        parte_contraria = str(state['selected_opposing']) if state['selected_opposing'] else ''
+                    processos_pai_ids = []
+                    processos_pai_titulos = []
+                    for parent_option in state.get('selected_parent_processes', []):
+                        proc = _find_process_by_option(parent_option)
+                        if proc:
+                            processos_pai_ids.append(proc.get('_id', ''))
+                            processos_pai_titulos.append(proc.get('titulo', ''))
+                    
+                    # Normalizar parte contrária - extrai display_names para salvar de forma consistente
+                    from .helpers import extrair_display_names
+                    opposing_display_names = extrair_display_names(
+                        state.get('selected_opposing', []) if isinstance(state.get('selected_opposing'), list) else [],
+                        envolvidos_e_parceiros
+                    )
+                    parte_contraria = ', '.join(opposing_display_names) if opposing_display_names else ''
 
-                    # Normalizar outros envolvidos
-                    outros_envolvidos = ''
-                    if isinstance(state.get('selected_others'), list):
-                        outros_envolvidos = ', '.join(state['selected_others']) if state['selected_others'] else ''
-                    else:
-                        outros_envolvidos = str(state.get('selected_others') or '') if state.get('selected_others') else ''
+                    # Normalizar outros envolvidos - extrai display_names
+                    others_display_names = extrair_display_names(
+                        state.get('selected_others', []) if isinstance(state.get('selected_others'), list) else [],
+                        envolvidos_e_parceiros
+                    )
+                    outros_envolvidos = ', '.join(others_display_names) if others_display_names else ''
                     
                     # Buscar UID do responsável pelo nome (usa lista já carregada)
                     responsavel_uid = ''
@@ -419,6 +499,13 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                             usuario_responsavel = next((u for u in usuarios_internos if u.get('nome') == responsavel_nome), None)
                             if usuario_responsavel:
                                 responsavel_uid = usuario_responsavel.get('uid', '')
+                    
+                    # Processa clientes: extrai display_names para salvar de forma consistente
+                    clientes_processados = extrair_display_names(
+                        state.get('selected_clients', []) if isinstance(state.get('selected_clients'), list) else [],
+                        todas_pessoas
+                    )
+                    clientes_nomes_processados = clientes_processados.copy()
                     
                     novos_dados = {
                         'titulo': aba_basicos_refs.get('title_input', {}).value.strip() if aba_basicos_refs.get('title_input') and aba_basicos_refs['title_input'].value else '',
@@ -432,15 +519,16 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         'estado': aba_juridicos_refs.get('estado_select', {}).value if aba_juridicos_refs.get('estado_select') else '',
                         'caso_id': selected_cases_ids[0] if selected_cases_ids else '',
                         'caso_titulo': caso_titulo,
-                        'clientes': state['selected_clients'].copy(),
-                        'clientes_nomes': [
-                            get_display_name(next((p for p in todas_pessoas if get_display_name(p) == cid or p.get('_id') == cid), {}))
-                            for cid in state['selected_clients']
-                        ],
+                        'clientes': clientes_processados,
+                        'clientes_nomes': clientes_nomes_processados,
                         'parte_contraria': parte_contraria,
                         'outros_envolvidos': outros_envolvidos,
-                        'processo_pai_id': processo_pai_id,
-                        'processo_pai_titulo': processo_pai_titulo,
+                        # Processos pai - suporta múltiplos
+                        'processos_pai_ids': processos_pai_ids,
+                        'processos_pai_titulos': processos_pai_titulos,
+                        # Mantém campo legado para compatibilidade
+                        'processo_pai_id': processos_pai_ids[0] if processos_pai_ids else '',
+                        'processo_pai_titulo': processos_pai_titulos[0] if processos_pai_titulos else '',
                         'status': aba_juridicos_refs.get('status_select', {}).value if aba_juridicos_refs.get('status_select') else 'Em andamento',
                         'data_abertura': aba_basicos_refs.get('data_abertura_input', {}).value.strip() if aba_basicos_refs.get('data_abertura_input') and aba_basicos_refs['data_abertura_input'].value else '',
                         'prioridade': aba_basicos_refs.get('prioridade_select', {}).value if aba_basicos_refs.get('prioridade_select') else PRIORIDADE_PADRAO,
@@ -458,6 +546,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         'legal_thesis': aba_estrategia_refs.get('thesis_input', {}).value if aba_estrategia_refs.get('thesis_input') else '',
                         'strategy_observations': aba_estrategia_refs.get('observations_input', {}).value if aba_estrategia_refs.get('observations_input') else '',
                         'protocols': state.get('protocols', []),
+                        'chaves_acesso': state.get('chaves_acesso', []),
                     }
                     
                     # Validação
@@ -604,7 +693,13 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                 else:
                     state['protocols'] = []
                 
-                # Renderizar chips
+                # Chaves de acesso
+                if dados.get('chaves_acesso') and isinstance(dados.get('chaves_acesso'), list):
+                    state['chaves_acesso'] = dados.get('chaves_acesso')
+                else:
+                    state['chaves_acesso'] = []
+                
+                # Renderizar chips e selects
                 try:
                     if 'refresh_chips' in aba_basicos_refs and 'client_chips' in aba_basicos_refs:
                         aba_basicos_refs['refresh_chips'](aba_basicos_refs['client_chips'], state['selected_clients'], 'clients', todas_pessoas)
@@ -615,8 +710,9 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                         aba_basicos_refs['others_sel'].value = state.get('selected_others', []) or []
                     if 'cases_chips' in aba_basicos_refs:
                         aba_basicos_refs['refresh_chips'](aba_basicos_refs['cases_chips'], state['selected_cases'], 'cases', None)
-                    if state.get('processo_pai_id') and 'refresh_parent_chips' in aba_basicos_refs and 'parent_process_chips' in aba_basicos_refs:
-                        aba_basicos_refs['refresh_parent_chips'](aba_basicos_refs['parent_process_chips'], state['processo_pai_id'])
+                    # Processos pai - seleção múltipla
+                    if 'parent_process_sel' in aba_basicos_refs:
+                        aba_basicos_refs['parent_process_sel'].value = state.get('selected_parent_processes', []) or []
                 except Exception as e:
                     print(f"[MODAL_VG] [POPULAR] ⚠ Erro ao renderizar chips: {e}")
                     import traceback
@@ -635,27 +731,7 @@ def abrir_modal_processo(processo: Optional[dict] = None, on_save: Optional[Call
                 traceback.print_exc()
                 ui.notify(f'Erro ao carregar dados do processo: {str(e)}', type='negative')
         
-        # Carregar opções de processos pais (usa lista já carregada em paralelo)
-        if aba_basicos_refs and 'parent_process_sel' in aba_basicos_refs:
-            try:
-                parent_options = []
-                current_id = state.get('process_id')
-                
-                for p in processos_pais:
-                    proc_id = p.get('_id')
-                    if proc_id and proc_id != current_id:
-                        title = p.get('titulo') or p.get('numero') or 'Sem título'
-                        number = p.get('numero', '')
-                        display = f"{title}" + (f" ({number})" if number else "") + f" | {proc_id}"
-                        parent_options.append(display)
-                
-                aba_basicos_refs['parent_process_sel'].options = parent_options if parent_options else ['— Nenhum (processo raiz) —']
-            except Exception as e:
-                print(f"[MODAL_VG] Erro ao carregar processos pais: {e}")
-                import traceback
-                traceback.print_exc()
-                if 'parent_process_sel' in aba_basicos_refs:
-                    aba_basicos_refs['parent_process_sel'].options = ['— Nenhum (processo raiz) —']
+        # As opções de processos pai já são carregadas no aba_dados_basicos.py
         
         # Popular campos após criar o dialog
         if is_edicao:

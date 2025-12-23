@@ -461,6 +461,7 @@ def acesso_processos():
         filter_parte = {'value': ''}
         filter_opposing = {'value': ''}
         filter_status = {'value': ''}
+        filter_priority = {'value': ''}  # Filtro de prioridade (P1, P2, P3, P4)
         
         # Referência para render_table (será definida depois)
         render_table_ref = {'func': None}
@@ -479,7 +480,8 @@ def acesso_processos():
                 'clients': [''] + sorted(set([c for r in all_rows for c in r.get('clients_list', []) if c])),
                 'parte': [''] + sorted(set([c for r in all_rows for c in r.get('clients_list', []) if c])),
                 'opposing': [''] + sorted(set([c for r in all_rows for c in r.get('opposing_list', []) if c])),
-                'status': [''] + sorted(set([r.get('status', '') for r in all_rows if r.get('status')]))
+                'status': [''] + sorted(set([r.get('status', '') for r in all_rows if r.get('status')])),
+                'priority': ['', 'P1', 'P2', 'P3', 'P4']  # Opções fixas de prioridade
             }
         
         # Filtros discretos em uma linha
@@ -529,6 +531,7 @@ def acesso_processos():
             filter_selects['parte'] = create_filter_dropdown('Parte', filter_options['parte'], filter_parte, 'min-w-[140px]')
             filter_selects['opposing'] = create_filter_dropdown('Parte Contrária', filter_options['opposing'], filter_opposing, 'min-w-[170px]')
             filter_selects['status'] = create_filter_dropdown('Status', filter_options['status'], filter_status, 'min-w-[140px]')
+            filter_selects['priority'] = create_filter_dropdown('Prioridade', filter_options['priority'], filter_priority, 'min-w-[100px]')
             
             # Botão limpar filtros
             def clear_filters():
@@ -538,6 +541,7 @@ def acesso_processos():
                 filter_parte['value'] = ''
                 filter_opposing['value'] = ''
                 filter_status['value'] = ''
+                filter_priority['value'] = ''  # Limpa filtro de prioridade
                 search_term['value'] = ''
                 # Limpar valores dos selects
                 filter_selects['area'].value = ''
@@ -546,6 +550,7 @@ def acesso_processos():
                 filter_selects['parte'].value = ''
                 filter_selects['opposing'].value = ''
                 filter_selects['status'].value = ''
+                filter_selects['priority'].value = ''  # Limpa select de prioridade
                 search_input.value = ''
                 refresh_table()
             
@@ -589,6 +594,10 @@ def acesso_processos():
             # Filtro de status
             if filter_status['value']:
                 filtered = [r for r in filtered if r.get('status') == filter_status['value']]
+            
+            # Filtro de prioridade (P1, P2, P3, P4)
+            if filter_priority['value']:
+                filtered = [r for r in filtered if r.get('prioridade') == filter_priority['value']]
             
             return filtered
 

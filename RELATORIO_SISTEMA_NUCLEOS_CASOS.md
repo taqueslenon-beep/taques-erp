@@ -464,3 +464,5 @@ if nucleo_filtro and nucleo_filtro != 'Todos':
 
 
 
+
+

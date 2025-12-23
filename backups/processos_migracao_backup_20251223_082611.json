@@ -1,0 +1,3501 @@
+[
+  {
+    "id": "1uchxgheItJyxR489zoK",
+    "data": {
+      "data_abertura": "2020-07-28 17:29:39",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.162663+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Flora",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5004642-42.2020.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "WALDIR JANTSCH"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "50000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Civil Pública Cível"
+    }
+  },
+  {
+    "id": "2B6ovRkXscufEbUp8Ovb",
+    "data": {
+      "data_abertura": "2024-10-19 22:59:06",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.138307+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Difamação (Criminal)",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "RAFAEL BONFIM DE ALMEIDA"
+      ],
+      "numero_processo": "5007482-83.2024.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JESSE DE FARIA LOPES"
+      ],
+      "valor_causa": "20000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Crimes de Calúnia, Injúria e Difamação de Competência do Juiz Singular",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "3BvQHZONBqk167SEtjR4",
+    "data": {
+      "data_abertura": "2023-09-20 12:42:53",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.490135+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Crimes contra o Ordenamento Urbano e o Patrimônio Cultural",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5007625-09.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "VILA MULTISHOW LTDA"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "3dTe7i4muaOCFtKLDt9T",
+    "data": {
+      "data_abertura": "2025-05-20 17:14:12",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.671221+00:00",
+      "assunto": "Revogação/Anulação de multa ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "CAPITAL MATE INDUSTRIA E COMERCIO LTDA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003526-25.2025.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "Gerente - INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA - Canoinhas"
+      ],
+      "processo_pai": "",
+      "valor_causa": "24000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "MANDADO DE SEGURANÇA"
+    }
+  },
+  {
+    "id": "3g9PoqlCrMxq0dHpyD1u",
+    "data": {
+      "data_abertura": "2023-06-26 09:52:00",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.647498+00:00",
+      "assunto": "Indenização por dano material",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "VINICIUS MARCELO CORNELSEN ALVES RIBEIRO"
+      ],
+      "numero_processo": "5005357-79.2023.8.24.0015   (CNI01CV01)",
+      "reus_sugestao": [
+        "MILI S/A"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "1150000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Procedimento Comum Cível"
+    }
+  },
+  {
+    "id": "3nY8WL0JwgRlLipUWatT",
+    "data": {
+      "data_abertura": "2020-08-13 11:00:35",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.102090+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Flora",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003215-29.2020.8.24.0041   (MFA02CV01)",
+      "reus_sugestao": [
+        "DANIELLY VENEZIO RODRIGUES"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "50000.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Civil Pública Cível"
+    }
+  },
+  {
+    "id": "4hCKdKrK86TGMXOsESze",
+    "data": {
+      "data_abertura": "2019-01-17 17:06:39",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:27.180571+00:00",
+      "assunto": "Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "0900003-75.2019.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ADIR PEREIRA DA ROCHA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Civil Pública Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "5hoyq6ILs0ck87W9L0h0",
+    "data": {
+      "data_abertura": "2023-02-28 15:46:15",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.493143+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Ambiental",
+      "autores_sugestao": [
+        "LUCIANE SCHMIDMEIER\nREFLORESTA EMPREENDIMENTOS LTDA - EPP"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001089-98.2023.8.24.0041   (MFA02CV01)",
+      "reus_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "370000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Procedimento Comum Cível"
+    }
+  },
+  {
+    "id": "6BQdRgjLGOYe8W7ujOJb",
+    "data": {
+      "data_abertura": "2023-01-31 18:40:12",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.843656+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5000817-85.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "PEDRO COLACO"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "6JYdqjURHCojUa7HJqQx",
+    "data": {
+      "data_abertura": "2022-09-22 18:40:33",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Rio Negrinho",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.794112+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Outros Atos Contra o Meio Ambiente",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003083-56.2022.8.24.0055   (RIN0201)",
+      "reus_sugestao": [
+        "ELCIO ANTONIO PSCHEIDT"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "6iW7Tf85LPLBAyGrZMyx",
+    "data": {
+      "data_abertura": "2021-06-18 13:06:08",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.016132+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Crimes contra a Flora",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5004348-53.2021.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "ELIEZER JANTSCH"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumário",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "6yeW8prVnSojpHPXs7OO",
+    "data": {
+      "data_abertura": "2023-10-24 18:36:26",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.961396+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Dano ambiental",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5008582-10.2023.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARIA TRINDADE NEVES"
+      ],
+      "valor_causa": "5012.67",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "7JoIQeyg4voRrlASx9Oa",
+    "data": {
+      "data_abertura": "2023-09-08 16:13:30",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": " Regional de Garantias - Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.301053+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Destruição ou Degradação",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5007373-06.2023.8.24.0015   (VRG01MFA01)",
+      "reus_sugestao": [
+        "MATHEUS MAURO MELECHENCO"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "7TzM076Kzxlr4RjyljY1",
+    "data": {
+      "data_abertura": "2021-12-17 11:46:57",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Itaiópolis",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.546469+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Crimes contra a Flora",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002505-02.2021.8.24.0032   (ILSUN01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ADRIANO BLASZKOSKI"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "7aqoarqaSxy7urTYiqpk",
+    "data": {
+      "data_abertura": "2021-07-22 17:26:40",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.795700+00:00",
+      "assunto": "Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5005494-32.2021.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "JOAO VARLEI NEVES"
+      ],
+      "processo_pai": "",
+      "valor_causa": "30000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Civil Pública Cível"
+    }
+  },
+  {
+    "id": "8KXrEuNnOxfurkrdtWEQ",
+    "data": {
+      "data_abertura": "2020-01-10 17:05:16",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": " Estadual - Execução Fiscal Estadual",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.378856+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Dívida Ativa (Execução Fiscal)",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000136-23.2020.8.24.0015   (FNSVEFE01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ADIR PEREIRA DA ROCHA"
+      ],
+      "valor_causa": "653751.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "EXECUÇÃO FISCAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "8i8NXPW3JxWcc9B3SX3N",
+    "data": {
+      "data_abertura": "2022-12-16 17:37:24",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": " Regional de Garantias - Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.373187+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5009151-45.2022.8.24.0015   (VRG01MFA01)",
+      "reus_sugestao": [
+        "SAULO SUCHARA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "8shPxXHUSEsHWnNDWQ3Q",
+    "data": {
+      "data_abertura": "2024-05-20 13:39:54",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Porto União",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.476687+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Revogação/Anulação de multa ambiental",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "BIG SAFRA S/A"
+      ],
+      "numero_processo": "5001971-90.2024.8.24.0052   (PUN02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "48000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Procedimento Comum Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "8z8faukn7bAYsOZ9ISPv",
+    "data": {
+      "data_abertura": "2023-09-14 18:07:10",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Papanduva",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.396801+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação Mediante Desmatamento ou Exploração Econômica",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002168-94.2023.8.24.0047   (PPVUN01)",
+      "reus_sugestao": [
+        "ADILSO FOLMER"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Penal - Procedimento Sumário"
+    }
+  },
+  {
+    "id": "9Ea5plSZXEZXyY41mFil",
+    "data": {
+      "data_abertura": "2025-05-27 17:33:24",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.756722+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Flora",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003737-61.2025.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARIA PAULA FRIEDRICH"
+      ],
+      "valor_causa": "16200.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "9QMltoACyswBGB8Z7YCs",
+    "data": {
+      "data_abertura": "2025-01-24 14:02:40",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.992908+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001144-59.2025.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "AUGUSTO SCHIMITBERGER"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "RECURSO EM SENTIDO ESTRITO"
+    }
+  },
+  {
+    "id": "9vLNRdrUuwTIpH4ezBl2",
+    "data": {
+      "data_abertura": "2024-04-10 07:32:34",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.564854+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002297-64.2024.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "EDSON LUIS RAABE"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "9xt6eKY1nLZqaVUCF2ET",
+    "data": {
+      "data_abertura": "2022-10-29 21:51:01",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:27.319201+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Revogação/Concessão de Licença Ambiental",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "PLANEJA EMPREENDIMENTOS IMOBILIARIOS LTDA - ME"
+      ],
+      "numero_processo": "5007864-47.2022.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "Gerente - INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA - Canoinhas"
+      ],
+      "processo_pai": "",
+      "valor_causa": "1000.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "MANDADO DE SEGURANÇA",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "AaxLs9STARL8mwsc8CeC",
+    "data": {
+      "data_abertura": "2023-10-16 15:40:41",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.098399+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Indenização por dano moral",
+      "autores_sugestao": [
+        "WILLIAN CILAS TEIXEIRA DA SILVA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5008276-41.2023.8.24.0015   (CNI01CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "AUTO PRATENSE LTDA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "22000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "BJjVnZPV7kWrWb5mtzfp",
+    "data": {
+      "data_abertura": "2023-08-09 16:21:50",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.723487+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Destruição ou Degradação",
+      "autores_sugestao": [
+        "POLÍCIA MILITAR DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006545-10.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "DITER HERMANN MULLER"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "TERMO CIRCUNSTANCIADO",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "Blg0fitU1VvbK6P4grTq",
+    "data": {
+      "data_abertura": "2021-05-14 11:12:34",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.952028+00:00",
+      "assunto": "Crimes contra a Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003387-15.2021.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "ANTONIO ROBERTO DE OLIVEIRA"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Penal - Procedimento Sumário"
+    }
+  },
+  {
+    "id": "Bljteq9B2C0DVY7yFCIp",
+    "data": {
+      "data_abertura": "2023-04-14 13:11:25",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.652671+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003114-65.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "MARCELO NIEZELSKI"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "C5IXIKmkMKwfRtGHp1ty",
+    "data": {
+      "data_abertura": "2024-10-24 10:07:51",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Itaiópolis",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.168840+00:00",
+      "assunto": "Indenização por dano moral",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "ADRIANO BLASZKOSKI"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002005-28.2024.8.24.0032   (ILSUN01)",
+      "reus_sugestao": [
+        "GERMANO WOEHL JUNIOR"
+      ],
+      "processo_pai": "",
+      "valor_causa": "20000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL"
+    }
+  },
+  {
+    "id": "EbSLJOsqUQFjlXMZEwap",
+    "data": {
+      "data_abertura": "2024-04-05 17:32:57",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Guaramirim",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.312160+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Direito de imagem",
+      "autores_sugestao": [
+        "GERMANO WOEHL JUNIOR"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001851-28.2024.8.24.0026   (GMM0101)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JOSE ADILSON KOBICHEN"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "10000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Procedimento Comum Cível"
+    }
+  },
+  {
+    "id": "F6swicvojsOi1xYP2cX1",
+    "data": {
+      "data_abertura": "2023-08-14 18:18:03",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.243016+00:00",
+      "assunto": "Dano ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5006682-89.2023.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ANTONIO ROBERTO DE OLIVEIRA"
+      ],
+      "valor_causa": "1320.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "GjaBdxNUp7dqvygVw2nv",
+    "data": {
+      "data_abertura": "2025-01-24 14:04:45",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.574505+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5001145-44.2025.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "ANDRE DA SILVEIRA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "RECURSO EM SENTIDO ESTRITO"
+    }
+  },
+  {
+    "id": "Hate47EPoD6oxD0RJN83",
+    "data": {
+      "data_abertura": "2023-07-06 11:03:25",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.403434+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003892-54.2023.8.24.0041   (MFACR01)",
+      "reus_sugestao": [
+        "REFLORESTA EMPREENDIMENTOS LTDA - EPP"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "HuOa1FDRBUQJaX1ckENu",
+    "data": {
+      "data_abertura": "2024-06-11 13:08:58",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.063687+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003861-78.2024.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "GENEZIO KUBIACK"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "ICteOiJxyvQLgm96aSnv",
+    "data": {
+      "data_abertura": "2025-07-03 18:27:37",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Guaramirim",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.454712+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Indenização por Dano Moral (Direito Civil)",
+      "autores_sugestao": [
+        "ADRIANO BLASZKOSKI"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003918-29.2025.8.24.0026   (GMM0201)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "GERMANO WOEHL JUNIOR"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "20000.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL"
+    }
+  },
+  {
+    "id": "Izv0z0YQzbb0ANIDdTKP",
+    "data": {
+      "data_abertura": "2025-04-25 15:02:28",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.655213+00:00",
+      "assunto": "Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002920-94.2025.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "LUIS BENEDITO BITTENCOURT PACHECO DE MIRANDA"
+      ],
+      "valor_causa": "1599.29",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "KBEunSC8pPBIFlVOPasR",
+    "data": {
+      "data_abertura": "2024-10-15 14:05:26",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.232269+00:00",
+      "assunto": "Área de Preservação Permanente",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "ADEMAR STAWAS"
+      ],
+      "numero_processo": "5007339-94.2024.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "36263.93",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Embargos à Execução",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "KKRgXHnw0iGuxNnvOc9j",
+    "data": {
+      "data_abertura": "2025-07-15 18:59:23",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.564283+00:00",
+      "assunto": "Crimes contra o Ordenamento Urbano e o Patrimônio Cultural",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5004968-26.2025.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "MARCOS HIROAKI NAGANO"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumaríssimo",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "KSVGNgRSO9rtM5CxWR4I",
+    "data": {
+      "data_abertura": "2023-08-22 17:02:56",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.025208+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Ambiental",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006894-13.2023.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "FERNANDO FARIAN"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Civil Pública Cível"
+    }
+  },
+  {
+    "id": "KaNZ9PtpQh7QqLdovknd",
+    "data": {
+      "data_abertura": "2021-06-22 17:02:02",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": " Estadual - Execução Fiscal Estadual",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.171653+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Dívida Ativa (Execução Fiscal)",
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5004465-44.2021.8.24.0015   (FNSVEFE01)",
+      "reus_sugestao": [
+        "ADAO LUCACHINSKI NETO"
+      ],
+      "processo_pai": "",
+      "valor_causa": "95950.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "EXECUÇÃO FISCAL"
+    }
+  },
+  {
+    "id": "NL5Spz8d6tVcg3CNndxX",
+    "data": {
+      "data_abertura": "2025-08-27 18:00:25",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.931162+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006110-65.2025.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "PEDRO COLACO"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Penal - Procedimento Ordinário"
+    }
+  },
+  {
+    "id": "NsjysUQFba8qROEaHP5S",
+    "data": {
+      "data_abertura": "2023-10-19 12:31:11",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.335021+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Dano ambiental",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "VILA MULTISHOW LTDA"
+      ],
+      "numero_processo": "5008400-24.2023.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "37800.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Produção Antecipada da Prova",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "OVgOTEsrUCzkYpzoWg4I",
+    "data": {
+      "data_abertura": "2024-05-03 11:56:52",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.285556+00:00",
+      "assunto": "Violação de domicílio (Criminal)",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002931-60.2024.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JOSIEL MAIA MOREIRA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "TERMO CIRCUNSTANCIADO"
+    }
+  },
+  {
+    "id": "Ob9TOOPiL2ATSs1ZeN8A",
+    "data": {
+      "data_abertura": "2022-08-26 11:21:07",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Guaramirim",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.449293+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Crimes do Sistema Nacional de Armas",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5004658-89.2022.8.24.0026   (GMMUJC01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ADRIANO BLASZKOSKI"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "INQUÉRITO POLICIAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "Oet6wf5cPrWCp0bMydUV",
+    "data": {
+      "data_abertura": "2023-10-24 18:41:59",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.329334+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Atos Contrários à Fiscalização e ao Sistema de Aplicação da Lei",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5008587-32.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "EDIVAL DOBRYCHTOP"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "OshlUEriTait9RgenQIQ",
+    "data": {
+      "data_abertura": "2017-01-12 10:50:39",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.259325+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Cheque",
+      "clientes": [],
+      "autores_sugestao": [
+        "AFRIB-ABATEDOURO E FRIGORIFICO BIONDO LTDA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "0300014-62.2017.8.24.0068   (CNI01CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ROBERT ALVES ELIAS"
+      ],
+      "valor_causa": "11535.1",
+      "parte_contraria": [],
+      "atualizado_em": "2025-12-23T08:11:03.836815+00:00",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Procedimento Comum Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "PZjpMpHfmItBqnv68Syq",
+    "data": {
+      "data_abertura": "2025-07-07 16:15:01",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Papanduva",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.801245+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Outros Atos Contra o Meio Ambiente",
+      "autores_sugestao": [
+        "MINISTERIO PUBLICO DA UNIAO"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001271-95.2025.8.24.0047   (PPVUN01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "CARLOS AUGUSTO PAPES"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "PcEhqoykqg8MKwHRKUZ0",
+    "data": {
+      "data_abertura": "2023-08-09 16:02:37",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.902086+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "POLÍCIA MILITAR DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5004677-16.2023.8.24.0041   (MFACR01)",
+      "reus_sugestao": [
+        "RODRIGO BALBINOTTI"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "TERMO CIRCUNSTANCIADO",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "QWpz6ImfDSQvDLBhzkcd",
+    "data": {
+      "data_abertura": "2023-03-03 12:26:02",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.102592+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Acordo de Não Persecução Penal",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5001825-97.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "SAULO SUCHARA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum"
+    }
+  },
+  {
+    "id": "RBZ0Uk4DpaTLb10JNNWm",
+    "data": {
+      "data_abertura": "2024-01-17 00:28:16",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.087894+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Dano ambiental",
+      "clientes": [],
+      "autores_sugestao": [
+        "MATHEUS MAURO MELECHENCO"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000200-91.2024.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "valor_causa": "5000.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Produção Antecipada da Prova"
+    }
+  },
+  {
+    "id": "RNGXOMAxjm5K2gCi02T3",
+    "data": {
+      "data_abertura": "2025-11-19 15:18:48",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.033354+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Multas e demais Sanções",
+      "clientes": [],
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006402-69.2025.8.24.0041   (MFA02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "LUCIANE SCHMIDMEIER"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "50193.17",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "RwnXa2sdruom6mBqzefr",
+    "data": {
+      "data_abertura": "2023-05-12 13:57:08",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.793670+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002716-40.2023.8.24.0041   (MFACR01)",
+      "reus_sugestao": [
+        "CARLOS SCHMIDMEIER"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "SkPjOq1L4zE4D0z900aM",
+    "data": {
+      "data_abertura": "2023-01-12 15:43:56",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:27.393476+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000169-08.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "FLAVIO CAVALHEIRO"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "SypaIgHlphV73rqOPLwi",
+    "data": {
+      "data_abertura": "2024-10-22 12:38:36",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.506984+00:00",
+      "assunto": "Revogação/Anulação de multa ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "EDSON LUIS RAABE"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5007539-04.2024.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA"
+      ],
+      "valor_causa": "50017.5",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Procedimento Comum Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "T3TQSyojWO3xTkfUJlI1",
+    "data": {
+      "data_abertura": "2025-08-22 18:33:48",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.025148+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Acordo de Não Persecução Penal",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5005980-75.2025.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "ANDRE DA SILVEIRA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum"
+    }
+  },
+  {
+    "id": "T5c5dipsPcfJXsBIGpSG",
+    "data": {
+      "data_abertura": "2024-04-16 18:32:21",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.748535+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Destruição ou Degradação",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002495-04.2024.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "GENEZIO KUBIACK"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "TQdWocufzamADeAstP3d",
+    "data": {
+      "data_abertura": "2023-07-21 15:40:19",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.904413+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006117-28.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "CARLOS AUGUSTO PAPES"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "U8vvtF3IVmwrYP6IK3hi",
+    "data": {
+      "data_abertura": "2024-07-03 18:14:21",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.339256+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Flora",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5004560-69.2024.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "PEDRO VATRAZ"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "1412.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "UP6C9frqpOXyF96A0vkB",
+    "data": {
+      "data_abertura": "2023-08-09 16:15:58",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.968879+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA MILITAR DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5004680-68.2023.8.24.0041   (MFACR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "EDSON SCHECK"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "TERMO CIRCUNSTANCIADO"
+    }
+  },
+  {
+    "id": "Ub4u18n5jszUXELcwrqw",
+    "data": {
+      "data_abertura": "2025-04-07 12:59:42",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.579327+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Flora",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002478-31.2025.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "WALDIR JANTSCH"
+      ],
+      "processo_pai": "",
+      "valor_causa": "1518.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "WJ94RnGUOyG1Cu4u339R",
+    "data": {
+      "data_abertura": "2024-06-24 21:41:39",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Rio do Campo",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.409757+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000758-67.2024.8.24.0143   (RCPUN01)",
+      "reus_sugestao": [
+        "VALDECIR DALCANAL"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumário",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "WnYFi9ovNfKGmqGWLtPe",
+    "data": {
+      "data_abertura": "2023-02-17 17:12:06",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.447773+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001435-30.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "FLAVIO CAVALHEIRO"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "XHX25z0W6i7N2nbK8t94",
+    "data": {
+      "data_abertura": "2021-03-24 10:29:38",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.255376+00:00",
+      "assunto": "Crimes contra a Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002086-33.2021.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ALBERTO SCHOSTAK"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumário",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "XaGJ2gBN3IVKZ9svWMe2",
+    "data": {
+      "data_abertura": "2023-09-26 14:17:20",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.181368+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Acordo de Não Persecução Penal",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5007768-95.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "MATHEUS MAURO MELECHENCO"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "Y2tpR3BpBwaNj1HXkKp7",
+    "data": {
+      "data_abertura": "2023-07-07 17:34:04",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.839729+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Crimes contra o Meio Ambiente e o Patrimônio Genético",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5005751-86.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "RENATO JARDEL GURTINSKI"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "INQUÉRITO POLICIAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "YgnIa8vn3dsFistd8X1q",
+    "data": {
+      "data_abertura": "2025-07-22 18:25:24",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.697782+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Acordo de Não Persecução Penal",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003980-24.2025.8.24.0041   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "AUGUSTO SCHIMITBERGER"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "ZRlZjFZQmS9PF4x4FFwI",
+    "data": {
+      "data_abertura": "2025-04-08 10:39:46",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.044543+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Flora",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002499-07.2025.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "ELIEZER JANTSCH"
+      ],
+      "processo_pai": "",
+      "valor_causa": "1518.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "ZZRrs43iiQwaEJIzhBGf",
+    "data": {
+      "data_abertura": "2023-06-27 18:29:09",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:27.247603+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5005434-88.2023.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "CARLOS AUGUSTO PAPES"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "adOJkAM8pRqoMuaeCWtv",
+    "data": {
+      "data_abertura": "2023-09-29 11:33:08",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.591334+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Revogação/Concessão de Licença Ambiental",
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "BIG SAFRA S/A"
+      ],
+      "numero_processo": "5005704-34.2023.8.24.0041   (MFA02CV01)",
+      "reus_sugestao": [
+        "Gerente - INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA - Mafra"
+      ],
+      "processo_pai": "",
+      "valor_causa": "28500.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "MANDADO DE SEGURANÇA"
+    }
+  },
+  {
+    "id": "bG8HNfrOjfktzf4zoKCz",
+    "data": {
+      "data_abertura": "2023-05-11 11:20:23",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Rio Negrinho",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.018910+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001364-05.2023.8.24.0055   (RIN0201)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "SIEGRID SCHLUP"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Ação Penal - Procedimento Sumário"
+    }
+  },
+  {
+    "id": "bdH0FVv1q1h7r1o0YeJD",
+    "data": {
+      "data_abertura": "2025-10-01 17:32:44",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Porto União",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.484677+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Outros Atos Contra o Meio Ambiente",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003797-20.2025.8.24.0052   (PUNCR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "RICARDO JOSE TEIXEIRA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "bnS7Blfpe0YbSJbV07XH",
+    "data": {
+      "data_abertura": "2022-12-14 13:26:06",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.865051+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação Mediante Desmatamento ou Exploração Econômica",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5008988-65.2022.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARIA PAULA FRIEDRICH"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "dHFWss6aJEfGXaWuHcR9",
+    "data": {
+      "data_abertura": "2023-03-29 09:46:20",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:27.030536+00:00",
+      "assunto": "Dano ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002670-32.2023.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "NILSO BECKER"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Civil Pública Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "dLoxwNeCEQ2812r29Sk7",
+    "data": {
+      "data_abertura": "2019-08-13 14:23:20",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.111315+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Indenização por dano moral",
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "LENON GUSTAVO BATISTA TAQUES"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5001006-05.2019.8.24.0015   (CNI01CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JOSE LUIZ LACOWICZ"
+      ],
+      "valor_causa": "10000.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Procedimento Comum Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "efRS621R0PgiaaU7uhn2",
+    "data": {
+      "data_abertura": "2025-06-12 17:55:35",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": " Regional de Garantias - Criciúma",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.750803+00:00",
+      "assunto": "Maus Tratos",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003390-65.2025.8.24.0520   (VRG01CUA01)",
+      "reus_sugestao": [
+        "FABIANA NUNES DA ROSA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "PEDIDO DE BUSCA E APREENSÃO CRIMINAL"
+    }
+  },
+  {
+    "id": "fwOSjeXloN0fSGDB8GhL",
+    "data": {
+      "data_abertura": "2025-07-18 14:43:59",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Concórdia",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.406911+00:00",
+      "assunto": "Destruição ou Degradação Mediante Desmatamento ou Exploração Econômica",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006935-94.2025.8.24.0019   (CDACR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MÁRCIO FABIANO HELBING"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Representação Criminal/Notícia de Crime"
+    }
+  },
+  {
+    "id": "giQf8jDBgeimlWfDdtJG",
+    "data": {
+      "data_abertura": "2024-09-23 12:56:14",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.767394+00:00",
+      "assunto": "Acordo de Não Persecução Penal",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5006783-92.2024.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "MARCOS TODT"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "h7I5LyGpn63dOh3qCrzN",
+    "data": {
+      "data_abertura": "2024-04-05 17:59:54",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Guaramirim",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.943748+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Calúnia (Criminal)",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "GERMANO WOEHL JUNIOR"
+      ],
+      "numero_processo": "5001854-80.2024.8.24.0026   (GMMUJC01)",
+      "reus_sugestao": [
+        "JOSE ADILSON KOBICHEN"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Crimes de Calúnia, Injúria e Difamação de Competência do Juiz Singular",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "hmbH6V3Nl8WyJ9jwQfvP",
+    "data": {
+      "data_abertura": "2025-01-24 14:02:40",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": " Regional de Garantias - Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.356403+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5000503-71.2025.8.24.0015   (VRG01MFA01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "AUGUSTO SCHIMITBERGER"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Procedimento Investigatório Criminal (PIC-MP)"
+    }
+  },
+  {
+    "id": "i506XITLcZRvDA8EtnfU",
+    "data": {
+      "data_abertura": "2024-04-22 07:28:42",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.891689+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002623-24.2024.8.24.0015   (CNICR01)",
+      "reus_sugestao": [
+        "GENEZIO KUBIACK"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "iJJx09t1QltfbIcfJQzY",
+    "data": {
+      "data_abertura": "2025-07-18 16:39:08",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.637050+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Flora",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5003919-66.2025.8.24.0041   (MFA02CV01)",
+      "reus_sugestao": [
+        "WALDIR JANTSCH"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "k5qdj0PHeSnjT6G5mzIv",
+    "data": {
+      "data_abertura": "2024-09-11 13:07:46",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Curitibanos",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.705248+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Pena de Multa",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5020293-54.2024.8.24.0022   (CBS01PM01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "LUIS BENEDITO BITTENCOURT PACHECO DE MIRANDA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "488.17",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Execução de Pena de Multa"
+    }
+  },
+  {
+    "id": "kT5xZOgsrLAorsznEPA5",
+    "data": {
+      "data_abertura": "2018-10-04 09:19:44",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": " Estadual - Execução Fiscal Estadual",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.568606+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Dívida Ativa (Execução Fiscal)",
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "0900172-96.2018.8.24.0015   (FNSVEFE01)",
+      "reus_sugestao": [
+        "ADIR PEREIRA DA ROCHA"
+      ],
+      "processo_pai": "",
+      "valor_causa": "164280.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "EXECUÇÃO FISCAL"
+    }
+  },
+  {
+    "id": "lrXw9EDJSeuQ1o2ZeDYk",
+    "data": {
+      "data_abertura": "2024-10-24 09:26:54",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Itaiópolis",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.495539+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Indenização por dano moral",
+      "autores_sugestao": [
+        "JOSE ADILSON KOBICHEN"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002004-43.2024.8.24.0032   (ILSUN01)",
+      "reus_sugestao": [
+        "GERMANO WOEHL JUNIOR"
+      ],
+      "processo_pai": "",
+      "valor_causa": "20000.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "PROCEDIMENTO DO JUIZADO ESPECIAL CÍVEL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "lziomyx4J7zsXFrzF82o",
+    "data": {
+      "data_abertura": "2025-01-24 14:04:45",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": " Regional de Garantias - Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.094033+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Destruição ou Degradação",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000504-56.2025.8.24.0015   (VRG01MFA01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ANDRE DA SILVEIRA"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "m7wtsgHqZSyqMecD1YIx",
+    "data": {
+      "data_abertura": "2023-02-02 17:59:49",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.573878+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5000896-64.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARCOS TODT"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "mDYQACZw3q66Qfs9GW4J",
+    "data": {
+      "data_abertura": "2022-01-27 15:53:03",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Rio Negrinho",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.186578+00:00",
+      "assunto": "Crimes contra o Meio Ambiente e o Patrimônio Genético",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5000194-32.2022.8.24.0055   (RIN0201)",
+      "reus_sugestao": [
+        "JHONNY SCHMIDMEIER"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "INQUÉRITO POLICIAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "nATNCGcXL93bb1uw7zS6",
+    "data": {
+      "data_abertura": "2021-12-17 16:54:54",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.867049+00:00",
+      "assunto": "Da Poluição",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5009586-53.2021.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "LUIS BENEDITO BITTENCOURT PACHECO DE MIRANDA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumário",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "nCW30QpCewJP2GmnfW72",
+    "data": {
+      "data_abertura": "2023-02-03 14:04:22",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "São Bento do Sul",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.378303+00:00",
+      "assunto": "Acordo de Não Persecução Penal",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5000834-89.2023.8.24.0058   (SBS0301)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "CRCO INCORPORADORA LTDA"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "Execução de Acordo de Não Persecução Penal - Juízo Comum",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "nff3KJiYHabXri3kfXLu",
+    "data": {
+      "data_abertura": "2018-08-02 09:20:17",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": " Estadual - Execução Fiscal Estadual",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.876255+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Dívida Ativa (Execução Fiscal)",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "0900097-57.2018.8.24.0015   (FNSVEFE01)",
+      "reus_sugestao": [
+        "WALDIR JANTSCH"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "162648.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "EXECUÇÃO FISCAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "oduLM1mb0ovoTLqrWAeR",
+    "data": {
+      "data_abertura": "2019-11-05 17:28:11",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": " Estadual - Execução Fiscal Estadual",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.115977+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Multas e demais Sanções",
+      "autores_sugestao": [
+        "ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002945-20.2019.8.24.0015   (FNSVEFE01)",
+      "reus_sugestao": [
+        "JOAO VARLEI NEVES"
+      ],
+      "processo_pai": "",
+      "valor_causa": "30906.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "EXECUÇÃO FISCAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "ojsxyi8bTMo8Ulz72gaD",
+    "data": {
+      "data_abertura": "2022-07-13 17:58:08",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Porto União",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:22.722610+00:00",
+      "assunto": "Crimes contra o Ordenamento Urbano e o Patrimônio Cultural",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA MILITAR DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003105-26.2022.8.24.0052   (PUNCR01)",
+      "reus_sugestao": [
+        "RICARDO JOSE TEIXEIRA"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "TERMO CIRCUNSTANCIADO"
+    }
+  },
+  {
+    "id": "owoQudSUcCOnl8buFOf0",
+    "data": {
+      "data_abertura": "2025-08-18 18:22:20",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Porto União",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.594216+00:00",
+      "assunto": "Revogação/Anulação de multa ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003148-55.2025.8.24.0052   (PUN02CV01)",
+      "reus_sugestao": [
+        "BIG SAFRA S/A"
+      ],
+      "processo_pai": "",
+      "valor_causa": "8854.53",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "rP8dQwCOma1JnEIyRYZ6",
+    "data": {
+      "data_abertura": "2024-04-05 08:33:31",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.727377+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Crimes contra o Ordenamento Urbano e o Patrimônio Cultural",
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002158-15.2024.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARCOS HIROAKI NAGANO"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "rziqzZOzkQgQTCib3dvb",
+    "data": {
+      "data_abertura": "2021-11-25 14:20:32",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.308615+00:00",
+      "assunto": "Dano ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5008881-55.2021.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JOAO ARILDO BALAO"
+      ],
+      "valor_causa": "5000.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Civil Pública Cível",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "udyPSMOXKPX0aaC5IGei",
+    "data": {
+      "data_abertura": "2022-06-14 13:19:26",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Mafra",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:25.652277+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Poluição",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5003038-94.2022.8.24.0041   (MFA02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "BIG SAFRA S/A"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "EXECUÇÃO DE TÍTULO EXTRAJUDICIAL",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "uwAk0VvAUftZXAiiVtRr",
+    "data": {
+      "data_abertura": "2022-12-06 18:43:54",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.522812+00:00",
+      "assunto": "Destruição ou Degradação",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5008779-96.2022.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "PEDRO COLACO"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "uyTpdKwhLvivmrm4INdF",
+    "data": {
+      "data_abertura": "2025-08-01 18:10:01",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:24.207798+00:00",
+      "assunto": "Falsidade ideológica",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA FEDERAL/SC"
+      ],
+      "numero_processo": "5005436-87.2025.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "A APURAR"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "INQUÉRITO POLICIAL"
+    }
+  },
+  {
+    "id": "vzTv81rFHmpt6QvERgok",
+    "data": {
+      "data_abertura": "2023-10-24 18:35:57",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.252027+00:00",
+      "assunto": "Dano ambiental",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "clientes": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5008581-25.2023.8.24.0015   (CNI02CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "MARIA TRINDADE NEVES"
+      ],
+      "valor_causa": "1320.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  },
+  {
+    "id": "w91Q4geqUZ8KZfp6Zbfh",
+    "data": {
+      "data_abertura": "2023-01-11 17:05:14",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Itaiópolis",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:23.622269+00:00",
+      "casos_vinculados": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "assunto": "Destruição ou Degradação Mediante Desmatamento ou Exploração Econômica",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5000025-80.2023.8.24.0032   (ILSUN01)",
+      "reus_sugestao": [
+        "CARLOS SCHMIDMEIER"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "Ação Penal - Procedimento Sumaríssimo",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "wMQJLX1wlIUBHkzCUyhB",
+    "data": {
+      "data_abertura": "2025-09-19 12:04:55",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:20.190212+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Indenização por dano moral",
+      "autores_sugestao": [
+        "LENON GUSTAVO BATISTA TAQUES\nVICTOR ROGERIO PEREIRA KARPEN"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5006746-31.2025.8.24.0015   (CNI01CV01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "JOSE LUIZ LACOWICZ"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "35606.67",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "wlCxRhwmux83ZmW8gl8d",
+    "data": {
+      "data_abertura": "2023-06-27 17:12:28",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.819822+00:00",
+      "assunto": "Estabelecimentos, Obras ou Serviços Potencialmente Poluidores",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5005422-74.2023.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "CLEBER FRIDRICH"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "classe_processo": "CRIMES AMBIENTAIS",
+      "status_migracao": "pendente"
+    }
+  },
+  {
+    "id": "xLnd0gAAAIbfPJrCHUiZ",
+    "data": {
+      "data_abertura": "2024-10-11 13:15:28",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:19.946232+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "casos_vinculados": [],
+      "assunto": "Dano Ambiental",
+      "link_eproc": "",
+      "autores_sugestao": [
+        "EDSON LUIS RAABE"
+      ],
+      "numero_processo": "5007275-84.2024.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "INSTITUTO DO MEIO AMBIENTE DE SANTA CATARINA"
+      ],
+      "processo_pai": "",
+      "parte_contraria": [],
+      "valor_causa": "50017.5",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Produção Antecipada da Prova"
+    }
+  },
+  {
+    "id": "yOUzujYjEPNmKfrck3s7",
+    "data": {
+      "data_abertura": "2020-04-29 15:47:01",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "São Bento do Sul",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.239754+00:00",
+      "assunto": "Crimes contra a Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002714-24.2020.8.24.0058   (SBS0301)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "RENAN CARVALHO DE OLIVEIRA"
+      ],
+      "parte_contraria": [],
+      "valor_causa": "0.0",
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "Representação Criminal/Notícia de Crime"
+    }
+  },
+  {
+    "id": "ylPmo8NRA53e84UIlEw4",
+    "data": {
+      "data_abertura": "2025-08-29 18:48:51",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Rio Negrinho",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:18.229773+00:00",
+      "assunto": "Crimes contra a Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002318-80.2025.8.24.0055   (RIN0201)",
+      "reus_sugestao": [
+        "JHONNY SCHMIDMEIER"
+      ],
+      "processo_pai": "",
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CRIMES AMBIENTAIS"
+    }
+  },
+  {
+    "id": "yoVd5ATgZ45owJwzW9Yr",
+    "data": {
+      "data_abertura": "2024-04-11 11:09:17",
+      "responsavel": "Lenon Taques",
+      "titulo_processo": "",
+      "nucleo": "",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:26.663066+00:00",
+      "clientes": [],
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "assunto": "Dano (Criminal)",
+      "casos_vinculados": [],
+      "link_eproc": "",
+      "autores_sugestao": [
+        "POLÍCIA CIVIL DO ESTADO DE SANTA CATARINA"
+      ],
+      "numero_processo": "5002338-31.2024.8.24.0015   (CNICR01)",
+      "processo_pai": "",
+      "reus_sugestao": [
+        "ANDREA GEOVANA PADILHA HOFFMANN"
+      ],
+      "valor_causa": "0.0",
+      "parte_contraria": [],
+      "prioridade": "P4",
+      "outros_envolvidos": [],
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "TERMO CIRCUNSTANCIADO"
+    }
+  },
+  {
+    "id": "yrWgoFwohp8gndlrfwac",
+    "data": {
+      "data_abertura": "2025-04-08 09:43:06",
+      "nucleo": "",
+      "titulo_processo": "",
+      "responsavel": "Lenon Taques",
+      "localidade_judicial": "Canoinhas",
+      "sistema_processual": "eproc - TJSC - 1ª instância",
+      "data_importacao": "2025-12-19T21:50:21.971552+00:00",
+      "assunto": "Flora",
+      "area_direito": "",
+      "tipo_processo": "Judicial",
+      "clientes": [],
+      "casos_vinculados": [],
+      "autores_sugestao": [
+        "MINISTÉRIO PÚBLICO DO ESTADO DE SANTA CATARINA"
+      ],
+      "link_eproc": "",
+      "numero_processo": "5002496-52.2025.8.24.0015   (CNI02CV01)",
+      "reus_sugestao": [
+        "SILMAR VOREL"
+      ],
+      "processo_pai": "",
+      "valor_causa": "1518.0",
+      "parte_contraria": [],
+      "outros_envolvidos": [],
+      "prioridade": "P4",
+      "estado": "Santa Catarina",
+      "status_migracao": "pendente",
+      "classe_processo": "CUMPRIMENTO DE SENTENÇA"
+    }
+  }
+]

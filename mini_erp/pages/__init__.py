@@ -25,6 +25,7 @@ from . import prazos
 
 # Módulo de desenvolvedor (painel de ferramentas)
 from .dev import dev
+from .developer import developer_page
 
 # Módulo de parceria DF/Taques (novo workspace)
 from . import parceria_df_taques

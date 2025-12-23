@@ -124,90 +124,66 @@ def obter_todos_usuarios() -> List[Dict[str, Any]]:
             print(f"Erro ao buscar usuarios_sistema: {e}")
         
         # Lista todos os usuários do Firebase Auth
+        # CORREÇÃO: Adicionar tratamento robusto para evitar crash do gRPC
+        # Usar apenas usuarios_sistema para evitar problemas de threading com Firebase Auth
         try:
-            page = admin_auth.list_users()
-            
-            while page:
-                for firebase_user in page.users:
-                    uid = firebase_user.uid
-                    email = firebase_user.email or ''
+            # Em vez de usar admin_auth.list_users() que pode causar crash,
+            # vamos usar apenas usuarios_sistema que já temos em memória
+            for firebase_uid, usuario_sistema in usuarios_sistema_map.items():
+                try:
+                    # Tenta obter dados do Firebase Auth apenas se necessário
+                    # Mas com tratamento de erro para evitar crash
+                    try:
+                        firebase_user = admin_auth.get_user(firebase_uid)
+                        email = firebase_user.email or ''
+                        disabled = firebase_user.disabled
+                    except Exception:
+                        # Se falhar, usa dados de usuarios_sistema
+                        email = usuario_sistema.get('email', '')
+                        disabled = False
                     
                     # Inicializa dados do usuário
                     usuario_info = {
-                        'firebase_uid': uid,
+                        'firebase_uid': firebase_uid,
                         'email': email,
-                        'status': 'Desativado' if firebase_user.disabled else 'Ativo',
-                        'vinculado': False,
+                        'status': 'Desativado' if disabled else 'Ativo',
+                        'vinculado': True,
                         'workspaces': [],
                         'nivel_acesso': 'Usuário',
                         'ultimo_login': '-',
                         'sem_firebase': False
                     }
                     
-                    # Nome completo: display_name > custom_claims > email
-                    if firebase_user.display_name:
-                        usuario_info['nome_completo'] = firebase_user.display_name
-                    else:
-                        custom_claims = firebase_user.custom_claims or {}
-                        display_name = custom_claims.get('display_name')
-                        if display_name:
-                            usuario_info['nome_completo'] = display_name
-                        else:
-                            # Fallback: parte do email antes do @
-                            usuario_info['nome_completo'] = email.split('@')[0] if email else 'Sem nome'
+                    # Nome completo
+                    nome_completo = usuario_sistema.get('nome_completo') or email.split('@')[0] if email else 'Sem nome'
+                    usuario_info['nome_completo'] = nome_completo
                     
-                    # Último login
-                    if firebase_user.user_metadata and firebase_user.user_metadata.last_sign_in_timestamp:
-                        timestamp_ms = firebase_user.user_metadata.last_sign_in_timestamp
-                        dt = datetime.fromtimestamp(timestamp_ms / 1000)
-                        usuario_info['ultimo_login'] = dt.strftime('%d/%m/%Y %H:%M')
+                    # Workspaces
+                    workspaces_colecao = usuario_sistema.get('workspaces', [])
+                    for ws_id in workspaces_colecao:
+                        nome_workspace = MAPEAMENTO_WORKSPACES_NOMES.get(ws_id)
+                        if nome_workspace:
+                            usuario_info['workspaces'].append(nome_workspace)
                     
-                    # Busca dados complementares em usuarios_sistema
-                    custom_claims = firebase_user.custom_claims or {}
-                    
-                    if uid in usuarios_sistema_map:
-                        usuario_sistema = usuarios_sistema_map[uid]
-                        usuario_info['vinculado'] = True
-                        
-                        # Workspaces
-                        workspaces_colecao = usuario_sistema.get('workspaces', [])
-                        for ws_id in workspaces_colecao:
-                            nome_workspace = MAPEAMENTO_WORKSPACES_NOMES.get(ws_id)
-                            if nome_workspace:
-                                usuario_info['workspaces'].append(nome_workspace)
-                        
-                        # Se não tem workspaces, marca como não vinculado
-                        if not usuario_info['workspaces']:
-                            usuario_info['workspaces'] = ['Não vinculado']
-                        
-                        # Nível de acesso: usa nivel_display de usuarios_sistema se existir
-                        nivel_display = usuario_sistema.get('nivel_display')
-                        if nivel_display:
-                            usuario_info['nivel_acesso'] = nivel_display
-                        else:
-                            # Fallback baseado em custom_claims
-                            usuario_info['nivel_acesso'] = _determinar_nivel_acesso_fallback(custom_claims)
-                    else:
-                        # Usuário do Firebase Auth sem registro em usuarios_sistema
+                    if not usuario_info['workspaces']:
                         usuario_info['workspaces'] = ['Não vinculado']
-                        # Fallback baseado em custom_claims
-                        usuario_info['nivel_acesso'] = _determinar_nivel_acesso_fallback(custom_claims)
+                    
+                    # Nível de acesso
+                    nivel_display = usuario_sistema.get('nivel_display')
+                    if nivel_display:
+                        usuario_info['nivel_acesso'] = nivel_display
+                    else:
+                        usuario_info['nivel_acesso'] = 'Administrador' if 'visao_geral' in workspaces_colecao else 'Usuário'
                     
                     usuarios.append(usuario_info)
-                    usuarios_por_uid[uid] = usuario_info
-                
-                # Próxima página
-                try:
-                    page = page.get_next_page()
-                except StopIteration:
-                    break
-                except Exception:
-                    break
+                except Exception as e:
+                    # Ignora erros individuais para não quebrar toda a lista
+                    continue
                     
         except Exception as e:
-            print(f"Erro ao listar usuários do Firebase Auth: {e}")
-            import traceback
-            traceback.print_exc()
+            # Se houver erro crítico, apenas loga sem quebrar
+            import logging
+            logging.error(f"Erro ao processar usuários: {e}", exc_info=True)
         
         # ============================================================
         # ETAPA 2: Adicionar usuários órfãos (só em usuarios_sistema)
