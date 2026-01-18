@@ -224,22 +224,39 @@ def buscar_clientes_para_select() -> Dict[str, str]:
     Busca clientes para popular select.
     Busca da coleção vg_pessoas (módulo Pessoas de Visão Geral).
     
+    CORREÇÃO: Muitas pessoas não têm o campo 'categoria' definido (importadas via migração).
+    Agora busca TODAS as pessoas, pois o filtro por categoria estava ocultando clientes válidos.
+    
     Returns:
-        Dicionário {id: nome_cliente}
+        Dicionário {id: nome_cliente} ordenado alfabeticamente
     """
     try:
         db = get_db()
-        docs = db.collection('vg_pessoas').where('categoria', '==', 'cliente').stream()
+        
+        # Buscar TODAS as pessoas (não filtrar por categoria)
+        # Muitas pessoas válidas não têm o campo categoria definido
+        docs = db.collection('vg_pessoas').stream()
         
         resultado = {}
         for doc in docs:
-            cliente = doc.to_dict()
-            cliente_id = doc.id
+            pessoa = doc.to_dict()
+            pessoa_id = doc.id
+            
             # Prioriza nome_exibicao, depois full_name, depois nome
-            nome = cliente.get('nome_exibicao') or cliente.get('full_name') or cliente.get('nome') or cliente_id
-            resultado[cliente_id] = nome
+            nome = pessoa.get('nome_exibicao') or pessoa.get('full_name') or pessoa.get('nome')
+            
+            # Só adiciona se tiver nome válido
+            if nome and nome.strip():
+                resultado[pessoa_id] = nome.strip()
+        
+        # Ordenar por nome (case-insensitive)
+        resultado = dict(sorted(resultado.items(), key=lambda x: x[1].lower()))
+        
+        print(f"[INFO] Clientes carregados: {len(resultado)} pessoa(s)")
         
         return resultado
     except Exception as e:
         print(f"[ERROR] Erro ao buscar clientes: {e}")
+        import traceback
+        traceback.print_exc()
         return {}
