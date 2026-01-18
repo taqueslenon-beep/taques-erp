@@ -23,6 +23,9 @@ from . import visao_geral
 # Módulo de prazos (placeholder em desenvolvimento)
 from . import prazos
 
+# Módulo de audiências
+from . import audiencias
+
 # Módulo de desenvolvedor (painel de ferramentas)
 from .dev import dev
 from .developer import developer_page

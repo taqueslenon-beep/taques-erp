@@ -1,3 +1,186 @@
+## [v1.14.0] - 2026-01-18
+
+### Adicionado
+
+- **Sistema de Filtros Hierárquicos no Módulo de Prazos**
+  - Filtros de status com seleção múltipla: Pendentes, Aguardando, Atrasados, Concluídos
+  - Novo filtro "Atrasados" para prazos vencidos
+  - Por padrão, Pendentes + Aguardando + Atrasados já vêm selecionados
+  - Filtros funcionais: Status, Temporal (Semana/Mês), Tipo (Simples/Recorrente/Parcelado), Responsável
+
+### Corrigido
+
+- **Filtro "Parcelado"** agora detecta corretamente todas as parcelas usando `_prazo_e_parcela()`
+- **Escopo de variáveis** corrigido para `filtros_ativos` e `renderizar_conteudo_ref_global`
+- **@ui.refreshable** agora funciona corretamente sem dependência de `conteudo_container`
+
+### Modificado
+
+- **Visual dos botões de filtro**: 
+  - Selecionado: Fundo verde escuro (#223631) com texto branco
+  - Não selecionado: Apenas borda (outline) com texto verde
+  - Atrasados selecionado: Fundo vermelho (#C62828) com texto branco
+- Movidas variáveis `filtros_ativos` e `aplicar_filtros_combinados` para escopo global da função `prazos()`
+
+---
+
+## [v1.13.0] - 2025-12-23
+
+### Adicionado
+
+- **Sistema de Validação e Cadastro em Massa de Pessoas (Migração EPROC)**
+  - Novo módulo: `validacao_pessoas_migracao.py`
+  - Botão "VALIDAR PESSOAS" na barra de informações da aba Gilberto
+  - Modal completo com fluxo de validação:
+    - Compara pessoas do EPROC (autores/réus) com cadastros no Firebase
+    - Identifica pessoas já cadastradas, não cadastradas e possíveis duplicatas
+    - Usa algoritmo de similaridade de strings (SequenceMatcher) com limiar de 90%
+  - Funcionalidades de seleção:
+    - Tabela com checkbox individual e mestre (selecionar todos)
+    - Filtro por tipo (PF/PJ) e busca por nome
+    - Contador de pessoas selecionadas
+  - Cadastro em massa:
+    - Usa batch write do Firebase (até 500 pessoas por lote)
+    - Feedback visual com spinner durante processamento
+    - Confirmação antes do cadastro
+    - Log de operações no Firestore (`logs_migracao`)
+  - Seção de "Possíveis Duplicatas" para revisão manual
+
+### Funções implementadas:
+
+- `normalizar_texto()`: Remove acentos, pontuação, lowercase
+- `extrair_cpf_cnpj_do_nome()`: Extrai documento do final do nome
+- `identificar_tipo_pessoa()`: Detecta PF vs PJ pelo nome
+- `calcular_similaridade()`: Compara strings com SequenceMatcher
+- `buscar_pessoas_cadastradas()`: Busca em 'people', 'vg_pessoas', 'vg_envolvidos'
+- `extrair_pessoas_eproc()`: Extrai autores e réus dos 62 processos Gilberto
+- `comparar_pessoas()`: Classifica em cadastradas/não cadastradas/duplicatas
+- `cadastrar_pessoas_em_massa()`: Batch write otimizado
+- `abrir_modal_validacao_pessoas()`: Interface NiceGUI completa
+
+---
+
+## [v1.12.0] - 2025-12-23
+
+### Modificado
+
+- **Layout Otimizado da Tela de Migração EPROC**: Reorganização completa para melhor aproveitamento de espaço
+  - **Antes**: Sidebar lateral (1/4) + Tabela (3/4) = desperdício de espaço horizontal
+  - **Depois**: Barra horizontal de informações + Tabela full width (100%)
+  - **Barra de informações horizontal** com 3 áreas lado a lado:
+    - Badge de processos carregados (verde, com ícone check)
+    - Progresso da migração: "X de Y" + barra de progresso + porcentagem
+    - Filtro dropdown + Botão "FINALIZAR"
+  - **Tabela de processos** agora ocupa 100% da largura disponível
+  - **Responsivo**: Em mobile, barra empilha verticalmente
+  - Aplicado em ambas as abas: Lenon e Gilberto
+  - CSS otimizado com classes reutilizáveis
+
+### Técnico
+
+- Removida classe `.migracao-sidebar` (sidebar lateral eliminada)
+- Adicionadas classes: `.barra-info-migracao`, `.tabela-migracao-fullwidth`, `.barra-info-item`
+- Media query para responsividade em telas < 768px
+- Funções refreshable mantidas para atualização em tempo real
+
+---
+
+## [v1.11.0] - 2025-12-23
+
+### Adicionado
+
+- **Filtro de Prioridade na Tela de Processos (Visão Geral)**: Novo dropdown para filtrar processos por nível de prioridade
+  - **Localização**: Rota `/visao-geral/processos`, ao lado dos filtros de Área e Status
+  - **Opções do filtro**: "Todas", "P1 - Urgente", "P2 - Alta", "P3 - Média", "P4 - Baixa"
+  - **Funcionalidade**: Filtragem em tempo real, combinável com outros filtros (cumulativos)
+  - **Visual**: Mesmo padrão dos filtros existentes (clearable, outlined, responsivo)
+  - **Botão Limpar**: Reseta também o filtro de prioridade
+  - **Integração Firestore**: Filtro aplicado diretamente na query (otimizado)
+
+### Modificado
+
+- **constants.py**: Adicionadas constantes `PRIORIDADES_PROCESSO`, `PRIORIDADE_LABELS`, `PRIORIDADE_CORES`
+- **filtros.py**: Novo componente de filtro de prioridade com labels amigáveis
+- **database.py**: Query Firestore agora suporta filtro por campo `prioridade`
+- **main.py**: Estado dos filtros inclui `prioridade: None`
+
+### Técnico
+
+- Campo `prioridade` já existia no modelo `Processo` (valores: P1, P2, P3, P4, default: P4)
+- Badge de prioridade já aparece ao lado do título do processo na tabela
+- Filtro usa `emit-value map-options` para exibir labels mas armazenar códigos
+
+---
+
+## [v1.10.2] - 2025-12-23
+
+### Corrigido
+
+- **Bug de Carregamento Infinito na Página de Processos**: Corrigido erro que deixava a página presa em "Carregando processos..."
+  - Problema: Loading nunca era desativado quando ocorria exceção antes/durante renderização
+  - Solução: Função `hide_loading()` robusta que é chamada em múltiplos pontos
+  - Adicionado tratamento de erros em cascata (barra de pesquisa → filtros → tabela)
+  - Logs de debug: `[PROCESSOS] Buscando processos do Firestore...`
+  - Botão "Tentar novamente" exibido em caso de erro para retry manual
+  - Loading é escondido GARANTIDAMENTE mesmo em caso de exceção
+
+---
+
+## [v1.10.1] - 2025-12-23
+
+### Adicionado
+
+- **62 Processos do Gilberto na Migração EPROC**: Inseridos dados hardcoded diretamente no código
+  - Lista `PROCESSOS_GILBERTO` com 62 processos completos (número, data, autores, réus)
+  - Função `popular_processos_gilberto()` que insere automaticamente no Firestore
+  - Verifica duplicatas antes de inserir (evita processos repetidos)
+  - Dados pré-carregados automaticamente ao abrir a aba Gilberto
+  - Botão "IMPORTAR PLANILHA" substituído por indicador "62 PROCESSOS CARREGADOS"
+  - CRUD completo: editar, excluir, mudar status (Pendente ↔ Migrado)
+  - Mesma estrutura da aba Lenon: tabela, filtros, progresso
+
+### Modificado
+
+- **migracao_service.py**:
+
+  - Nova constante `PROCESSOS_GILBERTO` com 62 processos hardcoded
+  - Nova função `popular_processos_gilberto()` para inserção automática
+
+- **admin_migracao_processos.py**:
+  - Import da função `popular_processos_gilberto`
+  - Interface da aba Gilberto modificada para carregar dados automaticamente
+  - Placeholder atualizado para quando todos processos forem migrados
+
+---
+
+## [v1.10.0] - 2025-12-23
+
+### Adicionado
+
+- **Sistema de Sub-abas na Migração EPROC**: Implementado sistema de abas para separar processos por origem/responsável
+
+  - Nova estrutura com duas abas: "EPROC - TJSC - 1ª instância - Lenon" e "EPROC - TJSC - 1ª instância - Gilberto"
+  - Aba Lenon: mantém toda funcionalidade existente (106 processos, tabela, filtros, botões)
+  - Aba Gilberto: nova interface pronta para importar planilha separada
+  - Campo discriminador `origem` adicionado aos documentos do Firestore
+  - Compatibilidade com dados antigos (sem campo origem = tratados como Lenon)
+
+- **Separação de Planilhas por Responsável**:
+  - Cada aba importa sua própria planilha (`relatorio-processos-2025-lenon.xls` e `relatorio-processos-gilberto-eproc-1-instancia.xls`)
+  - Estatísticas calculadas separadamente por origem
+  - Filtros e progresso independentes por aba
+  - Responsável atribuído automaticamente baseado na origem
+
+### Modificado
+
+- **migracao_service.py**: Todas as funções agora aceitam parâmetro `origem`:
+  - `importar_planilha_migracao(origem='lenon')` - importa planilha correta
+  - `obter_estatisticas_migracao(origem='lenon')` - estatísticas filtradas
+  - `listar_processos_migracao(status, origem='lenon')` - lista filtrada
+  - `finalizar_migracao_completa(origem='lenon')` - finalização por origem
+
+---
+
 ## [v1.9.0] - 2025-12-23
 
 ### Adicionado

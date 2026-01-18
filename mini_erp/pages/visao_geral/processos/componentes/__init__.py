@@ -11,3 +11,8 @@ __all__ = ['render_badge_status', 'render_badge_area']
 
 
 
+
+
+
+
+

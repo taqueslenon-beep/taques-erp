@@ -110,6 +110,55 @@ def verificar_prazo_atrasado(timestamp: Any, status: str) -> bool:
         return False
 
 
+def ordenar_prazos_prioridade(prazos_lista: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Ordena prazos por prioridade:
+    1. Prazos atrasados (vermelho) - no topo
+    2. Prazos "aguardando abertura" (rosa) - em segundo
+    3. Prazos normais (resto) - depois
+
+    Args:
+        prazos_lista: Lista de dicionários com prazos
+
+    Returns:
+        Lista ordenada de prazos
+    """
+    from datetime import datetime
+    
+    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    def obter_prioridade_ordenacao(prazo: Dict[str, Any]) -> Tuple[int, float]:
+        """
+        Retorna tupla (prioridade, timestamp) para ordenação.
+        Prioridade menor = aparece primeiro.
+        """
+        status = prazo.get('status', 'pendente').lower()
+        estado_abertura = prazo.get('estado_abertura', 'aberto')
+        prazo_fatal_ts = prazo.get('prazo_fatal')
+        
+        # 1. Prazos atrasados (prioridade 1)
+        if status == 'pendente' and prazo_fatal_ts:
+            try:
+                if isinstance(prazo_fatal_ts, (int, float)):
+                    data_fatal = datetime.fromtimestamp(prazo_fatal_ts)
+                    if data_fatal < hoje:
+                        return (1, prazo_fatal_ts or 0)  # Mais antigo primeiro
+            except Exception:
+                pass
+        
+        # 2. Prazos "aguardando abertura" (prioridade 2)
+        if estado_abertura == 'aguardando_abertura':
+            return (2, prazo_fatal_ts or 0)
+        
+        # 3. Prazos normais (prioridade 3)
+        return (3, prazo_fatal_ts or 0)
+    
+    # Ordenar usando a função de prioridade
+    prazos_ordenados = sorted(prazos_lista, key=obter_prioridade_ordenacao)
+    
+    return prazos_ordenados
+
+
 def formatar_titulo_prazo(prazo: Dict[str, Any]) -> str:
     """
     Formata o título do prazo, adicionando:
@@ -562,6 +611,28 @@ def prazos():
     # CSS para cores alternadas e prazos atrasados
     ui.add_head_html('''
     <style>
+        /* Container responsivo centralizado */
+        .container-prazos {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+        
+        /* Wrapper da tabela com scroll horizontal */
+        .tabela-prazos-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Tabela com largura mínima para garantir todas colunas */
+        .tabela-prazos {
+            min-width: 1000px;
+            width: 100%;
+            table-layout: auto;
+        }
+        
         /* Cores alternadas nas linhas */
         .tabela-prazos tbody tr:nth-child(even) {
             background-color: #ffffff !important;
@@ -591,6 +662,7 @@ def prazos():
             padding: 4px 8px !important;
             border-radius: 4px !important;
             display: inline-block;
+            white-space: nowrap;
         }
         
         .celula-prazo-fatal {
@@ -598,6 +670,70 @@ def prazos():
             padding: 4px 8px !important;
             border-radius: 4px !important;
             display: inline-block;
+            white-space: nowrap;
+        }
+        
+        /* Ajustes responsivos para telas menores */
+        @media (max-width: 1200px) {
+            .tabela-prazos {
+                min-width: 900px;
+            }
+        }
+        
+        /* Garantir que células não quebrem linha */
+        .tabela-prazos td {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        
+        /* Título pode quebrar linha e expande para preencher espaço */
+        .tabela-prazos td:nth-child(2) {
+            white-space: normal;
+            word-break: break-word;
+        }
+        
+        /* Clientes também pode quebrar se necessário */
+        .tabela-prazos td:nth-child(4) {
+            white-space: normal;
+            word-break: break-word;
+            max-width: 180px;
+        }
+        
+        /* Estilos para filtros hierárquicos */
+        .filtros-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .grupo-filtros {
+            margin-bottom: 16px;
+        }
+        
+        .grupo-filtros:last-child {
+            margin-bottom: 0;
+        }
+        
+        .grupo-filtros-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .filtro-btn {
+            transition: all 0.2s ease;
+            border-radius: 6px;
+            font-weight: 500;
+            min-width: 100px;
+        }
+        
+        .filtro-btn.ativo {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
     </style>
     <script>
@@ -698,20 +834,84 @@ def prazos():
         'mostrar_apenas_parcelas': False,
     }
 
-    # Referências para as funções refreshable (serão definidas depois)
-    refresh_funcs = {'pendentes': None, 'concluidos': None, 'semana': None}
+    # Referência para função de renderização de conteúdo (será definida depois)
+    # Usando lista mutável para permitir atualização de referência
+    renderizar_conteudo_ref_global = [None]
 
-    # Referências para as abas (serão definidas depois)
-    tabs_refs = {'tab_pendentes': None, 'tab_concluidos': None, 'tab_semana': None}
+    # Estado dos filtros hierárquicos (definido aqui para escopo correto)
+    # Status agora é um SET para permitir múltiplos filtros simultâneos
+    filtros_ativos = {
+        'status': {'pendente', 'aguardando_abertura', 'atrasado'},  # Set de status selecionados (padrão: pendentes, aguardando, atrasados)
+        'temporal': None,  # 'semana', 'mes', None (todos)
+        'tipo': None,  # 'simples', 'recorrente', 'parcelado', None (todos)
+        'responsavel_id': None,  # ID do responsável ou None (todos)
+    }
 
     def atualizar_tabelas():
-        """Atualiza todas as tabelas."""
-        if refresh_funcs['pendentes']:
-            refresh_funcs['pendentes'].refresh()
-        if refresh_funcs['concluidos']:
-            refresh_funcs['concluidos'].refresh()
-        if refresh_funcs['semana']:
-            refresh_funcs['semana'].refresh()
+        """Atualiza a visualização de prazos."""
+        if renderizar_conteudo_ref_global[0]:
+            renderizar_conteudo_ref_global[0].refresh()
+
+    # Função para aplicar filtros combinados (definida aqui para escopo correto)
+    def aplicar_filtros_combinados(prazos_lista: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Aplica todos os filtros ativos à lista de prazos."""
+        resultado = list(prazos_lista)
+        
+        # Filtro 1: Status (agora é um SET - permite múltiplos filtros simultâneos)
+        status_selecionados = filtros_ativos['status']
+        if status_selecionados:  # Se há algum status selecionado
+            def prazo_atende_status(p):
+                status_prazo = p.get('status', '').lower()
+                estado_abertura = p.get('estado_abertura', 'aberto')
+                prazo_fatal_ts = p.get('prazo_fatal')
+                
+                # Verifica cada status selecionado
+                if 'pendente' in status_selecionados:
+                    if status_prazo == 'pendente':
+                        return True
+                
+                if 'aguardando_abertura' in status_selecionados:
+                    if estado_abertura == 'aguardando_abertura':
+                        return True
+                
+                if 'concluido' in status_selecionados:
+                    if status_prazo == 'concluido':
+                        return True
+                
+                if 'atrasado' in status_selecionados:
+                    # Atrasado = prazo_fatal < hoje E status != 'concluido'
+                    if verificar_prazo_atrasado(prazo_fatal_ts, status_prazo):
+                        return True
+                
+                return False
+            
+            resultado = [p for p in resultado if prazo_atende_status(p)]
+        # Se filtros_ativos['status'] estiver vazio, mostra todos
+        
+        # Filtro 2: Temporal (POR SEMANA / POR MÊS) - será aplicado separadamente se necessário
+        
+        # Filtro 3: Tipo (SIMPLES / RECORRENTE / PARCELADO)
+        if filtros_ativos['tipo'] == 'simples':
+            resultado = [
+                p for p in resultado
+                if not p.get('recorrente', False)
+                and not _prazo_e_parcela(p)
+            ]
+        elif filtros_ativos['tipo'] == 'recorrente':
+            resultado = [p for p in resultado if p.get('recorrente', False)]
+        elif filtros_ativos['tipo'] == 'parcelado':
+            # Usa a função _prazo_e_parcela que tem toda a lógica de detecção
+            resultado = [p for p in resultado if _prazo_e_parcela(p)]
+        
+        # Filtro 4: Responsável
+        if filtros_ativos['responsavel_id']:
+            responsavel_id = filtros_ativos['responsavel_id']
+            resultado = [
+                p for p in resultado
+                if responsavel_id in (p.get('responsaveis') or [])
+            ]
+        
+        return resultado
 
     # Função callback após salvar
     def on_prazo_salvo(prazo_data: Dict[str, Any]):
@@ -953,51 +1153,212 @@ def prazos():
     breadcrumbs = gerar_breadcrumbs('Prazos', url_modulo='/prazos')
     
     with layout('Prazos', breadcrumbs=breadcrumbs):
-        # Header com botão (título removido - já vem do layout())
-        with ui.row().classes('w-full gap-4 mb-6 items-center justify-end flex-wrap'):
-            chk_apenas_parcelas = ui.checkbox(
-                'Mostrar apenas parcelas',
-                value=filtros_extras.get('mostrar_apenas_parcelas', False),
-                on_change=lambda e: (
-                    filtros_extras.__setitem__('mostrar_apenas_parcelas', bool(e.value)),
-                    atualizar_tabelas(),
-                ),
-            )
-            chk_apenas_parcelas.tooltip('Quando ativo, mostra somente prazos que são parcelas de um parcelamento.')
-            ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props(
-                'color=primary'
-            ).classes('font-bold')
+        # Container centralizado e responsivo
+        with ui.element('div').classes('container-prazos'):
+            # Estado para modo de revisão (apenas sessão - não salva no banco)
+            revisao_state = {
+                'prazos_revisados': set(),  # IDs dos prazos já revisados nesta sessão
+            }
 
-        # Função para obter contadores - UMA consulta, dois resultados
-        def obter_contadores():
-            """Retorna contagem de prazos por status - UMA consulta."""
-            try:
-                todos = listar_prazos()  # Uma única consulta (usa cache)
-                pendentes = sum(1 for p in todos if p.get('status', '').lower() == 'pendente')
-                concluidos = sum(1 for p in todos if p.get('status', '').lower() == 'concluido')
-                return pendentes, concluidos
-            except Exception as e:
-                print(f"[ERROR] Erro ao obter contadores: {e}")
-                return 0, 0
-
-        # Criar abas
-        pendentes_count, concluidos_count = obter_contadores()
-        with ui.tabs().classes('w-full mb-4') as tabs:
-            tab_pendentes = ui.tab(f'Pendentes ({pendentes_count})')
-            tab_concluidos = ui.tab(f'Concluídos ({concluidos_count})')
-            tab_semana = ui.tab('Por Semana')
-
-        # Salvar referências das abas
-        tabs_refs['tab_pendentes'] = tab_pendentes
-        tabs_refs['tab_concluidos'] = tab_concluidos
-        tabs_refs['tab_semana'] = tab_semana
-
-        # Função para criar tabela de prazos (sem coluna de status)
+            # filtros_ativos e aplicar_filtros_combinados definidos fora do with para escopo correto
+            
+            # Declarar função stub para evitar NameError (será redefinida depois)
+            def atualizar_estilo_botoes_filtros():
+                pass
+            
+            # Interface de filtros hierárquicos (PRIMEIRO - no topo da página, antes de tudo)
+            with ui.row().classes('w-full gap-3 mb-4 flex-wrap items-end'):
+                # Grupo 1: Status
+                with ui.row().classes('gap-2 items-center'):
+                    ui.label('Status:').classes('text-sm font-medium text-gray-600')
+                    
+                    # Status agora é um SET - toggle adiciona/remove do set
+                    def toggle_pendentes():
+                        status_set = filtros_ativos['status']
+                        if 'pendente' in status_set:
+                            status_set.discard('pendente')
+                        else:
+                            status_set.add('pendente')
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_pendentes = ui.button('Pendentes', on_click=toggle_pendentes).props('size=sm')
+                    
+                    def toggle_aguardando():
+                        status_set = filtros_ativos['status']
+                        if 'aguardando_abertura' in status_set:
+                            status_set.discard('aguardando_abertura')
+                        else:
+                            status_set.add('aguardando_abertura')
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_aguardando = ui.button('Aguardando', on_click=toggle_aguardando).props('size=sm')
+                    
+                    def toggle_atrasados():
+                        status_set = filtros_ativos['status']
+                        if 'atrasado' in status_set:
+                            status_set.discard('atrasado')
+                        else:
+                            status_set.add('atrasado')
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_atrasados = ui.button('Atrasados', on_click=toggle_atrasados).props('size=sm')
+                    
+                    def toggle_concluidos():
+                        status_set = filtros_ativos['status']
+                        if 'concluido' in status_set:
+                            status_set.discard('concluido')
+                        else:
+                            status_set.add('concluido')
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_concluidos = ui.button('Concluídos', on_click=toggle_concluidos).props('size=sm')
+                
+                # Grupo 2: Temporal
+                with ui.row().classes('gap-2 items-center'):
+                    ui.label('Temporal:').classes('text-sm font-medium text-gray-600')
+                    
+                    def toggle_semana():
+                        novo_valor = 'semana' if filtros_ativos.get('temporal') != 'semana' else None
+                        filtros_ativos['temporal'] = novo_valor
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_semana = ui.button('Semana', on_click=toggle_semana).props('size=sm outline color=grey-6')
+                    
+                    def toggle_mes():
+                        novo_valor = 'mes' if filtros_ativos.get('temporal') != 'mes' else None
+                        filtros_ativos['temporal'] = novo_valor
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_mes = ui.button('Mês', on_click=toggle_mes).props('size=sm outline color=grey-6')
+                
+                # Grupo 3: Tipo
+                with ui.row().classes('gap-2 items-center'):
+                    ui.label('Tipo:').classes('text-sm font-medium text-gray-600')
+                    
+                    def toggle_simples():
+                        novo_valor = 'simples' if filtros_ativos.get('tipo') != 'simples' else None
+                        filtros_ativos['tipo'] = novo_valor
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_simples_filtro = ui.button('Simples', on_click=toggle_simples).props('size=sm outline color=grey-6')
+                    
+                    def toggle_recorrente():
+                        novo_valor = 'recorrente' if filtros_ativos.get('tipo') != 'recorrente' else None
+                        filtros_ativos['tipo'] = novo_valor
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_recorrente_filtro = ui.button('Recorrente', on_click=toggle_recorrente).props('size=sm outline color=grey-6')
+                    
+                    def toggle_parcelado():
+                        novo_valor = 'parcelado' if filtros_ativos.get('tipo') != 'parcelado' else None
+                        filtros_ativos['tipo'] = novo_valor
+                        atualizar_estilo_botoes_filtros()
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    btn_parcelado_filtro = ui.button('Parcelado', on_click=toggle_parcelado).props('size=sm outline color=grey-6')
+                
+                # Grupo 4: Responsável
+                with ui.row().classes('gap-2 items-center'):
+                    def on_responsavel_change(e):
+                        filtros_ativos['responsavel_id'] = e.value if e.value != 'None' else None
+                        if renderizar_conteudo_ref_global[0]:
+                            renderizar_conteudo_ref_global[0].refresh()
+                    
+                    select_responsavel = ui.select(
+                        options={None: 'Todos', **usuarios_opcoes},
+                        label='Responsável',
+                        value=None,
+                        on_change=on_responsavel_change
+                    ).classes('w-48').props('outlined dense clearable')
+            
+            # Header com botão Adicionar Prazo
+            with ui.row().classes('w-full gap-4 mb-4 items-center justify-end'):
+                ui.button('Adicionar Prazo', icon='add', on_click=open_dialog_novo).props('color=primary').classes('font-bold')
+            
+            # Função para atualizar estilo dos botões baseado nos filtros ativos (definida DEPOIS dos botões)
+            def atualizar_estilo_botoes_filtros():
+                """Atualiza estilo visual dos botões conforme filtros ativos."""
+                # Status - agora é um SET, então verificamos se cada status está no set
+                status_set = filtros_ativos.get('status', set())
+                
+                # Cor verde padrão do sistema: #223631
+                if 'pendente' in status_set:
+                    btn_pendentes.props(remove='outline')
+                    btn_pendentes.style('background-color: #223631 !important; color: white !important;')
+                else:
+                    btn_pendentes.props('outline')
+                    btn_pendentes.style('background-color: transparent !important; color: #223631 !important; border-color: #223631 !important;')
+                
+                if 'aguardando_abertura' in status_set:
+                    btn_aguardando.props(remove='outline')
+                    btn_aguardando.style('background-color: #223631 !important; color: white !important;')
+                else:
+                    btn_aguardando.props('outline')
+                    btn_aguardando.style('background-color: transparent !important; color: #223631 !important; border-color: #223631 !important;')
+                
+                # Atrasados: vermelho preenchido com texto branco
+                if 'atrasado' in status_set:
+                    btn_atrasados.props(remove='outline')
+                    btn_atrasados.style('background-color: #C62828 !important; color: white !important;')
+                else:
+                    btn_atrasados.props('outline')
+                    btn_atrasados.style('background-color: transparent !important; color: #C62828 !important; border-color: #C62828 !important;')
+                
+                if 'concluido' in status_set:
+                    btn_concluidos.props(remove='outline')
+                    btn_concluidos.style('background-color: #223631 !important; color: white !important;')
+                else:
+                    btn_concluidos.props('outline')
+                    btn_concluidos.style('background-color: transparent !important; color: #223631 !important; border-color: #223631 !important;')
+                
+                # Temporal
+                temporal_atual = filtros_ativos.get('temporal')
+                if temporal_atual == 'semana':
+                    btn_semana.props('color=primary unelevated')
+                else:
+                    btn_semana.props('outline color=grey-6')
+                
+                if temporal_atual == 'mes':
+                    btn_mes.props('color=primary unelevated')
+                else:
+                    btn_mes.props('outline color=grey-6')
+                
+                # Tipo
+                tipo_atual = filtros_ativos.get('tipo')
+                if tipo_atual == 'simples':
+                    btn_simples_filtro.props('color=primary unelevated')
+                else:
+                    btn_simples_filtro.props('outline color=grey-6')
+                
+                if tipo_atual == 'recorrente':
+                    btn_recorrente_filtro.props('color=primary unelevated')
+                else:
+                    btn_recorrente_filtro.props('outline color=grey-6')
+                
+                if tipo_atual == 'parcelado':
+                    btn_parcelado_filtro.props('color=primary unelevated')
+                else:
+                    btn_parcelado_filtro.props('outline color=grey-6')
+            
+            # Inicializar estilos dos botões
+            atualizar_estilo_botoes_filtros()
+            
+            # Container para área de conteúdo (tabela) - CRIADO DEPOIS DOS FILTROS
+            conteudo_container = ui.column().classes('w-full')
+        
+        # Função para criar tabela de prazos (sem coluna de status) - PRIMEIRO
         def criar_tabela_prazos(prazos_lista: List[Dict[str, Any]], status_filtro: str):
             """Cria tabela de prazos com os dados fornecidos."""
-            # Filtro extra: mostrar apenas parcelas (não afeta outros filtros)
-            if filtros_extras.get('mostrar_apenas_parcelas'):
-                prazos_lista = [p for p in (prazos_lista or []) if _prazo_e_parcela(p)]
+            # Ordenar prazos por prioridade (atrasados, aguardando abertura, resto)
+            prazos_lista = ordenar_prazos_prioridade(prazos_lista)
 
             if not prazos_lista:
                 # Mensagem quando não há prazos
@@ -1033,12 +1394,12 @@ def prazos():
             # Definir colunas da tabela (sem coluna "Status" e sem "Recorrente")
             columns = [
                 {'name': 'concluido', 'label': '', 'field': 'concluido', 'align': 'center', 'style': 'width: 50px;'},
-                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 230px;'},
-                {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left', 'style': 'width: 230px;'},
-                {'name': 'prazo_seguranca', 'label': 'Prazo de Segurança', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 150px;'},
-                {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 120px;'},
-                {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 120px;'},
+                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left', 'style': 'min-width: 280px;'},
+                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 180px;'},
+                {'name': 'clientes', 'label': 'Clientes', 'field': 'clientes', 'align': 'left', 'style': 'width: 180px;'},
+                {'name': 'prazo_seguranca', 'label': 'Prazo de Segurança', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 130px;'},
+                {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 110px;'},
+                {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 80px;'},
             ]
 
             # Preparar linhas
@@ -1060,6 +1421,8 @@ def prazos():
                 status = prazo.get('status', 'pendente')
                 esta_concluido = status.lower() == 'concluido'
                 esta_atrasado = verificar_prazo_atrasado(prazo_fatal_ts, status)
+                estado_abertura = prazo.get('estado_abertura', 'aberto')
+                esta_aguardando_abertura = estado_abertura == 'aguardando_abertura'
 
                 # Detecção de parcelamento (badge) - usa campos do backend
                 is_parcelado = bool(
@@ -1073,6 +1436,7 @@ def prazos():
                     '_indice': indice,
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
+                    'aguardando_abertura': esta_aguardando_abertura,
                     'titulo': titulo,
                     # Campos extras para UI/ações
                     'is_parcelado': is_parcelado,
@@ -1086,100 +1450,62 @@ def prazos():
                     'acoes': prazo.get('_id'),
                 })
 
-            # Criar tabela
-            table = ui.table(
-                columns=columns,
-                rows=rows,
-                row_key='id'
-            ).classes('w-full tabela-prazos').props('flat dense')
+            # Wrapper para scroll horizontal em telas menores
+            with ui.element('div').classes('tabela-prazos-wrapper'):
+                # Criar tabela
+                table = ui.table(
+                    columns=columns,
+                    rows=rows,
+                    row_key='id'
+                ).classes('w-full tabela-prazos').props('flat dense')
 
-            # Slot para checkbox de concluído - adiciona data-atrasado para JavaScript
-            table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" 
-                      style="vertical-align: middle;"
-                      :data-atrasado="props.row.atrasado ? 'true' : 'false'">
-                    <q-checkbox
-                        :model-value="props.value"
-                        @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
-                        color="green"
-                        size="md"
-                        round
-                    >
-                        <q-tooltip>{{ props.value ? "Reabrir prazo" : "Marcar como concluído" }}</q-tooltip>
-                    </q-checkbox>
-                </q-td>
-            ''')
-
-            # Slot para Título
-            table.add_slot('body-cell-titulo', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span>{{ props.value }}</span>
-                        <q-badge
-                            v-if="props.row.is_parcelado"
-                            style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
-                            class="px-2 py-1"
+            # Slot para linha completa - aplica cor de fundo para prazos atrasados (vermelho) e aguardando abertura (azul)
+            table.add_slot('body', '''
+                <q-tr :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2 !important;' : (props.row.aguardando_abertura ? 'background-color: #BBDEFB !important;' : '')">
+                    <q-td key="concluido" :props="props" style="vertical-align: middle;">
+                        <q-checkbox
+                            :model-value="props.row.concluido"
+                            @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
+                            color="green"
+                            size="md"
+                            round
                         >
-                            Parcelado
-                        </q-badge>
-                    </div>
-                </q-td>
-            ''')
-
-            # Slot para Responsáveis
-            table.add_slot('body-cell-responsaveis', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    {{ props.value }}
-                </q-td>
-            ''')
-
-            # Slot para Clientes
-            table.add_slot('body-cell-clientes', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    {{ props.value }}
-                </q-td>
-            ''')
-
-            # Slot para Prazo de Segurança (amarelo pastel sempre)
-            table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" style="vertical-align: middle; text-align: center;">
-                    <span class="celula-prazo-seguranca">{{ props.value }}</span>
-                </q-td>
-            ''')
-
-            # Slot para Prazo Fatal (vermelho pastel sempre, mais escuro se atrasado)
-            table.add_slot('body-cell-prazo_fatal', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
-                    <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.value }}</span>
-                </q-td>
-            ''')
-
-            # Slot para ações (editar e excluir)
-            table.add_slot('body-cell-acoes', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    <q-btn
-                        flat
-                        round
-                        dense
-                        icon="edit"
-                        color="primary"
-                        size="sm"
-                        @click="$parent.$emit('edit', props.row)"
-                    >
-                        <q-tooltip>Editar</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                        flat
-                        round
-                        dense
-                        icon="delete"
-                        color="negative"
-                        size="sm"
-                        @click="$parent.$emit('delete', props.row)"
-                    >
-                        <q-tooltip>Excluir</q-tooltip>
-                    </q-btn>
-                </q-td>
+                            <q-tooltip>{{ props.row.concluido ? "Reabrir prazo" : "Marcar como concluído" }}</q-tooltip>
+                        </q-checkbox>
+                    </q-td>
+                    <q-td key="titulo" :props="props" style="vertical-align: middle;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span>{{ props.row.titulo }}</span>
+                            <q-badge
+                                v-if="props.row.is_parcelado"
+                                style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
+                                class="px-2 py-1"
+                            >
+                                Parcelado
+                            </q-badge>
+                        </div>
+                    </q-td>
+                    <q-td key="responsaveis" :props="props" style="vertical-align: middle;">
+                        {{ props.row.responsaveis }}
+                    </q-td>
+                    <q-td key="clientes" :props="props" style="vertical-align: middle;">
+                        {{ props.row.clientes }}
+                    </q-td>
+                    <q-td key="prazo_seguranca" :props="props" style="vertical-align: middle; text-align: center;">
+                        <span class="celula-prazo-seguranca">{{ props.row.prazo_seguranca }}</span>
+                    </q-td>
+                    <q-td key="prazo_fatal" :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
+                        <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.row.prazo_fatal }}</span>
+                    </q-td>
+                    <q-td key="acoes" :props="props" style="vertical-align: middle;">
+                        <q-btn flat round dense icon="edit" color="primary" size="sm" @click="$parent.$emit('edit', props.row)">
+                            <q-tooltip>Editar</q-tooltip>
+                        </q-btn>
+                        <q-btn flat round dense icon="delete" color="negative" size="sm" @click="$parent.$emit('delete', props.row)">
+                            <q-tooltip>Excluir</q-tooltip>
+                        </q-btn>
+                    </q-td>
+                </q-tr>
             ''')
 
             # Handler para toggle de status COM CONFIRMAÇÃO
@@ -1227,13 +1553,55 @@ def prazos():
             table.on('toggle-status', lambda e: on_toggle_status(e.args))
             table.on('edit', lambda e: on_edit_tb(e.args))
             table.on('delete', lambda e: on_delete_tb(e.args))
+        
+        # Função para atualizar visualização baseada nos filtros (DEPOIS de criar_tabela_prazos estar definida)
+        @ui.refreshable
+        def renderizar_conteudo():
+            """Renderiza conteúdo baseado nos filtros ativos."""
+            try:
+                todos_prazos = listar_prazos()
+                prazos_filtrados = aplicar_filtros_combinados(todos_prazos)
+                
+                # Se filtro temporal está ativo, aplicar filtro de semana/mês
+                if filtros_ativos['temporal'] == 'semana':
+                    hoje = date.today()
+                    inicio_semana = hoje - timedelta(days=hoje.weekday())
+                    fim_semana = inicio_semana + timedelta(days=6)
+                    prazos_filtrados = filtrar_prazos_por_semana(prazos_filtrados, inicio_semana, fim_semana)
+                elif filtros_ativos['temporal'] == 'mes':
+                    hoje = date.today()
+                    inicio_mes = date(hoje.year, hoje.month, 1)
+                    if hoje.month == 12:
+                        fim_mes = date(hoje.year + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        fim_mes = date(hoje.year, hoje.month + 1, 1) - timedelta(days=1)
+                    prazos_filtrados = [
+                        p for p in prazos_filtrados
+                        if p.get('prazo_fatal') and inicio_mes <= datetime.fromtimestamp(p.get('prazo_fatal')).date() <= fim_mes
+                    ]
+                
+                # Criar tabela diretamente (sem container - @ui.refreshable gerencia isso)
+                prazos_filtrados = ordenar_prazos_prioridade(prazos_filtrados)
+                criar_tabela_prazos(prazos_filtrados, filtros_ativos['status'] or 'todos')
+                
+            except Exception as e:
+                print(f"[ERROR] Erro ao renderizar conteúdo: {e}")
+                import traceback
+                traceback.print_exc()
+                ui.notify('Erro ao carregar prazos', type='negative')
+        
+        # Salvar referência global para atualizar_tabelas() e para os callbacks dos botões
+        renderizar_conteudo_ref_global[0] = renderizar_conteudo
+        
+        # Renderizar conteúdo inicial dentro do container
+        with conteudo_container:
+            renderizar_conteudo()
 
         # Função para criar tabela COM coluna de status (para aba Por Semana)
         def criar_tabela_prazos_com_status(prazos_lista: List[Dict[str, Any]]):
             """Cria tabela de prazos com coluna de status (para visualização Por Semana)."""
-            # Filtro extra: mostrar apenas parcelas
-            if filtros_extras.get('mostrar_apenas_parcelas'):
-                prazos_lista = [p for p in (prazos_lista or []) if _prazo_e_parcela(p)]
+            # Ordenar prazos por prioridade (atrasados, aguardando abertura, resto)
+            prazos_lista = ordenar_prazos_prioridade(prazos_lista)
 
             if not prazos_lista:
                 with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
@@ -1249,12 +1617,12 @@ def prazos():
             # Definir colunas da tabela COM coluna de status
             columns = [
                 {'name': 'concluido', 'label': '', 'field': 'concluido', 'align': 'center', 'style': 'width: 50px;'},
-                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left'},
-                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 180px;'},
-                {'name': 'prazo_seguranca', 'label': 'Prazo Seg.', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 110px;'},
-                {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 110px;'},
-                {'name': 'status', 'label': 'Status', 'field': 'status_label', 'align': 'center', 'style': 'width: 120px;'},
-                {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 100px;'},
+                {'name': 'titulo', 'label': 'Título', 'field': 'titulo', 'align': 'left', 'style': 'min-width: 280px;'},
+                {'name': 'responsaveis', 'label': 'Responsáveis', 'field': 'responsaveis', 'align': 'left', 'style': 'width: 160px;'},
+                {'name': 'prazo_seguranca', 'label': 'Prazo Seg.', 'field': 'prazo_seguranca', 'align': 'center', 'style': 'width: 100px;'},
+                {'name': 'prazo_fatal', 'label': 'Prazo Fatal', 'field': 'prazo_fatal', 'align': 'center', 'style': 'width: 100px;'},
+                {'name': 'status', 'label': 'Status', 'field': 'status_label', 'align': 'center', 'style': 'width: 100px;'},
+                {'name': 'acoes', 'label': 'Ações', 'field': 'acoes', 'align': 'center', 'style': 'width: 80px;'},
             ]
 
             # Preparar linhas
@@ -1272,6 +1640,8 @@ def prazos():
                 status = prazo.get('status', 'pendente')
                 esta_concluido = status.lower() == 'concluido'
                 esta_atrasado = verificar_prazo_atrasado(prazo_fatal_ts, status)
+                estado_abertura = prazo.get('estado_abertura', 'aberto')
+                esta_aguardando_abertura = estado_abertura == 'aguardando_abertura'
 
                 # Determinar status_label para exibição
                 if esta_concluido:
@@ -1295,6 +1665,7 @@ def prazos():
                     '_indice': indice,
                     'concluido': esta_concluido,
                     'atrasado': esta_atrasado,
+                    'aguardando_abertura': esta_aguardando_abertura,
                     'titulo': titulo,
                     'is_parcelado': is_parcelado,
                     'parcela_de': prazo.get('parcela_de'),
@@ -1308,107 +1679,69 @@ def prazos():
                     'acoes': prazo.get('_id'),
                 })
 
-            # Criar tabela
-            table = ui.table(
-                columns=columns,
-                rows=rows,
-                row_key='id'
-            ).classes('w-full tabela-prazos').props('flat dense')
+            # Wrapper para scroll horizontal em telas menores
+            with ui.element('div').classes('tabela-prazos-wrapper'):
+                # Criar tabela
+                table = ui.table(
+                    columns=columns,
+                    rows=rows,
+                    row_key='id'
+                ).classes('w-full tabela-prazos').props('flat dense')
 
-            # Slot para checkbox de concluído - adiciona data-atrasado para JavaScript
-            table.add_slot('body-cell-concluido', '''
-                <q-td :props="props" 
-                      style="vertical-align: middle;"
-                      :data-atrasado="props.row.atrasado ? 'true' : 'false'">
-                    <q-checkbox
-                        :model-value="props.value"
-                        @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
-                        color="green"
-                        size="md"
-                        round
-                    >
-                        <q-tooltip>{{ props.value ? "Reabrir prazo" : "Marcar como concluído" }}</q-tooltip>
-                    </q-checkbox>
-                </q-td>
-            ''')
-
-            # Slot para Título
-            table.add_slot('body-cell-titulo', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span>{{ props.value }}</span>
-                        <q-badge
-                            v-if="props.row.is_parcelado"
-                            style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
-                            class="px-2 py-1"
+            # Slot para linha completa - aplica cor de fundo para prazos atrasados (vermelho) e aguardando abertura (azul)
+            table.add_slot('body', '''
+                <q-tr :props="props" :style="props.row.atrasado ? 'background-color: #FFCDD2 !important;' : (props.row.aguardando_abertura ? 'background-color: #BBDEFB !important;' : '')">
+                    <q-td key="concluido" :props="props" style="vertical-align: middle;">
+                        <q-checkbox
+                            :model-value="props.row.concluido"
+                            @update:model-value="(val) => $parent.$emit('toggle-status', {row: props.row, value: val})"
+                            color="green"
+                            size="md"
+                            round
                         >
-                            Parcelado
+                            <q-tooltip>{{ props.row.concluido ? "Reabrir prazo" : "Marcar como concluído" }}</q-tooltip>
+                        </q-checkbox>
+                    </q-td>
+                    <q-td key="titulo" :props="props" style="vertical-align: middle;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span>{{ props.row.titulo }}</span>
+                            <q-badge
+                                v-if="props.row.is_parcelado"
+                                style="background-color:#c7d2fe; color:#111827; border: 1px solid rgba(0,0,0,0.08);"
+                                class="px-2 py-1"
+                            >
+                                Parcelado
+                            </q-badge>
+                        </div>
+                    </q-td>
+                    <q-td key="responsaveis" :props="props" style="vertical-align: middle;">
+                        {{ props.row.responsaveis }}
+                    </q-td>
+                    <q-td key="prazo_seguranca" :props="props" style="vertical-align: middle; text-align: center;">
+                        <span class="celula-prazo-seguranca">{{ props.row.prazo_seguranca }}</span>
+                    </q-td>
+                    <q-td key="prazo_fatal" :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
+                        <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.row.prazo_fatal }}</span>
+                    </q-td>
+                    <q-td key="status" :props="props" style="vertical-align: middle; text-align: center;">
+                        <q-badge
+                            :style="props.row.status_value === 'atrasado' ? 'background-color: #EF5350; color: white;' :
+                                    props.row.status_value === 'concluido' ? 'background-color: #4CAF50; color: white;' :
+                                    'background-color: #FFC107; color: black;'"
+                            class="px-3 py-1"
+                        >
+                            {{ props.row.status_label }}
                         </q-badge>
-                    </div>
-                </q-td>
-            ''')
-
-            # Slot para Responsáveis
-            table.add_slot('body-cell-responsaveis', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    {{ props.value }}
-                </q-td>
-            ''')
-
-            # Slot para Prazo de Segurança (amarelo pastel sempre)
-            table.add_slot('body-cell-prazo_seguranca', '''
-                <q-td :props="props" style="vertical-align: middle; text-align: center;">
-                    <span class="celula-prazo-seguranca">{{ props.value }}</span>
-                </q-td>
-            ''')
-
-            # Slot para Prazo Fatal (vermelho pastel sempre, mais escuro se atrasado)
-            table.add_slot('body-cell-prazo_fatal', '''
-                <q-td :props="props" :style="props.row.atrasado ? 'vertical-align: middle; text-align: center; font-weight: bold;' : 'vertical-align: middle; text-align: center;'">
-                    <span class="celula-prazo-fatal" :style="props.row.atrasado ? 'background-color: #EF9A9A !important;' : ''">{{ props.value }}</span>
-                </q-td>
-            ''')
-
-            # Slot para Status com badge colorido
-            table.add_slot('body-cell-status', '''
-                <q-td :props="props" style="vertical-align: middle; text-align: center;">
-                    <q-badge
-                        :style="props.row.status_value === 'atrasado' ? 'background-color: #EF5350; color: white;' :
-                                props.row.status_value === 'concluido' ? 'background-color: #4CAF50; color: white;' :
-                                'background-color: #FFC107; color: black;'"
-                        class="px-3 py-1"
-                    >
-                        {{ props.value }}
-                    </q-badge>
-                </q-td>
-            ''')
-
-            # Slot para ações
-            table.add_slot('body-cell-acoes', '''
-                <q-td :props="props" style="vertical-align: middle;">
-                    <q-btn
-                        flat
-                        round
-                        dense
-                        icon="edit"
-                        color="primary"
-                        size="sm"
-                        @click="$parent.$emit('edit', props.row)"
-                    >
-                        <q-tooltip>Editar</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                        flat
-                        round
-                        dense
-                        icon="delete"
-                        color="negative"
-                        size="sm"
-                        @click="$parent.$emit('delete', props.row)"
-                    >
-                        <q-tooltip>Excluir</q-tooltip>
-                    </q-btn>
-                </q-td>
+                    </q-td>
+                    <q-td key="acoes" :props="props" style="vertical-align: middle;">
+                        <q-btn flat round dense icon="edit" color="primary" size="sm" @click="$parent.$emit('edit', props.row)">
+                            <q-tooltip>Editar</q-tooltip>
+                        </q-btn>
+                        <q-btn flat round dense icon="delete" color="negative" size="sm" @click="$parent.$emit('delete', props.row)">
+                            <q-tooltip>Excluir</q-tooltip>
+                        </q-btn>
+                    </q-td>
+                </q-tr>
             ''')
 
             # Handler para toggle de status
@@ -1451,282 +1784,5 @@ def prazos():
             table.on('toggle-status', lambda e: on_toggle_status(e.args))
             table.on('edit', lambda e: on_edit_tb(e.args))
             table.on('delete', lambda e: on_delete_tb(e.args))
-
-        # Container para tabelas
-        with ui.tab_panels(tabs, value=tab_pendentes).classes('w-full'):
-            # =================================================================
-            # ABA PENDENTES - Mostra TODOS os pendentes (visão geral)
-            # =================================================================
-            with ui.tab_panel(tab_pendentes):
-                @ui.refreshable
-                def render_tabela_pendentes():
-                    """Renderiza tabela com TODOS os prazos pendentes."""
-                    try:
-                        print("[PRAZOS] Carregando todos os prazos pendentes...")
-
-                        # Buscar TODOS os prazos pendentes (sem filtro de semana)
-                        prazos_lista = listar_prazos_por_status('pendente')
-
-                        # Ordenar por prazo_fatal (mais próximo primeiro)
-                        prazos_lista.sort(key=lambda p: p.get('prazo_fatal', 0))
-
-                        pendentes_count = len(prazos_lista)
-                        print(f"[PRAZOS] {pendentes_count} prazos pendentes encontrados")
-
-                        criar_tabela_prazos(prazos_lista, 'pendente')
-                    except Exception as e:
-                        print(f"[ERROR] Erro ao carregar prazos pendentes: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
-                            ui.icon('error', size='48px').classes('text-red-400 mb-4')
-                            ui.label('Erro ao carregar prazos').classes(
-                                'text-red-600 text-lg font-medium mb-2'
-                            )
-                            ui.label(f'Detalhes: {str(e)}').classes(
-                                'text-sm text-gray-500 text-center'
-                            )
-
-                # Salvar referência e renderizar
-                refresh_funcs['pendentes'] = render_tabela_pendentes
-                render_tabela_pendentes()
-
-            # =================================================================
-            # ABA CONCLUÍDOS - Mostra TODOS os concluídos
-            # =================================================================
-            with ui.tab_panel(tab_concluidos):
-                @ui.refreshable
-                def render_tabela_concluidos():
-                    """Renderiza tabela com TODOS os prazos concluídos."""
-                    try:
-                        print("[PRAZOS] Carregando todos os prazos concluídos...")
-
-                        # Buscar TODOS os prazos concluídos
-                        prazos_lista = listar_prazos_por_status('concluido')
-
-                        # Ordenar por atualizado_em (mais recente primeiro)
-                        prazos_lista.sort(key=lambda p: p.get('atualizado_em', 0), reverse=True)
-
-                        concluidos_count = len(prazos_lista)
-                        print(f"[PRAZOS] {concluidos_count} prazos concluídos encontrados")
-
-                        criar_tabela_prazos(prazos_lista, 'concluido')
-                    except Exception as e:
-                        print(f"[ERROR] Erro ao carregar prazos concluídos: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
-                            ui.icon('error', size='48px').classes('text-red-400 mb-4')
-                            ui.label('Erro ao carregar prazos').classes(
-                                'text-red-600 text-lg font-medium mb-2'
-                            )
-                            ui.label(f'Detalhes: {str(e)}').classes(
-                                'text-sm text-gray-500 text-center'
-                            )
-
-                # Salvar referência e renderizar
-                refresh_funcs['concluidos'] = render_tabela_concluidos
-                render_tabela_concluidos()
-
-            # =================================================================
-            # ABA POR SEMANA - Mostra TODOS os prazos da semana selecionada
-            # =================================================================
-            with ui.tab_panel(tab_semana):
-                # Estado do filtro de semana
-                ano_atual = date.today().year
-                filtro_semana = {
-                    'tipo': 'esta_semana',
-                    'semana_especifica': None,
-                    'ano_selecionado': ano_atual
-                }
-
-                def obter_periodo_filtro():
-                    """Retorna início e fim baseado no filtro atual."""
-                    if filtro_semana['tipo'] == 'semana_passada':
-                        return obter_semana_passada()
-                    elif filtro_semana['tipo'] == 'proxima_semana':
-                        return obter_proxima_semana()
-                    elif filtro_semana['tipo'] == 'selecionar' and filtro_semana['semana_especifica']:
-                        ano, num_semana = filtro_semana['semana_especifica']
-                        return obter_semana_do_ano(ano, num_semana)
-                    else:  # esta_semana (padrão)
-                        return obter_esta_semana()
-
-                def selecionar_filtro(tipo: str):
-                    """Seleciona um filtro de semana."""
-                    filtro_semana['tipo'] = tipo
-                    filtro_semana['semana_especifica'] = None
-                    render_filtros_semana.refresh()
-                    render_tabela_semana.refresh()
-
-                def selecionar_ano(ano_str: str):
-                    """Seleciona o ano e atualiza o dropdown de semanas."""
-                    if ano_str:
-                        try:
-                            ano = int(ano_str)
-                            filtro_semana['ano_selecionado'] = ano
-                            # Limpar seleção de semana ao trocar ano
-                            filtro_semana['semana_especifica'] = None
-                            render_filtros_semana.refresh()
-                        except Exception as e:
-                            print(f"[ERROR] Erro ao selecionar ano: {e}")
-
-                def selecionar_semana_especifica(valor):
-                    """Seleciona uma semana específica do dropdown."""
-                    if valor:
-                        try:
-                            partes = valor.split('-')
-                            ano = int(partes[0])
-                            
-                            # Lidar com formato especial "ano-1-proximo"
-                            if len(partes) == 3 and partes[2] == 'proximo':
-                                # Primeira semana do próximo ano que começa no ano atual
-                                num_semana = 1
-                                ano_real = ano + 1
-                            else:
-                                num_semana = int(partes[1])
-                                # Se número >= 200, é semana do ano anterior (offset 200)
-                                if num_semana >= 200:
-                                    num_semana = num_semana - 200
-                                    ano_real = ano - 1
-                                else:
-                                    ano_real = ano
-                            
-                            filtro_semana['tipo'] = 'selecionar'
-                            filtro_semana['semana_especifica'] = (ano_real, num_semana)
-                            render_filtros_semana.refresh()
-                            render_tabela_semana.refresh()
-                        except Exception as e:
-                            print(f"[ERROR] Erro ao selecionar semana: {e}")
-                            import traceback
-                            traceback.print_exc()
-
-                # Filtros de semana
-                @ui.refreshable
-                def render_filtros_semana():
-                    """Renderiza os filtros de semana com dropdowns de ano e semana."""
-                    inicio, fim = obter_periodo_filtro()
-
-                    with ui.row().classes('w-full gap-2 mb-4 items-center flex-wrap'):
-                        # Botões de filtro rápido
-                        btn_passada = ui.button(
-                            'Semana Passada',
-                            icon='chevron_left',
-                            on_click=lambda: selecionar_filtro('semana_passada')
-                        )
-                        if filtro_semana['tipo'] == 'semana_passada':
-                            btn_passada.props('color=primary unelevated')
-                        else:
-                            btn_passada.props('flat')
-
-                        btn_esta = ui.button(
-                            'Esta Semana',
-                            icon='today',
-                            on_click=lambda: selecionar_filtro('esta_semana')
-                        )
-                        if filtro_semana['tipo'] == 'esta_semana':
-                            btn_esta.props('color=primary unelevated')
-                        else:
-                            btn_esta.props('flat')
-
-                        btn_proxima = ui.button(
-                            'Próxima Semana',
-                            icon='chevron_right',
-                            on_click=lambda: selecionar_filtro('proxima_semana')
-                        )
-                        if filtro_semana['tipo'] == 'proxima_semana':
-                            btn_proxima.props('color=primary unelevated')
-                        else:
-                            btn_proxima.props('flat')
-
-                        # Separador
-                        ui.label('|').classes('text-gray-300 mx-2')
-
-                        # Dropdown de Ano
-                        opcoes_anos = {'2025': '2025', '2026': '2026'}
-                        ano_selecionado_str = str(filtro_semana['ano_selecionado'])
-                        
-                        select_ano = ui.select(
-                            options=opcoes_anos,
-                            value=ano_selecionado_str,
-                            label='Selecionar Ano:',
-                            on_change=lambda e: selecionar_ano(e.value)
-                        ).classes('w-40')
-                        select_ano.props('outlined')
-
-                        # Dropdown de Semana (atualiza baseado no ano selecionado)
-                        opcoes_semanas = criar_opcoes_semanas(filtro_semana['ano_selecionado'])
-                        valor_atual = None
-                        if filtro_semana['tipo'] == 'selecionar' and filtro_semana['semana_especifica']:
-                            ano, num = filtro_semana['semana_especifica']
-                            # Só manter seleção se o ano corresponder
-                            if ano == filtro_semana['ano_selecionado']:
-                                valor_atual = f"{ano}-{num}"
-
-                        select_semana = ui.select(
-                            options=opcoes_semanas,
-                            value=valor_atual,
-                            label='Selecionar Semana',
-                            on_change=lambda e: selecionar_semana_especifica(e.value)
-                        ).classes('w-80')
-
-                        if filtro_semana['tipo'] == 'selecionar':
-                            select_semana.props('outlined color=primary')
-                        else:
-                            select_semana.props('outlined')
-
-                    # Label do período atual
-                    with ui.row().classes('w-full mb-2'):
-                        ui.icon('date_range', size='18px').classes('text-gray-500')
-                        ui.label(f"Período: {formatar_periodo_semana(inicio, fim)}").classes(
-                            'text-sm text-gray-600 font-medium'
-                        )
-
-                render_filtros_semana()
-
-                @ui.refreshable
-                def render_tabela_semana():
-                    """Renderiza tabela com TODOS os prazos da semana (pendentes, atrasados e concluídos)."""
-                    try:
-                        print("[PRAZOS] Carregando prazos da semana...")
-
-                        # Buscar TODOS os prazos (não filtrado por status)
-                        todos_prazos = listar_prazos()
-
-                        # Obter período do filtro
-                        inicio, fim = obter_periodo_filtro()
-
-                        # Filtrar prazos pela semana selecionada
-                        prazos_semana = filtrar_prazos_por_semana(todos_prazos, inicio, fim)
-
-                        # Ordenar por prazo_fatal (mais próximo primeiro)
-                        prazos_semana.sort(key=lambda p: p.get('prazo_fatal', 0))
-
-                        total_semana = len(prazos_semana)
-                        print(f"[PRAZOS] {total_semana} prazos encontrados na semana")
-
-                        # Mostrar contador
-                        with ui.row().classes('w-full mb-2 items-center'):
-                            ui.label(f'{total_semana} prazo(s) nesta semana').classes(
-                                'text-sm text-gray-500'
-                            )
-
-                        criar_tabela_prazos_com_status(prazos_semana)
-                    except Exception as e:
-                        print(f"[ERROR] Erro ao carregar prazos da semana: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        with ui.card().classes('w-full p-8 flex flex-col items-center justify-center'):
-                            ui.icon('error', size='48px').classes('text-red-400 mb-4')
-                            ui.label('Erro ao carregar prazos').classes(
-                                'text-red-600 text-lg font-medium mb-2'
-                            )
-                            ui.label(f'Detalhes: {str(e)}').classes(
-                                'text-sm text-gray-500 text-center'
-                            )
-
-                # Salvar referência e renderizar
-                refresh_funcs['semana'] = render_tabela_semana
-                render_tabela_semana()
 
     print("[PRAZOS] Página carregada com sucesso!")

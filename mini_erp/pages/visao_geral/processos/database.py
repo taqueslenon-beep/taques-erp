@@ -52,6 +52,7 @@ def listar_processos(filtros: Optional[Dict[str, Any]] = None) -> List[Dict[str,
             - busca: str - Busca em título e número
             - area: str - Filtra por área
             - status: str - Filtra por status
+            - prioridade: str - Filtra por prioridade (P1, P2, P3, P4)
             - tipo: str - Filtra por tipo (Judicial/Administrativo)
             - caso_id: str - Filtra por caso vinculado
             - grupo_nome: str - Filtra por grupo
@@ -74,6 +75,8 @@ def listar_processos(filtros: Optional[Dict[str, Any]] = None) -> List[Dict[str,
                 query = query.where('area', '==', filtros['area'])
             if filtros.get('status'):
                 query = query.where('status', '==', filtros['status'])
+            if filtros.get('prioridade'):
+                query = query.where('prioridade', '==', filtros['prioridade'])
             if filtros.get('tipo'):
                 query = query.where('tipo', '==', filtros['tipo'])
             if filtros.get('caso_id'):

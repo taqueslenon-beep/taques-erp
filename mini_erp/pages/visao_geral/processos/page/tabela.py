@@ -175,69 +175,127 @@ BODY_SLOT_ACOES = '''
 # FUNÇÕES DE CONVERSÃO
 # =============================================================================
 
+def _sanitizar_valor(valor, tipo_esperado='str', valor_padrao=''):
+    """
+    Sanitiza valor para evitar erros de 'Invalid value' na tabela.
+    Garante que nenhum valor None seja passado para componentes UI.
+    
+    CORREÇÃO: Valores None causam erro "Invalid value" em componentes NiceGUI/Quasar.
+    
+    Args:
+        valor: Valor a sanitizar
+        tipo_esperado: 'str', 'list', 'bool'
+        valor_padrao: Valor padrão se inválido
+        
+    Returns:
+        Valor sanitizado
+    """
+    if valor is None:
+        if tipo_esperado == 'list':
+            return []
+        elif tipo_esperado == 'bool':
+            return False
+        return valor_padrao
+    
+    if tipo_esperado == 'str':
+        return str(valor) if valor else valor_padrao
+    elif tipo_esperado == 'list':
+        if isinstance(valor, list):
+            return [str(v) for v in valor if v is not None]
+        return [str(valor)] if valor else []
+    elif tipo_esperado == 'bool':
+        return bool(valor)
+    
+    return valor
+
+
 def converter_processo_para_row(processo: dict) -> dict:
     """
     Converte processo do formato vg_processos para formato esperado pela tabela.
+    
+    CORREÇÃO: Adicionado sanitização de todos os valores para evitar erro "Invalid value".
+    Todos os campos agora passam por _sanitizar_valor() para garantir tipos corretos.
     
     Args:
         processo: Dicionário do processo no formato vg_processos
         
     Returns:
-        Dicionário no formato esperado pela tabela
+        Dicionário no formato esperado pela tabela (sem valores None)
     """
-    # Processa data de abertura
-    data_abertura_raw = processo.get('data_abertura') or ''
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Log de debug para diagnóstico
+    processo_id = processo.get('_id', 'SEM_ID')
+    logger.debug(f"[CONVERTER] Processando: {processo_id}")
+    
+    # Processa data de abertura com tratamento robusto
+    data_abertura_raw = processo.get('data_abertura')
     data_abertura_display = ''
     data_abertura_sort = ''
     
-    if data_abertura_raw:
+    if data_abertura_raw is not None:
         try:
-            # Tenta converter timestamps ISO para formato DD/MM/AAAA
-            if isinstance(data_abertura_raw, str) and 'T' in data_abertura_raw:
-                # É um timestamp ISO
-                dt = datetime.fromisoformat(data_abertura_raw.replace('Z', '+00:00'))
-                data_abertura_display = dt.strftime('%d/%m/%Y')
-                data_abertura_sort = dt.strftime('%Y/%m/%d')
-            else:
-                data_abertura_raw = str(data_abertura_raw).strip()
-                
-                # Formato: AAAA (apenas ano)
-                if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
-                    data_abertura_display = data_abertura_raw
-                    data_abertura_sort = f"{data_abertura_raw}/00/00"
-                # Formato: MM/AAAA (mês e ano)
-                elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
-                    partes = data_abertura_raw.split('/')
-                    if len(partes) == 2:
-                        data_abertura_display = data_abertura_raw
-                        data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
-                # Formato: DD/MM/AAAA (completa)
-                elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
-                    partes = data_abertura_raw.split('/')
-                    if len(partes) == 3:
-                        data_abertura_display = data_abertura_raw
-                        data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
+            # Converte para string se não for
+            if not isinstance(data_abertura_raw, str):
+                # Pode ser datetime, DatetimeWithNanoseconds, etc.
+                if hasattr(data_abertura_raw, 'isoformat'):
+                    data_abertura_raw = data_abertura_raw.isoformat()
+                elif hasattr(data_abertura_raw, 'strftime'):
+                    data_abertura_raw = data_abertura_raw.strftime('%Y-%m-%dT%H:%M:%S')
                 else:
-                    data_abertura_display = data_abertura_raw
-        except Exception:
-            data_abertura_display = str(data_abertura_raw)
+                    data_abertura_raw = str(data_abertura_raw)
+            
+            data_abertura_raw = data_abertura_raw.strip() if data_abertura_raw else ''
+            
+            if data_abertura_raw:
+                # Tenta converter timestamps ISO para formato DD/MM/AAAA
+                if 'T' in data_abertura_raw:
+                    # É um timestamp ISO
+                    dt = datetime.fromisoformat(data_abertura_raw.replace('Z', '+00:00'))
+                    data_abertura_display = dt.strftime('%d/%m/%Y')
+                    data_abertura_sort = dt.strftime('%Y/%m/%d')
+                else:
+                    # Formato: AAAA (apenas ano)
+                    if len(data_abertura_raw) == 4 and data_abertura_raw.isdigit():
+                        data_abertura_display = data_abertura_raw
+                        data_abertura_sort = f"{data_abertura_raw}/00/00"
+                    # Formato: MM/AAAA (mês e ano)
+                    elif len(data_abertura_raw) == 7 and '/' in data_abertura_raw:
+                        partes = data_abertura_raw.split('/')
+                        if len(partes) == 2:
+                            data_abertura_display = data_abertura_raw
+                            data_abertura_sort = f"{partes[1]}/{partes[0]}/00"
+                    # Formato: DD/MM/AAAA (completa)
+                    elif len(data_abertura_raw) == 10 and data_abertura_raw.count('/') == 2:
+                        partes = data_abertura_raw.split('/')
+                        if len(partes) == 3:
+                            data_abertura_display = data_abertura_raw
+                            data_abertura_sort = f"{partes[2]}/{partes[1]}/{partes[0]}"
+                    else:
+                        data_abertura_display = data_abertura_raw
+        except Exception as e:
+            logger.warning(f"[CONVERTER] Erro ao converter data de abertura para {processo_id}: {e}")
+            data_abertura_display = str(data_abertura_raw) if data_abertura_raw else ''
     
-    # Extrai clientes (formato esperado: lista de strings)
-    clientes_nomes = processo.get('clientes_nomes', [])
-    if not isinstance(clientes_nomes, list):
+    # Extrai clientes (formato esperado: lista de strings) - COM SANITIZAÇÃO
+    clientes_nomes = processo.get('clientes_nomes')
+    if clientes_nomes is None:
+        clientes_nomes = []
+    elif not isinstance(clientes_nomes, list):
         clientes_nomes = [str(clientes_nomes)] if clientes_nomes else []
-    clients_list = [str(c).upper() for c in clientes_nomes if c]
+    clients_list = [str(c).upper() for c in clientes_nomes if c is not None and c != '']
     
-    # Extrai casos vinculados
-    caso_titulo = processo.get('caso_titulo', '')
+    # Extrai casos vinculados - COM SANITIZAÇÃO
+    caso_titulo = _sanitizar_valor(processo.get('caso_titulo'), 'str', '')
     cases_list = [caso_titulo] if caso_titulo else []
     
-    # Mapeia parte contrária
-    parte_contraria = processo.get('parte_contraria', '')
+    # Mapeia parte contrária - COM SANITIZAÇÃO
+    parte_contraria = _sanitizar_valor(processo.get('parte_contraria'), 'str', '')
     opposing_list = [parte_contraria.upper()] if parte_contraria else []
     
-    # Migra status antigos para novos
-    status_raw = processo.get('status', 'Em andamento')
+    # Migra status antigos para novos - COM SANITIZAÇÃO
+    status_raw = _sanitizar_valor(processo.get('status'), 'str', 'Em andamento')
     status_mapeamento = {
         'Ativo': 'Em andamento',
         'Suspenso': 'Em monitoramento',
@@ -249,21 +307,35 @@ def converter_processo_para_row(processo: dict) -> dict:
     if status_final not in ['Em andamento', 'Concluído', 'Em monitoramento']:
         status_final = 'Em andamento'
     
-    return {
-        '_id': processo.get('_id', ''),
-        'data_abertura': data_abertura_display,
-        'data_abertura_sort': data_abertura_sort,
-        'nucleo': processo.get('nucleo', 'Ambiental'),
-        'title': processo.get('titulo', 'Sem título'),
-        'title_raw': processo.get('titulo', 'Sem título'),
-        'number': processo.get('numero', ''),
-        'clients_list': clients_list,
-        'cases_list': cases_list,
-        'system': processo.get('sistema_processual', ''),
-        'status': status_final,
-        'area': processo.get('area', ''),
-        'link': processo.get('link', ''),
-        'prioridade': processo.get('prioridade', PRIORIDADE_PADRAO),
+    # Monta row com TODOS os valores sanitizados (sem None)
+    row = {
+        '_id': _sanitizar_valor(processo.get('_id'), 'str', ''),
+        'data_abertura': _sanitizar_valor(data_abertura_display, 'str', ''),
+        'data_abertura_sort': _sanitizar_valor(data_abertura_sort, 'str', ''),
+        'nucleo': _sanitizar_valor(processo.get('nucleo'), 'str', 'Ambiental'),
+        'title': _sanitizar_valor(processo.get('titulo'), 'str', 'Sem título'),
+        'title_raw': _sanitizar_valor(processo.get('titulo'), 'str', 'Sem título'),
+        'number': _sanitizar_valor(processo.get('numero'), 'str', ''),
+        'clients_list': clients_list,  # Já é lista sanitizada
+        'cases_list': cases_list,  # Já é lista sanitizada
+        'system': _sanitizar_valor(processo.get('sistema_processual'), 'str', ''),
+        'status': status_final,  # Já sanitizado acima
+        'area': _sanitizar_valor(processo.get('area'), 'str', ''),
+        'link': _sanitizar_valor(processo.get('link'), 'str', ''),
+        'prioridade': _sanitizar_valor(processo.get('prioridade'), 'str', PRIORIDADE_PADRAO),
         'is_third_party_monitoring': False,
         'is_desdobramento': False,
     }
+    
+    # Validação final: garante que não há None em nenhum campo
+    for campo, valor in row.items():
+        if valor is None:
+            logger.warning(f"[CONVERTER] Campo '{campo}' ainda é None para {processo_id}, corrigindo...")
+            if campo.endswith('_list'):
+                row[campo] = []
+            elif campo.startswith('is_'):
+                row[campo] = False
+            else:
+                row[campo] = ''
+    
+    return row

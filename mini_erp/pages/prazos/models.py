@@ -128,6 +128,23 @@ PRIORIDADE_ORDEM = {
 
 
 # =============================================================================
+# CONSTANTES - ESTADO DE ABERTURA
+# =============================================================================
+
+# Valores possíveis de estado de abertura
+ESTADO_ABERTURA_OPCOES = ['aberto', 'aguardando_abertura']
+
+# Estado de abertura padrão
+ESTADO_ABERTURA_PADRAO = 'aberto'
+
+# Labels para exibição
+ESTADO_ABERTURA_LABELS = {
+    'aberto': 'Aberto',
+    'aguardando_abertura': 'Aguardando abertura',
+}
+
+
+# =============================================================================
 # TIPOS ESTRUTURADOS (TypedDict)
 # =============================================================================
 
@@ -149,6 +166,7 @@ class Prazo(TypedDict, total=False):
     prazo_fatal: float  # Timestamp (time.time())
     status: str  # 'pendente' | 'concluido'
     prioridade: str  # 'baixa' | 'media' | 'alta' | 'urgente' (obrigatório)
+    estado_abertura: str  # 'aberto' | 'aguardando_abertura' (padrão: 'aberto')
     recorrente: bool
     tipo_prazo: str  # 'simples' | 'recorrente' | 'parcelado'
     config_recorrencia: Optional[ConfigRecorrencia]

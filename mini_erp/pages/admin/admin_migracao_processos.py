@@ -9,7 +9,11 @@ from .migracao_service import (
     importar_planilha_migracao, obter_estatisticas_migracao, 
     listar_processos_migracao, salvar_processo_migracao,
     finalizar_migracao_completa, atualizar_status_migracao,
-    excluir_processo_migracao
+    excluir_processo_migracao, popular_processos_gilberto
+)
+from .validacao_pessoas_migracao import (
+    validar_pessoas_migracao, cadastrar_pessoas_em_massa,
+    preparar_pessoas_para_ui
 )
 from ..visao_geral.processos.constants import AREAS_PROCESSO, NUCLEOS_PROCESSO
 from ..visao_geral.processos.database import listar_processos_pais, criar_processo as criar_processo_workspace
@@ -969,8 +973,10 @@ def abrir_modal_completar(processo, callback_refresh=None):
                                     callback_refresh()
                                 
                                 # Abrir próximo pendente automaticamente
+                                # Detecta origem do processo atual para buscar próximos da mesma origem
+                                origem_atual = processo.get('origem', 'lenon')
                                 await asyncio.sleep(0.3)
-                                proximos = listar_processos_migracao('pendente')
+                                proximos = listar_processos_migracao(status='pendente', origem=origem_atual)
                                 
                                 if proximos:
                                     logger.info(f"[MIGRAÇÃO] Abrindo próximo processo: {proximos[0].get('numero_processo', 'DESCONHECIDO')}")
@@ -1013,24 +1019,20 @@ def abrir_modal_completar(processo, callback_refresh=None):
 
 def render_migracao_interface():
     """
-    Renderiza interface de migração para ser usada no painel de desenvolvedor ou standalone.
-    Versão segura sem decorators de página.
+    Renderiza interface de migração com sub-abas por origem (Lenon/Gilberto).
+    Sistema de abas para separar planilhas EPROC de diferentes responsáveis.
     """
     # Carregar cache do sistema (necessário para os selects no modal)
     carregar_cache_sistema()
     
-    # Estado local para filtros e seleção
-    estado = {
-        'filtro_status': 'todos',
-        'processos_selecionados': set()  # IDs dos processos selecionados
-    }
-
-    # Estilos específicos da migração (minimalistas)
+    # Estilos específicos da migração (layout horizontal otimizado)
     ui.add_head_html('''
         <style>
-            .migracao-sidebar { background-color: #f9fafb; border-right: 1px solid #e5e7eb; }
+            /* Cards de status e pendentes */
             .card-pendente { border-left: 5px solid #fbbf24; }
             .card-concluido { border-left: 5px solid #10b981; }
+            
+            /* Estilos da tabela de migração */
             .tabela-migracao tbody tr.tabela-migracao-linha {
                 transition: background-color 0.2s;
             }
@@ -1043,6 +1045,7 @@ def render_migracao_interface():
             .tabela-migracao tbody tr.tabela-migracao-linha-concluida {
                 border-left: 4px solid #10b981 !important;
             }
+            
             /* Estilos para ícones de cópia */
             .copy-icon {
                 transition: opacity 0.2s, color 0.2s;
@@ -1054,59 +1057,137 @@ def render_migracao_interface():
             .tabela-migracao tbody tr:hover .copy-icon {
                 opacity: 0.8;
             }
+            
+            /* Estilos para sub-abas de migração */
+            .sub-abas-migracao {
+                background-color: #f3f4f6;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            .sub-abas-migracao .q-tab {
+                min-height: 40px;
+                padding: 0 16px;
+            }
+            
+            /* Barra de informações horizontal */
+            .barra-info-migracao {
+                background-color: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 12px 16px;
+            }
+            
+            /* Tabela full width */
+            .tabela-migracao-fullwidth {
+                width: 100% !important;
+            }
+            .tabela-migracao-fullwidth .q-table {
+                width: 100% !important;
+            }
+            
+            /* Responsividade da barra de informações */
+            @media (max-width: 768px) {
+                .barra-info-migracao {
+                    flex-direction: column !important;
+                    gap: 12px !important;
+                }
+                .barra-info-item {
+                    width: 100% !important;
+                }
+            }
         </style>
     ''')
-
-    with ui.row().classes('w-full gap-0 no-wrap h-[calc(100vh-280px)]'):
+    
+    # Sistema de Sub-abas por Origem
+    with ui.tabs().classes('w-full sub-abas-migracao') as tabs_migracao:
+        tab_lenon = ui.tab('EPROC - TJSC - 1ª instância - Lenon')
+        tab_gilberto = ui.tab('EPROC - TJSC - 1ª instância - Gilberto')
+    
+    with ui.tab_panels(tabs_migracao, value=tab_lenon).classes('w-full'):
+        # Painel Lenon (conteúdo atual)
+        with ui.tab_panel(tab_lenon):
+            criar_interface_migracao_lenon()
         
-        # SIDEBAR (1/4)
-        with ui.column().classes('w-1/4 p-4 migracao-sidebar h-full gap-4'):
-            ui.label('🔄 Migração EPROC').classes('text-lg font-bold text-[#223631]')
-            
-            async def handle_import():
-                with ui.dialog() as loading, ui.card().classes('items-center p-8'):
-                    ui.spinner(size='lg', color='primary')
-                    ui.label('Processando planilha...').classes('mt-4 font-medium')
-                loading.open()
-                res = importar_planilha_migracao()
-                loading.close()
-                if res['sucesso']:
-                    ui.notify(f"✅ {res['importados']} processos importados!", type='positive')
-                    area_progresso.refresh()
-                    lista_processos_migracao.refresh()
-                else:
-                    ui.notify(f"❌ {res['erro']}", type='negative')
+        # Painel Gilberto (novo)
+        with ui.tab_panel(tab_gilberto):
+            criar_interface_migracao_gilberto()
 
-            ui.button('IMPORTAR PLANILHA', icon='upload_file', on_click=handle_import).classes('w-full').props('color=primary unelevated')
+
+def criar_interface_migracao_lenon():
+    """
+    Interface de migração EPROC - TJSC - 1ª instância - Lenon.
+    Layout horizontal otimizado: [Barra Info] → [Tabela Full Width]
+    """
+    # Estado local para filtros e seleção
+    estado = {
+        'filtro_status': 'todos',
+        'processos_selecionados': set()  # IDs dos processos selecionados
+    }
+
+    # Handler para importar planilha
+    async def handle_import():
+        with ui.dialog() as loading, ui.card().classes('items-center p-8'):
+            ui.spinner(size='lg', color='primary')
+            ui.label('Processando planilha...').classes('mt-4 font-medium')
+        loading.open()
+        res = importar_planilha_migracao(origem='lenon')
+        loading.close()
+        if res['sucesso']:
+            ui.notify(f"✅ {res['importados']} processos importados!", type='positive')
+            area_progresso.refresh()
+            lista_processos_migracao.refresh()
+        else:
+            ui.notify(f"❌ {res['erro']}", type='negative')
+
+    # Container principal vertical
+    with ui.column().classes('w-full gap-4'):
+        
+        # BARRA DE INFORMAÇÕES HORIZONTAL
+        with ui.row().classes('w-full items-center justify-between gap-4 barra-info-migracao flex-wrap'):
             
+            # Item 1: Botão Importar + Badge de processos
+            with ui.row().classes('items-center gap-3 barra-info-item'):
+                ui.button('IMPORTAR', icon='upload_file', on_click=handle_import).props('color=primary dense unelevated')
+                
+                @ui.refreshable
+                def badge_total():
+                    stats = obter_estatisticas_migracao(origem='lenon')
+                    if stats['total'] > 0:
+                        with ui.badge(f"{stats['total']} PROCESSOS", color='positive').classes('px-3 py-1'):
+                            pass
+                    else:
+                        with ui.badge('NENHUM PROCESSO', color='grey').classes('px-3 py-1'):
+                            pass
+                badge_total()
+            
+            # Item 2: Progresso da migração
             @ui.refreshable
             def area_progresso():
-                stats = obter_estatisticas_migracao()
-                with ui.column().classes('w-full gap-1'):
-                    ui.label('Progresso da Migração').classes('text-xs font-bold text-gray-500 uppercase')
-                    with ui.row().classes('w-full items-center justify-between'):
-                        ui.label(f"{stats['concluidos']} de {stats['total']}").classes('text-sm font-bold')
-                        ui.label(f"{stats['progresso']}%").classes('text-xs text-gray-400')
-                    ui.linear_progress(value=stats['progresso']/100).classes('w-full rounded-full').props('color=positive stripe')
-
+                stats = obter_estatisticas_migracao(origem='lenon')
+                with ui.row().classes('items-center gap-3 barra-info-item'):
+                    ui.label('PROGRESSO:').classes('text-xs font-bold text-gray-500')
+                    ui.label(f"{stats['concluidos']} de {stats['total']}").classes('text-sm font-bold text-[#223631]')
+                    with ui.element('div').classes('w-32'):
+                        ui.linear_progress(value=stats['progresso']/100).classes('rounded-full').props('color=positive stripe')
+                    ui.label(f"{stats['progresso']:.0f}%").classes('text-xs text-gray-500 font-medium')
             area_progresso()
             
-            ui.select(
-                {'todos': 'Todos os Processos', 'pendente': 'Pendentes', 'concluido': 'Concluídos'},
-                value='todos',
-                label='Filtrar Lista',
-                on_change=lambda e: (estado.update({'filtro_status': e.value}), lista_processos_migracao.refresh())
-            ).classes('w-full').props('outlined dense')
+            # Item 3: Filtro de status + Botão finalizar
+            with ui.row().classes('items-center gap-3 barra-info-item'):
+                ui.select(
+                    {'todos': 'Todos', 'pendente': 'Pendentes', 'concluido': 'Concluídos'},
+                    value='todos',
+                    label='Filtrar',
+                    on_change=lambda e: (estado.update({'filtro_status': e.value}), lista_processos_migracao.refresh())
+                ).classes('w-32').props('outlined dense')
+                
+                ui.button('FINALIZAR', icon='verified', on_click=lambda: finalizar_fluxo()).props('color=positive outline dense no-caps')
 
-            with ui.column().classes('mt-auto w-full pt-4 border-t'):
-                ui.button('FINALIZAR TUDO', icon='verified', on_click=lambda: finalizar_fluxo()) \
-                    .classes('w-full').props('color=positive outline no-caps')
-
-        # CONTEÚDO PRINCIPAL (3/4)
-        with ui.column().classes('w-3/4 p-6 h-full overflow-y-auto bg-white'):
+        # TABELA DE PROCESSOS - FULL WIDTH
+        with ui.column().classes('w-full tabela-migracao-fullwidth'):
             @ui.refreshable
             def lista_processos_migracao():
-                processos = listar_processos_migracao(estado.get('filtro_status', 'todos'))
+                processos = listar_processos_migracao(status=estado.get('filtro_status', 'todos'), origem='lenon')
                 if not processos:
                     with ui.column().classes('w-full items-center justify-center py-20 text-gray-400'):
                         ui.icon('inventory_2', size='xl').classes('mb-2')
@@ -1605,7 +1686,7 @@ def render_migracao_interface():
             lista_processos_migracao()
 
     async def finalizar_fluxo():
-        res = finalizar_migracao_completa()
+        res = finalizar_migracao_completa(origem='lenon')
         if res['sucesso']:
             ui.notify(res['mensagem'], type='positive')
             ui.navigate.to('/visao-geral/processos')
@@ -1613,8 +1694,600 @@ def render_migracao_interface():
             ui.notify(res['erro'], type='warning')
 
 
-    async def finalizar_fluxo():
-        res = finalizar_migracao_completa()
+# =============================================================================
+# MODAL DE VALIDAÇÃO E CADASTRO DE PESSOAS (GILBERTO)
+# =============================================================================
+
+def abrir_modal_validacao_pessoas():
+    """
+    Abre modal para validar pessoas não cadastradas nos processos EPROC.
+    Permite selecionar e cadastrar em massa pessoas faltantes.
+    """
+    # Estado do modal
+    estado_validacao = {
+        'resultado': None,
+        'pessoas_selecionadas': set(),
+        'filtro_tipo': 'todos',
+        'busca': '',
+        'processando': False,
+    }
+    
+    with ui.dialog() as modal, ui.card().classes('w-full max-w-5xl max-h-[90vh]'):
+        # Cabeçalho
+        with ui.row().classes('w-full items-center justify-between mb-4'):
+            ui.label('🔍 Validação de Pessoas - EPROC Gilberto').classes('text-xl font-bold text-[#223631]')
+            ui.button(icon='close', on_click=modal.close).props('flat round dense')
+        
+        ui.separator()
+        
+        # Área de conteúdo
+        with ui.column().classes('w-full gap-4 overflow-y-auto') as conteudo_modal:
+            
+            # Estado inicial: botão para executar validação
+            @ui.refreshable
+            def area_resultado():
+                if estado_validacao['processando']:
+                    with ui.column().classes('w-full items-center py-16'):
+                        ui.spinner('dots', size='xl', color='primary')
+                        ui.label('Analisando pessoas...').classes('mt-4 text-gray-500')
+                        ui.label('Comparando com cadastros existentes').classes('text-sm text-gray-400')
+                    return
+                
+                if not estado_validacao['resultado']:
+                    # Ainda não executou validação
+                    with ui.column().classes('w-full items-center py-12'):
+                        ui.icon('person_search', size='64px').classes('text-gray-300 mb-4')
+                        ui.label('Clique para analisar pessoas').classes('text-lg text-gray-500')
+                        ui.label('Compara autores e réus do EPROC com pessoas cadastradas').classes('text-sm text-gray-400 mb-6')
+                        
+                        async def executar_validacao():
+                            estado_validacao['processando'] = True
+                            area_resultado.refresh()
+                            
+                            # Executa validação (pode demorar)
+                            resultado = validar_pessoas_migracao(origem='gilberto')
+                            
+                            estado_validacao['resultado'] = resultado
+                            estado_validacao['processando'] = False
+                            area_resultado.refresh()
+                        
+                        ui.button(
+                            'EXECUTAR VALIDAÇÃO',
+                            icon='play_arrow',
+                            on_click=executar_validacao
+                        ).props('color=primary unelevated size=lg')
+                    return
+                
+                resultado = estado_validacao['resultado']
+                
+                if not resultado.get('sucesso'):
+                    with ui.column().classes('w-full items-center py-8'):
+                        ui.icon('error', size='48px').classes('text-red-400 mb-4')
+                        ui.label('Erro na validação').classes('text-lg text-red-600')
+                        ui.label(resultado.get('erro', 'Erro desconhecido')).classes('text-sm text-gray-500')
+                    return
+                
+                # Resumo da validação
+                resumo = resultado.get('resumo', {})
+                with ui.row().classes('w-full gap-4 mb-4'):
+                    with ui.card().classes('flex-1 p-4 bg-green-50 border border-green-200'):
+                        ui.label(str(resumo.get('cadastradas', 0))).classes('text-2xl font-bold text-green-700')
+                        ui.label('Já cadastradas').classes('text-xs text-green-600')
+                    
+                    with ui.card().classes('flex-1 p-4 bg-amber-50 border border-amber-200'):
+                        ui.label(str(resumo.get('nao_cadastradas', 0))).classes('text-2xl font-bold text-amber-700')
+                        ui.label('Não cadastradas').classes('text-xs text-amber-600')
+                    
+                    with ui.card().classes('flex-1 p-4 bg-blue-50 border border-blue-200'):
+                        ui.label(str(resumo.get('possiveis_duplicatas', 0))).classes('text-2xl font-bold text-blue-700')
+                        ui.label('Possíveis duplicatas').classes('text-xs text-blue-600')
+                
+                # Lista de pessoas não cadastradas
+                nao_cadastradas = preparar_pessoas_para_ui(resultado.get('nao_cadastradas', []))
+                duplicatas = preparar_pessoas_para_ui(resultado.get('possiveis_duplicatas', []))
+                
+                if not nao_cadastradas and not duplicatas:
+                    with ui.column().classes('w-full items-center py-8'):
+                        ui.icon('check_circle', size='48px').classes('text-green-400 mb-4')
+                        ui.label('Todas as pessoas já estão cadastradas!').classes('text-lg text-green-600')
+                    return
+                
+                # Filtros e busca
+                with ui.row().classes('w-full items-center gap-4 mb-4'):
+                    ui.input(
+                        placeholder='Buscar por nome...',
+                        on_change=lambda e: (estado_validacao.update({'busca': e.value or ''}), tabela_pessoas.refresh())
+                    ).props('outlined dense clearable').classes('flex-grow')
+                    
+                    ui.select(
+                        {'todos': 'Todos os tipos', 'PF': 'Pessoa Física', 'PJ': 'Pessoa Jurídica'},
+                        value='todos',
+                        label='Tipo',
+                        on_change=lambda e: (estado_validacao.update({'filtro_tipo': e.value}), tabela_pessoas.refresh())
+                    ).props('outlined dense').classes('w-40')
+                    
+                    # Contador de selecionadas
+                    with ui.badge(f"{len(estado_validacao['pessoas_selecionadas'])} selecionadas", color='primary').classes('px-3 py-1'):
+                        pass
+                
+                # Tabela de pessoas não cadastradas
+                @ui.refreshable
+                def tabela_pessoas():
+                    # Aplicar filtros
+                    lista_exibir = nao_cadastradas.copy()
+                    
+                    # Filtro de busca
+                    if estado_validacao['busca']:
+                        termo = estado_validacao['busca'].lower()
+                        lista_exibir = [p for p in lista_exibir if termo in p['nome'].lower()]
+                    
+                    # Filtro de tipo
+                    if estado_validacao['filtro_tipo'] != 'todos':
+                        lista_exibir = [p for p in lista_exibir if p['tipo_pessoa'] == estado_validacao['filtro_tipo']]
+                    
+                    if not lista_exibir:
+                        ui.label('Nenhuma pessoa encontrada com os filtros atuais.').classes('text-gray-400 italic py-4')
+                        return
+                    
+                    # Colunas da tabela
+                    colunas = [
+                        {'name': 'selecionar', 'label': '', 'field': 'selecionar', 'align': 'center', 'style': 'width: 50px;'},
+                        {'name': 'nome', 'label': 'Nome', 'field': 'nome', 'align': 'left', 'sortable': True},
+                        {'name': 'cpf_cnpj', 'label': 'CPF/CNPJ', 'field': 'cpf_cnpj', 'align': 'left', 'style': 'width: 150px;'},
+                        {'name': 'tipo_label', 'label': 'Tipo', 'field': 'tipo_label', 'align': 'center', 'style': 'width: 120px;'},
+                        {'name': 'papeis_label', 'label': 'Papel', 'field': 'papeis_label', 'align': 'center', 'style': 'width: 100px;'},
+                        {'name': 'qtd_processos', 'label': 'Processos', 'field': 'qtd_processos', 'align': 'center', 'style': 'width: 80px;'},
+                    ]
+                    
+                    # Prepara rows com índice para seleção
+                    rows = []
+                    for i, p in enumerate(lista_exibir):
+                        rows.append({
+                            '_idx': i,
+                            'nome': p['nome'],
+                            'cpf_cnpj': p['cpf_cnpj'],
+                            'tipo_pessoa': p['tipo_pessoa'],
+                            'tipo_label': p['tipo_label'],
+                            'papeis_label': p['papeis_label'],
+                            'qtd_processos': p['qtd_processos'],
+                            'selecionado': i in estado_validacao['pessoas_selecionadas'],
+                            '_dados': p['_dados_originais'],
+                        })
+                    
+                    # Tabela
+                    table = ui.table(
+                        columns=colunas,
+                        rows=rows,
+                        row_key='_idx',
+                        pagination={'rowsPerPage': 15}
+                    ).classes('w-full').props('flat dense bordered')
+                    
+                    # Header com checkbox mestre
+                    todos_selecionados = len(estado_validacao['pessoas_selecionadas']) == len(lista_exibir) and len(lista_exibir) > 0
+                    alguns_selecionados = 0 < len(estado_validacao['pessoas_selecionadas']) < len(lista_exibir)
+                    
+                    indet_attr = ':indeterminate="true"' if alguns_selecionados else ''
+                    checked_val = 'true' if todos_selecionados else 'false'
+                    
+                    table.add_slot('header-cell-selecionar', f'''
+                        <q-th :props="props" style="text-align: center;">
+                            <q-checkbox 
+                                :model-value={checked_val}
+                                {indet_attr}
+                                @update:model-value="$parent.$emit('toggle-all', $event)"
+                                dense
+                            />
+                        </q-th>
+                    ''')
+                    
+                    # Body checkbox
+                    table.add_slot('body-cell-selecionar', '''
+                        <q-td :props="props" style="text-align: center;">
+                            <q-checkbox 
+                                :model-value="props.row.selecionado"
+                                @update:model-value="$parent.$emit('toggle-item', {idx: props.row._idx, value: $event})"
+                                dense
+                            />
+                        </q-td>
+                    ''')
+                    
+                    # Handler toggle all
+                    def handle_toggle_all(e):
+                        checked = e.args
+                        if checked:
+                            estado_validacao['pessoas_selecionadas'] = set(range(len(lista_exibir)))
+                        else:
+                            estado_validacao['pessoas_selecionadas'] = set()
+                        tabela_pessoas.refresh()
+                    
+                    table.on('toggle-all', handle_toggle_all)
+                    
+                    # Handler toggle item
+                    def handle_toggle_item(e):
+                        data = e.args
+                        idx = data.get('idx')
+                        checked = data.get('value', False)
+                        
+                        if checked:
+                            estado_validacao['pessoas_selecionadas'].add(idx)
+                        else:
+                            estado_validacao['pessoas_selecionadas'].discard(idx)
+                        
+                        tabela_pessoas.refresh()
+                    
+                    table.on('toggle-item', handle_toggle_item)
+                
+                # Renderiza tabela
+                with ui.card().classes('w-full'):
+                    ui.label('📋 Pessoas Não Cadastradas').classes('text-sm font-bold text-gray-600 mb-2')
+                    tabela_pessoas()
+                
+                # Seção de possíveis duplicatas (se houver)
+                if duplicatas:
+                    with ui.expansion('⚠️ Possíveis Duplicatas (revisar manualmente)', icon='warning').classes('w-full mt-4'):
+                        for dup in duplicatas:
+                            with ui.card().classes('w-full p-3 mb-2 bg-amber-50 border border-amber-200'):
+                                with ui.row().classes('w-full items-center justify-between'):
+                                    with ui.column().classes('gap-0'):
+                                        ui.label(dup['nome']).classes('font-medium')
+                                        ui.label(f"Similar a: {dup['pessoa_similar_nome']} ({dup['similaridade_pct']})").classes('text-xs text-amber-600')
+                                    ui.label(dup['tipo_label']).classes('text-xs text-gray-500')
+                
+                # Botão de cadastro em massa
+                with ui.row().classes('w-full justify-end mt-4 gap-3'):
+                    async def cadastrar_selecionadas():
+                        if not estado_validacao['pessoas_selecionadas']:
+                            ui.notify('Selecione pelo menos uma pessoa', type='warning')
+                            return
+                        
+                        # Prepara lista de pessoas para cadastrar
+                        pessoas_para_cadastrar = []
+                        for idx in estado_validacao['pessoas_selecionadas']:
+                            if idx < len(nao_cadastradas):
+                                pessoas_para_cadastrar.append(nao_cadastradas[idx]['_dados_originais'])
+                        
+                        if not pessoas_para_cadastrar:
+                            ui.notify('Nenhuma pessoa selecionada', type='warning')
+                            return
+                        
+                        # Confirma
+                        with ui.dialog() as confirm_dialog, ui.card().classes('p-4'):
+                            ui.label(f'Confirmar cadastro de {len(pessoas_para_cadastrar)} pessoa(s)?').classes('font-medium mb-4')
+                            
+                            with ui.row().classes('w-full justify-end gap-2'):
+                                ui.button('Cancelar', on_click=confirm_dialog.close).props('flat')
+                                
+                                async def confirmar():
+                                    confirm_dialog.close()
+                                    estado_validacao['processando'] = True
+                                    area_resultado.refresh()
+                                    
+                                    # Executa cadastro em massa
+                                    res_cadastro = cadastrar_pessoas_em_massa(pessoas_para_cadastrar)
+                                    
+                                    estado_validacao['processando'] = False
+                                    
+                                    if res_cadastro.get('sucesso'):
+                                        ui.notify(
+                                            f"✅ {res_cadastro['cadastrados']} pessoa(s) cadastrada(s)!",
+                                            type='positive',
+                                            timeout=5000
+                                        )
+                                        # Limpa seleção e reexecuta validação
+                                        estado_validacao['pessoas_selecionadas'] = set()
+                                        estado_validacao['resultado'] = None
+                                        area_resultado.refresh()
+                                    else:
+                                        ui.notify(
+                                            f"❌ Erro: {res_cadastro.get('erro', 'Desconhecido')}",
+                                            type='negative',
+                                            timeout=5000
+                                        )
+                                        area_resultado.refresh()
+                                
+                                ui.button('CONFIRMAR CADASTRO', icon='check', on_click=confirmar).props('color=positive unelevated')
+                        
+                        confirm_dialog.open()
+                    
+                    qtd_selecionadas = len(estado_validacao['pessoas_selecionadas'])
+                    ui.button(
+                        f"CADASTRAR {qtd_selecionadas} SELECIONADA(S)" if qtd_selecionadas else "CADASTRAR SELECIONADAS",
+                        icon='person_add',
+                        on_click=cadastrar_selecionadas
+                    ).props(f"color=positive unelevated {'disable' if not qtd_selecionadas else ''}")
+            
+            # Renderiza área de resultado
+            area_resultado()
+    
+    # Abre o modal
+    modal.open()
+
+
+def criar_interface_migracao_gilberto():
+    """
+    Interface de migração EPROC - TJSC - 1ª instância - Gilberto.
+    Layout horizontal otimizado: [Barra Info] → [Tabela Full Width]
+    62 processos pré-carregados automaticamente.
+    """
+    # Estado local para filtros e seleção
+    estado_gilberto = {
+        'filtro_status': 'todos',
+        'processos_selecionados': set(),
+        'dados_carregados': False
+    }
+
+    # Popula automaticamente os processos do Gilberto no Firestore
+    # (verifica se já existem antes de inserir)
+    res_populate = popular_processos_gilberto()
+    if res_populate['sucesso'] and res_populate.get('inseridos', 0) > 0:
+        logger.info(f"[GILBERTO] {res_populate['inseridos']} processos inseridos automaticamente")
+    estado_gilberto['dados_carregados'] = True
+
+    # Container principal vertical
+    with ui.column().classes('w-full gap-4'):
+        
+        # BARRA DE INFORMAÇÕES HORIZONTAL
+        with ui.row().classes('w-full items-center justify-between gap-4 barra-info-migracao flex-wrap'):
+            
+            # Item 1: Badge de processos carregados
+            with ui.row().classes('items-center gap-3 barra-info-item'):
+                @ui.refreshable
+                def badge_total_gilberto():
+                    stats = obter_estatisticas_migracao(origem='gilberto')
+                    with ui.badge(f"{stats['total']} PROCESSOS CARREGADOS", color='positive').classes('px-3 py-1'):
+                        ui.icon('check_circle', size='14px').classes('mr-1')
+                badge_total_gilberto()
+                ui.label('Dados pré-carregados').classes('text-xs text-gray-500')
+            
+            # Item 2: Progresso da migração
+            @ui.refreshable
+            def area_progresso_gilberto():
+                stats = obter_estatisticas_migracao(origem='gilberto')
+                with ui.row().classes('items-center gap-3 barra-info-item'):
+                    ui.label('PROGRESSO:').classes('text-xs font-bold text-gray-500')
+                    ui.label(f"{stats['concluidos']} de {stats['total']}").classes('text-sm font-bold text-[#223631]')
+                    with ui.element('div').classes('w-32'):
+                        ui.linear_progress(value=stats['progresso']/100).classes('rounded-full').props('color=positive stripe')
+                    ui.label(f"{stats['progresso']:.0f}%").classes('text-xs text-gray-500 font-medium')
+            area_progresso_gilberto()
+            
+            # Item 3: Filtro de status + Botões de ação
+            with ui.row().classes('items-center gap-3 barra-info-item'):
+                ui.select(
+                    {'todos': 'Todos', 'pendente': 'Pendentes', 'concluido': 'Concluídos'},
+                    value='todos',
+                    label='Filtrar',
+                    on_change=lambda e: (estado_gilberto.update({'filtro_status': e.value}), lista_processos_migracao_gilberto.refresh())
+                ).classes('w-32').props('outlined dense')
+                
+                # Botão de validação de pessoas não cadastradas
+                ui.button(
+                    'VALIDAR PESSOAS', 
+                    icon='person_search', 
+                    on_click=lambda: abrir_modal_validacao_pessoas()
+                ).props('color=primary outline dense no-caps')
+                
+                ui.button('FINALIZAR', icon='verified', on_click=lambda: finalizar_fluxo_gilberto()).props('color=positive outline dense no-caps')
+
+        # TABELA DE PROCESSOS - FULL WIDTH
+        with ui.column().classes('w-full tabela-migracao-fullwidth'):
+            @ui.refreshable
+            def lista_processos_migracao_gilberto():
+                processos = listar_processos_migracao(status=estado_gilberto.get('filtro_status', 'todos'), origem='gilberto')
+                
+                if not processos:
+                    # Placeholder quando não há processos (todos foram excluídos/migrados)
+                    with ui.column().classes('w-full items-center justify-center py-20'):
+                        ui.icon('check_circle', size='64px').classes('text-green-300 mb-4')
+                        ui.label('Nenhum processo pendente').classes('text-xl text-gray-500 font-medium')
+                        ui.label('Todos os processos foram migrados ou excluídos.').classes('text-gray-400 text-sm')
+                        
+                        # Informação sobre recarregar dados
+                        with ui.card().classes('mt-6 p-4 bg-green-50 border border-green-200'):
+                            ui.label('✅ Migração concluída!').classes('text-sm font-bold text-green-800')
+                            ui.label('Os 62 processos do Gilberto foram processados.').classes('text-xs text-green-600')
+                    return
+
+                # Definir colunas da tabela
+                COLUNAS_TABELA_MIGRACAO = [
+                    {'name': 'selecionado', 'label': '', 'field': 'selecionado', 'align': 'center', 'sortable': False, 'style': 'width: 50px;'},
+                    {'name': 'numero', 'label': 'Número do Processo', 'field': 'numero', 'align': 'left', 'sortable': True, 'style': 'width: 250px;'},
+                    {'name': 'data_distribuicao', 'label': 'Data de Distribuição', 'field': 'data_distribuicao', 'align': 'left', 'sortable': True, 'style': 'width: 150px;'},
+                    {'name': 'partes', 'label': 'Partes', 'field': 'partes', 'align': 'left', 'sortable': False},
+                    {'name': 'status', 'label': 'Status', 'field': 'status', 'align': 'center', 'sortable': True, 'style': 'width: 120px;'},
+                    {'name': 'acoes', 'label': '', 'field': 'acoes', 'align': 'right', 'sortable': False, 'style': 'width: 150px;'},
+                ]
+
+                # Preparar dados da tabela
+                rows = []
+                processos_dict = {}
+                
+                for p in processos:
+                    p_convertido = converter_timestamps_documento(p)
+                    
+                    processo_id = p_convertido.get('_id', '')
+                    status = p_convertido.get('status_migracao', 'pendente')
+                    num_limpo = limpar_numero_processo(p_convertido.get('numero_processo', ''))
+                    
+                    data_abertura_raw = p_convertido.get('data_abertura')
+                    data_formatada = converter_datetime_firestore(data_abertura_raw, formato_saida='%d/%m/%Y')
+                    
+                    partes_lista = []
+                    if p_convertido.get('autores_sugestao'):
+                        partes_lista.extend([f"🔵 {a}" for a in p_convertido.get('autores_sugestao', [])[:2]])
+                    if p_convertido.get('reus_sugestao'):
+                        partes_lista.extend([f"🔴 {r}" for r in p_convertido.get('reus_sugestao', [])[:2]])
+                    partes_str = ', '.join(partes_lista) if partes_lista else 'Não informado'
+                    if len(partes_str) > 80:
+                        partes_str = partes_str[:77] + '...'
+                    
+                    processos_dict[processo_id] = p_convertido
+                    
+                    is_migrado = status in ['migrado', 'concluido']
+                    numero_original = p_convertido.get('numero_processo', '')
+                    
+                    rows.append({
+                        '_id': processo_id,
+                        'selecionado': is_migrado,
+                        'numero': num_limpo,
+                        'numero_original': numero_original,
+                        'data_distribuicao': data_formatada,
+                        'partes': partes_str,
+                        'status': 'migrado' if is_migrado else 'pendente',
+                        'status_label': 'Migrado' if is_migrado else 'Pendente',
+                        'classe_processo': p_convertido.get('classe_processo', 'Classe não informada'),
+                    })
+
+                # Criar tabela
+                table = ui.table(
+                    columns=COLUNAS_TABELA_MIGRACAO,
+                    rows=rows,
+                    row_key='_id'
+                ).classes('w-full tabela-migracao').props('flat dense bordered')
+
+                # Slots da tabela (reutilizar lógica do Lenon)
+                table.add_slot('body-cell-selecionado', '''
+                    <q-td :props="props" style="text-align: center;">
+                        <q-checkbox 
+                            :model-value="props.row.selecionado"
+                            @update:model-value="$parent.$emit('toggle-select', {id: props.row._id, value: $event})"
+                            dense
+                        />
+                    </q-td>
+                ''')
+                
+                table.add_slot('body-cell-numero', '''
+                    <q-td :props="props" style="text-align: left;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="flex: 1;">{{ props.row.numero }}</span>
+                            <q-icon 
+                                name="content_copy" 
+                                size="14px" 
+                                class="copy-icon"
+                                style="color: #9ca3af; cursor: pointer; opacity: 0.6;"
+                                @click.stop="$parent.$emit('copiar-numero', props.row)"
+                            />
+                        </div>
+                    </q-td>
+                ''')
+                
+                table.add_slot('body-cell-status', '''
+                    <q-td :props="props" style="text-align: center;">
+                        <q-badge 
+                            :color="props.row.status === 'migrado' ? 'green' : 'amber'"
+                            :label="props.row.status_label"
+                            class="q-mt-xs"
+                        />
+                    </q-td>
+                ''')
+
+                table.add_slot('body-cell-acoes', '''
+                    <q-td :props="props" style="text-align: right;">
+                        <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
+                            <q-btn 
+                                :label="props.row.status === 'migrado' ? 'EDITAR' : 'COMPLETAR'"
+                                icon="edit_note"
+                                flat
+                                dense
+                                color="primary"
+                                no-caps
+                                @click="$parent.$emit('completar', props.row)"
+                            />
+                            <q-btn 
+                                icon="delete"
+                                flat
+                                dense
+                                color="negative"
+                                @click="$parent.$emit('excluir', props.row)"
+                            >
+                                <q-tooltip>Excluir processo da lista</q-tooltip>
+                            </q-btn>
+                        </div>
+                    </q-td>
+                ''')
+
+                def refresh_ui_gilberto():
+                    area_progresso_gilberto.refresh()
+                    lista_processos_migracao_gilberto.refresh()
+
+                # Handler para checkbox individual
+                async def handle_toggle_select_gilberto(e):
+                    data = e.args
+                    processo_id = data.get('id')
+                    checked = data.get('value', False)
+                    novo_status = 'migrado' if checked else 'pendente'
+                    sucesso = atualizar_status_migracao(processo_id, novo_status)
+                    
+                    if sucesso:
+                        refresh_ui_gilberto()
+                        status_label = 'Migrado' if checked else 'Pendente'
+                        ui.notify(f'✓ Status alterado para: {status_label}', type='positive' if checked else 'info', timeout=1500, position='top-right')
+                    else:
+                        ui.notify('❌ Erro ao atualizar status', type='negative', timeout=3000)
+                        lista_processos_migracao_gilberto.refresh()
+                
+                table.on('toggle-select', handle_toggle_select_gilberto)
+                
+                # Handler para copiar número
+                def handle_copiar_numero_gilberto(e):
+                    row_data = e.args
+                    numero_original = row_data.get('numero_original', row_data.get('numero', ''))
+                    if not numero_original:
+                        ui.notify('❌ Número não disponível', type='negative', timeout=2000)
+                        return
+                    
+                    numero_limpo = limpar_numero_processo(numero_original)
+                    numero_escapado = str(numero_limpo).replace("'", "\\'").replace('"', '\\"')
+                    
+                    ui.run_javascript(f'''
+                        navigator.clipboard.writeText("{numero_escapado}").catch(console.error);
+                    ''')
+                    ui.notify('📋 Número copiado!', type='positive', timeout=2000, position='top-right')
+                
+                table.on('copiar-numero', handle_copiar_numero_gilberto)
+
+                # Handler para completar/editar
+                def handle_completar_gilberto(e):
+                    row_data = e.args
+                    processo_id = row_data.get('_id')
+                    if processo_id and processo_id in processos_dict:
+                        processo_completo = processos_dict[processo_id]
+                        abrir_modal_completar(processo_completo, refresh_ui_gilberto)
+                
+                table.on('completar', handle_completar_gilberto)
+                
+                # Handler para exclusão
+                def handle_excluir_gilberto(e):
+                    row_data = e.args
+                    processo_id = row_data.get('_id')
+                    numero_processo = row_data.get('numero', 'N/A')
+                    
+                    with ui.dialog() as dialog_excluir, ui.card().classes('w-96 p-4'):
+                        ui.label('⚠️ Confirmar Exclusão').classes('text-lg font-bold text-red-600 mb-3')
+                        ui.label(f'Deseja excluir "{numero_processo}" da lista?').classes('mb-4')
+                        
+                        with ui.row().classes('w-full justify-end gap-2'):
+                            ui.button('Cancelar', on_click=dialog_excluir.close).props('flat color=grey')
+                            
+                            async def confirmar():
+                                sucesso = excluir_processo_migracao(processo_id)
+                                if sucesso:
+                                    dialog_excluir.close()
+                                    refresh_ui_gilberto()
+                                    ui.notify(f'✅ Processo excluído', type='positive', timeout=3000)
+                                else:
+                                    ui.notify('❌ Erro ao excluir', type='negative')
+                            
+                            ui.button('Excluir', icon='delete', on_click=confirmar).props('color=negative')
+                    
+                    dialog_excluir.open()
+                
+                table.on('excluir', handle_excluir_gilberto)
+
+            lista_processos_migracao_gilberto()
+
+    async def finalizar_fluxo_gilberto():
+        res = finalizar_migracao_completa(origem='gilberto')
         if res['sucesso']:
             ui.notify(res['mensagem'], type='positive')
             ui.navigate.to('/visao-geral/processos')

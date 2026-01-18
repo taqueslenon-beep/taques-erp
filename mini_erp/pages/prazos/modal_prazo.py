@@ -25,6 +25,9 @@ from .models import (
     OPCOES_SEMANA_LABELS,
     OPCOES_DIA_SEMANA,
     OPCOES_DIA_SEMANA_LABELS,
+    ESTADO_ABERTURA_OPCOES,
+    ESTADO_ABERTURA_LABELS,
+    ESTADO_ABERTURA_PADRAO,
 )
 from ...auth import get_current_user
 
@@ -226,6 +229,7 @@ def render_prazo_dialog(
     # Monta estado inicial do formulário usando prazo_inicial_safe (nunca None)
     state = {
         'titulo': prazo_inicial_safe.get('titulo', '') if is_edicao else '',
+        'estado_abertura': prazo_inicial_safe.get('estado_abertura', ESTADO_ABERTURA_PADRAO) if is_edicao else ESTADO_ABERTURA_PADRAO,
         'responsaveis': prazo_inicial_safe.get('responsaveis') or [] if is_edicao else [],
         'clientes': prazo_inicial_safe.get('clientes') or [] if is_edicao else [],
         'casos': prazo_inicial_safe.get('casos') or [] if is_edicao else [],
@@ -379,6 +383,17 @@ def render_prazo_dialog(
                     value=state['titulo']
                 ).classes('w-full').props('outlined dense')
                 
+                # Estado de Abertura
+                estado_abertura_options = {
+                    op: ESTADO_ABERTURA_LABELS.get(op, op)
+                    for op in ESTADO_ABERTURA_OPCOES
+                }
+                estado_abertura_select = ui.select(
+                    estado_abertura_options,
+                    label='Estado de Abertura',
+                    value=state['estado_abertura']
+                ).classes('w-full').props('outlined dense')
+                
                 # Responsáveis (múltiplo) - usando mesma lógica de casos_page.py
                 ui.label('Responsável(is) *').classes('text-sm font-medium text-gray-700')
                 responsaveis_select = ui.select(
@@ -416,6 +431,26 @@ def render_prazo_dialog(
                     value=state['prazo_fatal']
                 ).classes('w-full').props('outlined dense')
                 prazo_fatal_input.validation = {'Data inválida': validar_data_br}
+                
+                # Função para atualizar visibilidade do prazo fatal (deve vir depois da criação do campo)
+                def atualizar_visibilidade_prazo_fatal():
+                    """Atualiza a visibilidade/habilitado do campo prazo fatal baseado no estado de abertura."""
+                    estado = estado_abertura_select.value or ESTADO_ABERTURA_PADRAO
+                    state['estado_abertura'] = estado
+                    
+                    # Se for "aguardando_abertura", desabilita o campo prazo_fatal
+                    if estado == 'aguardando_abertura':
+                        prazo_fatal_input.props('disabled')
+                        # Limpa o valor se estava preenchido
+                        if prazo_fatal_input.value:
+                            prazo_fatal_input.value = ''
+                    else:
+                        # Se for "aberto", habilita o campo
+                        prazo_fatal_input.props(remove='disabled')
+                
+                # Atualizar inicialmente e quando o estado mudar
+                atualizar_visibilidade_prazo_fatal()
+                estado_abertura_select.on('update:model-value', lambda: atualizar_visibilidade_prazo_fatal())
                 
                 # Status
                 status_options = {op: STATUS_LABELS.get(op, op) for op in STATUS_OPCOES}
@@ -582,6 +617,12 @@ def render_prazo_dialog(
 
                         def gerar_parcelas_preview():
                             """Gera preview das parcelas e monta accordion editável."""
+                            # Validação: parcelamento só é possível se o estado for "aberto"
+                            estado_atual = estado_abertura_select.value or ESTADO_ABERTURA_PADRAO
+                            if estado_atual == 'aguardando_abertura':
+                                ui.notify('Não é possível criar parcelamento para prazos "Aguardando abertura". Mude o estado para "Aberto" primeiro.', type='warning')
+                                return
+                            
                             # Validações obrigatórias
                             if not prazo_fatal_input.value or not validar_data_br(prazo_fatal_input.value):
                                 ui.notify('Por favor, preencha uma data válida em "Prazo Fatal".', type='warning')
@@ -838,32 +879,45 @@ def render_prazo_dialog(
                         ui.notify('Selecione ao menos um responsável', type='warning')
                         return
                     
-                    # Validar prazo fatal
-                    if not prazo_fatal_input.value or not validar_data_br(prazo_fatal_input.value):
-                        ui.notify('Preencha o prazo fatal (DD/MM/AAAA)', type='warning')
-                        return
+                    # Validar prazo fatal (somente se estado for "aberto")
+                    estado_abertura_atual = estado_abertura_select.value or ESTADO_ABERTURA_PADRAO
+                    if estado_abertura_atual == 'aberto':
+                        if not prazo_fatal_input.value or not validar_data_br(prazo_fatal_input.value):
+                            ui.notify('Preencha o prazo fatal (DD/MM/AAAA)', type='warning')
+                            return
+                    else:
+                        # Se for "aguardando_abertura", não valida o prazo fatal
+                        # Mas precisa garantir que não será salvo
+                        if prazo_fatal_input.value:
+                            prazo_fatal_input.value = ''
                     
-                    # Converter data para timestamp
-                    prazo_fatal_ts = converter_data_br_para_timestamp(
-                        prazo_fatal_input.value
-                    )
-                    if not prazo_fatal_ts:
-                        ui.notify('Erro ao converter data do prazo fatal', type='negative')
-                        return
+                    # Converter data para timestamp (somente se estado for "aberto")
+                    prazo_fatal_ts = None
+                    if estado_abertura_atual == 'aberto':
+                        prazo_fatal_ts = converter_data_br_para_timestamp(
+                            prazo_fatal_input.value
+                        )
+                        if not prazo_fatal_ts:
+                            ui.notify('Erro ao converter data do prazo fatal', type='negative')
+                            return
 
                     tipo_prazo = state.get('tipo_prazo', 'simples')
                     
                     # Preparar dados do prazo
                     prazo_data = {
                         'titulo': titulo_input.value.strip(),
+                        'estado_abertura': estado_abertura_atual,
                         'responsaveis': responsaveis_select.value or [],
                         'clientes': clientes_select.value or [],
                         'casos': casos_select.value or [],
-                        'prazo_fatal': prazo_fatal_ts,
                         'status': status_select.value or 'pendente',
                         'recorrente': recorrente_switch.value or False,
                         'observacoes': observacoes_input.value or '',
                     }
+                    
+                    # Adicionar prazo_fatal somente se estado for "aberto"
+                    if estado_abertura_atual == 'aberto' and prazo_fatal_ts:
+                        prazo_data['prazo_fatal'] = prazo_fatal_ts
                     
                     # Configuração de recorrência (se recorrente)
                     if recorrente_switch.value and tipo_prazo == 'recorrente':
@@ -904,6 +958,11 @@ def render_prazo_dialog(
                     try:
                         # Salvar no banco
                         if tipo_prazo == 'parcelado' and not is_edicao:
+                            # Parcelamento requer estado "aberto" e prazo_fatal
+                            if estado_abertura_atual == 'aguardando_abertura':
+                                ui.notify('Não é possível criar parcelamento para prazos "Aguardando abertura". Mude o estado para "Aberto" primeiro.', type='warning')
+                                return
+                            
                             parcelas = state.get('parcelas_geradas') or []
                             if not parcelas:
                                 ui.notify('Configure o parcelamento antes de salvar', type='warning')

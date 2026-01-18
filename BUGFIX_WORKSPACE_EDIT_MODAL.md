@@ -357,3 +357,8 @@ O bug foi causado por falta de tratamento de erro e validação de dados no flux
 
 
 
+
+
+
+
+

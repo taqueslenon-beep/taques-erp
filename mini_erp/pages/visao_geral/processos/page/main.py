@@ -1,8 +1,12 @@
 """
 Página principal do módulo Processos do workspace Visão Geral.
 Rota: /visao-geral/processos
-# Removido ambiente de migração (19/12/2025) - será recriado do zero
+
+CORREÇÃO (23/12/2025): Adicionado logging detalhado e tratamento robusto
+para identificar e corrigir erros "Invalid value" em componentes UI.
 """
+import logging
+import traceback
 from nicegui import ui
 from mini_erp.core import layout
 from mini_erp.auth import is_authenticated
@@ -17,6 +21,10 @@ from .tabela import (
 from .filtros import (
     criar_barra_pesquisa, criar_filtros, criar_botao_limpar_filtros, filtrar_rows
 )
+
+# Configura logger do módulo
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 @ui.page('/visao-geral/processos')
@@ -48,67 +56,161 @@ def processos_visao_geral():
 
 
 def _renderizar_pagina_processos():
-    """Renderiza o conteúdo da página de processos."""
+    """
+    Renderiza o conteúdo da página de processos.
+    
+    CORREÇÃO (23/12/2025): Adicionado logging detalhado em cada etapa
+    para identificar origem de erros "Invalid value".
+    """
+    logger.info("[PROCESSOS] ========== INICIANDO RENDERIZAÇÃO ==========")
+    
     try:
         with layout('Processos', breadcrumbs=[('Visão geral do escritório', '/visao-geral/painel'), ('Processos', None)]):
+            logger.debug("[PROCESSOS] Layout criado com sucesso")
+            
             # Aplicar CSS padrão de tabelas de processos
             ui.add_head_html(TABELA_PROCESSOS_CSS)
+            logger.debug("[PROCESSOS] CSS aplicado")
 
-            # Estado dos filtros
+            # Estado dos filtros (busca, área, status e prioridade)
+            # CORREÇÃO: Usar string vazia em vez de None para evitar "Invalid value"
             filtros = {
-                'busca': '',
-                'area': None,
-                'status': None,
+                'busca': '',      # String vazia, não None
+                'area': '',       # CORRIGIDO: era None
+                'status': '',     # CORRIGIDO: era None  
+                'prioridade': '', # CORRIGIDO: era None
             }
+            logger.debug(f"[PROCESSOS] Filtros inicializados: {filtros}")
 
-            # Referência para o refreshable
+            # Referência para o refreshable e loading
             refresh_ref = {'func': None}
+            loading_ref = {'row': None, 'hidden': False}
 
             # Loading inicial
             loading_row = ui.row().classes('w-full justify-center py-8')
             with loading_row:
                 ui.spinner('dots', size='lg', color='primary')
                 ui.label('Carregando processos...').classes('ml-3 text-gray-500')
+            loading_ref['row'] = loading_row
+
+            def hide_loading():
+                """Esconde loading de forma segura."""
+                try:
+                    if not loading_ref['hidden'] and loading_ref['row']:
+                        loading_ref['row'].set_visibility(False)
+                        loading_ref['hidden'] = True
+                except Exception as e:
+                    logger.warning(f"Erro ao esconder loading: {e}")
 
             # Barra de pesquisa e botões de ação
-            with ui.row().classes('w-full items-center gap-2 sm:gap-4 mb-4 flex-wrap'):
-                search_input = criar_barra_pesquisa(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+            try:
+                with ui.row().classes('w-full items-center gap-2 sm:gap-4 mb-4 flex-wrap'):
+                    search_input = criar_barra_pesquisa(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
-                # Botão Novo Processo
-                def novo_processo():
-                    abrir_modal_processo(on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+                    # Botão Novo Processo
+                    def novo_processo():
+                        abrir_modal_processo(on_save=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
 
-                ui.button('Novo Processo', icon='add', on_click=novo_processo).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
+                    ui.button('Novo Processo', icon='add', on_click=novo_processo).props('color=primary').classes('whitespace-nowrap w-full sm:w-auto')
+            except Exception as e:
+                logger.error(f"Erro ao criar barra de pesquisa: {e}")
+                hide_loading()
+                raise
 
             # Linha de filtros
-            with ui.row().classes('w-full items-center mb-4 gap-3 flex-wrap'):
-                filtro_components = criar_filtros(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
-                criar_botao_limpar_filtros(filtros, search_input, filtro_components, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+            try:
+                with ui.row().classes('w-full items-center mb-4 gap-3 flex-wrap'):
+                    filtro_components = criar_filtros(filtros, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+                    criar_botao_limpar_filtros(filtros, search_input, filtro_components, lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None)
+            except Exception as e:
+                logger.error(f"Erro ao criar filtros: {e}")
+                hide_loading()
+                raise
 
             # Função para renderizar tabela
             @ui.refreshable
             def render_table():
-                """Renderiza tabela de processos."""
-                # Esconde loading
-                loading_row.set_visibility(False)
+                """
+                Renderiza tabela de processos.
+                
+                CORREÇÃO (23/12/2025): Adicionado logging detalhado e validação
+                de cada row antes de passar para ui.table.
+                """
+                logger.info("[PROCESSOS] ========== RENDER_TABLE INICIADO ==========")
+                
+                # Esconde loading PRIMEIRO (antes de qualquer operação)
+                hide_loading()
                 
                 try:
-                    # Carrega processos
-                    todos_processos = listar_processos(filtros)
+                    # Carrega processos com log de debug
+                    logger.info("[PROCESSOS] Buscando processos do Firestore...")
                     
-                    # Converte para formato da tabela
-                    rows = [converter_processo_para_row(p) for p in todos_processos]
+                    # CORREÇÃO: Converte filtros vazios para None antes de consultar
+                    filtros_query = {}
+                    for key, value in filtros.items():
+                        if value and value != '':
+                            filtros_query[key] = value
+                    logger.debug(f"[PROCESSOS] Filtros para query: {filtros_query}")
+                    
+                    todos_processos = listar_processos(filtros_query if filtros_query else None)
+                    total = len(todos_processos) if todos_processos else 0
+                    logger.info(f"[PROCESSOS] {total} processos encontrados")
+                    
+                    if not todos_processos:
+                        logger.warning("[PROCESSOS] Nenhum processo retornado do Firestore")
+                        with ui.card().classes('w-full p-8 flex justify-center items-center'):
+                            ui.label('Nenhum processo encontrado.').classes('text-gray-400 italic')
+                        return
+                    
+                    # Converte para formato da tabela COM VALIDAÇÃO
+                    logger.info("[PROCESSOS] Convertendo processos para formato de tabela...")
+                    rows = []
+                    for idx, p in enumerate(todos_processos):
+                        try:
+                            row = converter_processo_para_row(p)
+                            
+                            # Validação: verifica se há valores None que podem causar erro
+                            valores_none = [k for k, v in row.items() if v is None]
+                            if valores_none:
+                                logger.warning(f"[PROCESSOS] Row {idx} tem valores None: {valores_none}")
+                                # Corrige valores None
+                                for k in valores_none:
+                                    if k.endswith('_list'):
+                                        row[k] = []
+                                    elif k.startswith('is_'):
+                                        row[k] = False
+                                    else:
+                                        row[k] = ''
+                            
+                            rows.append(row)
+                        except Exception as e:
+                            logger.error(f"[PROCESSOS] Erro ao converter processo {idx}: {e}")
+                            logger.error(f"[PROCESSOS] Dados do processo: {p.get('_id', 'SEM_ID')}")
+                            traceback.print_exc()
+                    
+                    logger.info(f"[PROCESSOS] {len(rows)} rows convertidas com sucesso")
                     
                     # Aplica filtros adicionais
+                    logger.debug("[PROCESSOS] Aplicando filtros adicionais...")
                     filtered_rows = filtrar_rows(rows, filtros)
+                    logger.info(f"[PROCESSOS] {len(filtered_rows)} rows após filtros")
                     
                     if not filtered_rows:
                         with ui.card().classes('w-full p-8 flex justify-center items-center'):
                             ui.label('Nenhum processo encontrado para os filtros atuais.').classes('text-gray-400 italic')
                         return
                     
+                    # VALIDAÇÃO FINAL: Log de amostra de dados
+                    if filtered_rows:
+                        amostra = filtered_rows[0]
+                        logger.debug(f"[PROCESSOS] Amostra de row (primeira): {list(amostra.keys())}")
+                        for campo, valor in amostra.items():
+                            logger.debug(f"[PROCESSOS]   {campo}: {type(valor).__name__} = {repr(valor)[:50]}")
+                    
                     # Cria tabela com evento row-click habilitado
+                    logger.info("[PROCESSOS] Criando ui.table...")
                     table = ui.table(columns=COLUMNS, rows=filtered_rows, row_key='_id', pagination={'rowsPerPage': 20}).classes('w-full')
+                    logger.info("[PROCESSOS] ui.table criada com sucesso")
                     
                     # Handler para clique no botão editar - abre modal de edição
                     def handle_edit_click(e):
@@ -271,19 +373,31 @@ def _renderizar_pagina_processos():
                     table.on('copyNumber', handle_copy_number)
                     
                 except Exception as e:
-                    print(f"[ERRO] Erro ao renderizar tabela: {e}")
+                    logger.error(f"[PROCESSOS] Erro ao renderizar tabela: {e}")
                     import traceback
                     traceback.print_exc()
+                    # Garante que loading está escondido mesmo em caso de erro
+                    hide_loading()
                     with ui.column().classes('w-full items-center py-8'):
                         ui.icon('error', size='48px', color='negative')
                         ui.label('Erro ao carregar processos').classes('text-lg text-gray-600 mt-2')
                         ui.label(f'Erro: {str(e)}').classes('text-sm text-gray-400')
+                        # Botão para tentar novamente
+                        ui.button('Tentar novamente', icon='refresh', on_click=lambda: refresh_ref['func'].refresh() if refresh_ref['func'] else None).props('color=primary outline').classes('mt-4')
 
             # Guarda referência
             refresh_ref['func'] = render_table
             
-            # Renderiza tabela
-            render_table()
+            # Renderiza tabela com tratamento de erro
+            try:
+                logger.info("[PROCESSOS] Iniciando renderização da tabela...")
+                render_table()
+                logger.info("[PROCESSOS] Tabela renderizada com sucesso")
+            except Exception as e:
+                logger.error(f"[PROCESSOS] Erro crítico ao renderizar tabela: {e}")
+                hide_loading()
+                import traceback
+                traceback.print_exc()
             
     except Exception as e:
         print(f"[ERRO CRÍTICO] Erro ao renderizar página de processos: {e}")

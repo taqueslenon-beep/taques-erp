@@ -21,3 +21,8 @@ def render_badge_area(area: str):
 
 
 
+
+
+
+
+

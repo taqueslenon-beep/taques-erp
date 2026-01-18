@@ -134,7 +134,32 @@ SCENARIO_IMPACT_OPTIONS = ['Muito bom', 'Bom', 'Moderado', 'Ruim', 'Muito ruim']
 SCENARIO_STATUS_OPTIONS = ['Mapeado', 'Em análise', 'Próximo de ocorrer', 'Ocorrido', 'Descartado']
 
 # =============================================================================
-# CONSTANTES - FIRESTORE
+# CONSTANTES - PRIORIDADES
 # =============================================================================
 
+# Prioridades disponíveis para filtro
+PRIORIDADES_PROCESSO = ['P1', 'P2', 'P3', 'P4']
+
+# Rótulos amigáveis para exibição no filtro
+PRIORIDADE_LABELS = {
+    'P1': 'Urgente',
+    'P2': 'Alta',
+    'P3': 'Média',
+    'P4': 'Baixa',
+}
+
+# Cores das prioridades (para referência)
+PRIORIDADE_CORES = {
+    'P1': {'bg': '#DC2626', 'text': 'white'},  # Vermelho - Urgente
+    'P2': {'bg': '#CA8A04', 'text': 'white'},  # Amarelo escuro - Alta
+    'P3': {'bg': '#2563EB', 'text': 'white'},  # Azul - Média
+    'P4': {'bg': '#6B7280', 'text': 'white'},  # Cinza - Baixa
+}
+
+# Prioridade padrão para novos processos
+PRIORIDADE_PADRAO = 'P4'
+
+# =============================================================================
+# CONSTANTES - FIRESTORE
+# =============================================================================
 COLECAO_PROCESSOS = "vg_processos"

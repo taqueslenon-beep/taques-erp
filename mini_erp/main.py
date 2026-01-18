@@ -4,6 +4,7 @@ import errno
 import socket
 import signal
 import logging
+import atexit
 
 # ============================================================================
 # CONFIGURAÇÃO DE LOGGING
@@ -107,13 +108,50 @@ def is_port_available(port: int) -> bool:
         return False
 
 
+def shutdown_cleanly():
+    """Encerra aplicação de forma limpa, fechando Firebase antes do Python finalizar."""
+    try:
+        logger.info("Iniciando shutdown limpo da aplicação...")
+        
+        # Importa e chama shutdown do Firebase
+        try:
+            from mini_erp.firebase_config import shutdown_firebase_cleanly
+            shutdown_firebase_cleanly()
+        except Exception as e:
+            logger.warning(f"Erro ao encerrar Firebase durante shutdown: {e}")
+        
+        logger.info("✅ Shutdown limpo concluído")
+    except Exception as e:
+        logger.error(f"Erro durante shutdown limpo: {e}")
+
+
 def handle_segmentation_fault(signum, frame):
     """Handler para segmentation fault - tenta encerrar limpo."""
     logger.critical(f"\n❌ Erro crítico: Segmentation fault (sinal {signum}) detectado.")
     logger.critical(f"   Isso pode ocorrer quando a porta está em uso e o servidor tenta iniciar.")
     logger.critical(f"   Tente encerrar outros processos na porta ou use outra porta (APP_PORT).\n")
+    
+    # Tenta shutdown limpo antes de forçar saída
+    try:
+        shutdown_cleanly()
+    except Exception:
+        pass
+    
     # Usa os._exit() para forçar saída imediata sem executar handlers de limpeza
     os._exit(1)
+
+
+def handle_shutdown_signal(signum, frame):
+    """Handler para sinais de shutdown (SIGTERM, SIGINT)."""
+    logger.info(f"\n🛑 Sinal de shutdown recebido (sinal {signum}). Encerrando aplicação...")
+    
+    try:
+        shutdown_cleanly()
+    except Exception as e:
+        logger.error(f"Erro durante shutdown: {e}")
+    
+    # Encerra normalmente
+    sys.exit(0)
 
 
 def find_available_port(start_port=8081):
@@ -144,6 +182,18 @@ def start_server_safe():
     Se a porta estiver em uso, tenta portas alternativas automaticamente até encontrar uma disponível.
     """
     logger.info("Iniciando o procedimento para iniciar o servidor seguro (start_server_safe)...")
+    
+    # Registra shutdown limpo automático
+    atexit.register(shutdown_cleanly)
+    
+    # Registra handlers para sinais de shutdown
+    try:
+        signal.signal(signal.SIGTERM, handle_shutdown_signal)
+        signal.signal(signal.SIGINT, handle_shutdown_signal)
+        logger.debug("Handlers de shutdown (SIGTERM, SIGINT) registrados")
+    except (AttributeError, ValueError) as e:
+        logger.warning(f"Não foi possível registrar handlers de shutdown: {e}")
+    
     # Registra handler para segmentation fault (SIGSEGV)
     # Nota: Em alguns sistemas, isso pode não funcionar, mas ajuda quando possível
     try:
@@ -235,6 +285,10 @@ def start_server_safe():
             raise
     except KeyboardInterrupt:
         logger.info("\n\n🛑 Servidor interrompido pelo usuário (KeyboardInterrupt).")
+        try:
+            shutdown_cleanly()
+        except Exception:
+            pass
         os._exit(0)
     except Exception as e:
         logger.critical(f"\n❌ Erro fatal e inesperado ao iniciar o servidor.", exc_info=True)

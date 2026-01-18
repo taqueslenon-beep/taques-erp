@@ -1,9 +1,13 @@
 """
 Componentes de filtros para a página de processos (Visão Geral).
+Inclui filtros de área, status e prioridade.
 """
 from nicegui import ui
 from typing import Dict, Any, Callable, Optional
-from ..constants import AREAS_PROCESSO, STATUS_PROCESSO
+from ..constants import (
+    AREAS_PROCESSO, STATUS_PROCESSO,
+    PRIORIDADES_PROCESSO, PRIORIDADE_LABELS
+)
 
 
 def criar_barra_pesquisa(filtros: Dict[str, Any], refresh_callback: Optional[Callable] = None) -> ui.input:
@@ -32,7 +36,7 @@ def criar_barra_pesquisa(filtros: Dict[str, Any], refresh_callback: Optional[Cal
 
 def criar_filtros(filtros: Dict[str, Any], refresh_callback: Optional[Callable] = None) -> Dict[str, ui.select]:
     """
-    Cria componentes de filtro (área e status).
+    Cria componentes de filtro (área, status e prioridade).
     
     Args:
         filtros: Dicionário de estado dos filtros
@@ -49,7 +53,8 @@ def criar_filtros(filtros: Dict[str, Any], refresh_callback: Optional[Callable] 
     area_select.style('font-size: 12px; border-color: #d1d5db;')
     
     def on_area_change():
-        filtros['area'] = area_select.value if area_select.value else None
+        # CORREÇÃO: Usar string vazia em vez de None para evitar "Invalid value"
+        filtros['area'] = area_select.value if area_select.value else ''
         if refresh_callback:
             refresh_callback()
     
@@ -61,15 +66,37 @@ def criar_filtros(filtros: Dict[str, Any], refresh_callback: Optional[Callable] 
     status_select.style('font-size: 12px; border-color: #d1d5db;')
     
     def on_status_change():
-        filtros['status'] = status_select.value if status_select.value else None
+        # CORREÇÃO: Usar string vazia em vez de None para evitar "Invalid value"
+        filtros['status'] = status_select.value if status_select.value else ''
         if refresh_callback:
             refresh_callback()
     
     status_select.on('update:model-value', on_status_change)
     
+    # Filtro por prioridade (P1=Urgente, P2=Alta, P3=Média, P4=Baixa)
+    # CORREÇÃO: ui.select com emit-value map-options requer que options sejam strings simples
+    # quando o valor inicial é None (nenhuma seleção)
+    prioridade_options = ['P1', 'P2', 'P3', 'P4']
+    
+    prioridade_select = ui.select(
+        prioridade_options,
+        label='Prioridade',
+        value=None  # None = nenhum valor selecionado (aceito pelo NiceGUI)
+    ).props('clearable dense outlined').classes('w-full sm:w-auto min-w-[100px] sm:min-w-[140px]')
+    prioridade_select.style('font-size: 12px; border-color: #d1d5db;')
+    
+    def on_prioridade_change():
+        # CORREÇÃO: Usar string vazia em vez de None internamente
+        filtros['prioridade'] = prioridade_select.value if prioridade_select.value else ''
+        if refresh_callback:
+            refresh_callback()
+    
+    prioridade_select.on('update:model-value', on_prioridade_change)
+    
     return {
         'area': area_select,
-        'status': status_select
+        'status': status_select,
+        'prioridade': prioridade_select
     }
 
 
@@ -80,7 +107,7 @@ def criar_botao_limpar_filtros(
     refresh_callback: Optional[Callable] = None
 ) -> ui.button:
     """
-    Cria botão para limpar todos os filtros.
+    Cria botão para limpar todos os filtros (área, status e prioridade).
     
     Args:
         filtros: Dicionário de estado dos filtros
@@ -92,12 +119,20 @@ def criar_botao_limpar_filtros(
         Componente ui.button
     """
     def limpar_filtros():
+        # CORREÇÃO: Usar string vazia em vez de None para evitar "Invalid value"
+        # Reseta todos os filtros no estado
         filtros['busca'] = ''
-        filtros['area'] = None
-        filtros['status'] = None
+        filtros['area'] = ''      # CORRIGIDO: era None
+        filtros['status'] = ''    # CORRIGIDO: era None
+        filtros['prioridade'] = '' # CORRIGIDO: era None
+        
+        # Reseta valores visuais dos componentes
         search_input.value = ''
         filtro_components['area'].value = ''
         filtro_components['status'].value = ''
+        if 'prioridade' in filtro_components:
+            filtro_components['prioridade'].value = ''
+        
         if refresh_callback:
             refresh_callback()
     
@@ -106,11 +141,16 @@ def criar_botao_limpar_filtros(
 
 def filtrar_rows(rows: list, filtros: Dict[str, Any]) -> list:
     """
-    Aplica filtros aos processos.
+    Aplica filtros aos processos (busca, área, status e prioridade).
+    Filtros são cumulativos - todos devem ser atendidos.
     
     Args:
         rows: Lista de processos (rows da tabela)
-        filtros: Dicionário com filtros ativos
+        filtros: Dicionário com filtros ativos:
+            - busca: texto para buscar em título/número
+            - area: área do processo (Cível, Criminal, etc.)
+            - status: status do processo (Em andamento, Concluído, etc.)
+            - prioridade: código da prioridade (P1, P2, P3, P4)
         
     Returns:
         Lista filtrada de processos
@@ -129,6 +169,11 @@ def filtrar_rows(rows: list, filtros: Dict[str, Any]) -> list:
     # Filtro de status
     if filtros.get('status'):
         filtered = [r for r in filtered if (r.get('status') or '').strip() == filtros['status'].strip()]
+    
+    # Filtro de prioridade (P1, P2, P3, P4)
+    if filtros.get('prioridade'):
+        prioridade_filtro = filtros['prioridade'].strip().upper()
+        filtered = [r for r in filtered if (r.get('prioridade') or 'P4').strip().upper() == prioridade_filtro]
     
     return filtered
 

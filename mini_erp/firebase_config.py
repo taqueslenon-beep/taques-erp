@@ -2,6 +2,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore, auth
 import os
 import json
+import atexit
+import logging
+import threading
+import time
+
+logger = logging.getLogger(__name__)
 
 
 def init_firebase():
@@ -87,3 +93,75 @@ def get_auth():
     """
     ensure_firebase_initialized()
     return auth
+
+
+# ============================================================================
+# SHUTDOWN LIMPO DO FIREBASE/gRPC
+# ============================================================================
+# Previne segmentation fault durante shutdown do Python quando threads do gRPC
+# tentam acessar o GIL que já foi destruído.
+# ============================================================================
+
+_shutdown_in_progress = threading.Lock()
+_shutdown_complete = False
+
+
+def shutdown_firebase_cleanly():
+    """
+    Encerra Firebase Admin SDK de forma limpa, aguardando threads do gRPC terminarem.
+    Deve ser chamado antes do Python finalizar para evitar segmentation fault.
+    """
+    global _shutdown_complete
+    
+    # Evita múltiplas chamadas simultâneas
+    if not _shutdown_in_progress.acquire(blocking=False):
+        return
+    
+    if _shutdown_complete:
+        _shutdown_in_progress.release()
+        return
+    
+    try:
+        logger.info("Encerrando Firebase Admin SDK de forma limpa...")
+        
+        # Fecha clientes Firestore se existirem
+        global db
+        if db is not None:
+            try:
+                # Firestore client não tem método close explícito, mas podemos limpar a referência
+                db = None
+            except Exception as e:
+                logger.warning(f"Erro ao limpar cliente Firestore: {e}")
+        
+        # Aguarda um pouco para threads do gRPC finalizarem operações pendentes
+        # Isso evita que threads tentem acessar o GIL durante o shutdown
+        time.sleep(0.5)
+        
+        # Tenta encerrar apps do Firebase se existirem
+        if firebase_admin._apps:
+            try:
+                # Não há método explícito de shutdown no firebase_admin,
+                # mas limpar as referências ajuda
+                for app_name in list(firebase_admin._apps.keys()):
+                    try:
+                        # Deleta o app (isso deve encerrar conexões gRPC)
+                        firebase_admin.delete_app(firebase_admin._apps[app_name])
+                    except Exception as e:
+                        logger.debug(f"Erro ao deletar app {app_name}: {e}")
+            except Exception as e:
+                logger.warning(f"Erro ao encerrar apps Firebase: {e}")
+        
+        # Aguarda mais um pouco para garantir que threads do gRPC terminaram
+        time.sleep(0.5)
+        
+        logger.info("✅ Firebase Admin SDK encerrado com sucesso")
+        _shutdown_complete = True
+        
+    except Exception as e:
+        logger.warning(f"Erro durante shutdown do Firebase: {e}")
+    finally:
+        _shutdown_in_progress.release()
+
+
+# Registra shutdown automático quando Python encerrar
+atexit.register(shutdown_firebase_cleanly)

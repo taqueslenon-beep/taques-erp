@@ -250,6 +250,7 @@ def obter_itens_menu_por_workspace(workspace_id: str, usuario_admin: bool = Fals
     MENU_AREA_CLIENTE = [
         {'icone': 'dashboard', 'titulo': 'Painel', 'rota': '/'},
         {'icone': 'calendar_month', 'titulo': 'Prazos', 'rota': '/prazos'},
+        {'icone': 'event', 'titulo': 'Audiências', 'rota': '/audiencias'},
         {'icone': 'psychology', 'titulo': 'Inteligência', 'rota': '/inteligencia'},
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/processos'},
@@ -265,6 +266,7 @@ def obter_itens_menu_por_workspace(workspace_id: str, usuario_admin: bool = Fals
         {'icone': 'dashboard', 'titulo': 'Painel', 'rota': '/visao-geral/painel'},
         {'icone': 'trending_up', 'titulo': 'Novos Negócios', 'rota': '/visao-geral/novos-negocios'},
         {'icone': 'calendar_month', 'titulo': 'Prazos', 'rota': '/prazos'},
+        {'icone': 'event', 'titulo': 'Audiências', 'rota': '/audiencias'},
         {'icone': 'folder', 'titulo': 'Casos', 'rota': '/visao-geral/casos'},
         {'icone': 'gavel', 'titulo': 'Processos', 'rota': '/visao-geral/processos'},
         {'icone': 'assignment', 'titulo': 'Entregáveis', 'rota': '/visao-geral/entregaveis'},
