@@ -1,3 +1,66 @@
+## [v1.15.0] - 2026-01-18
+
+### Adicionado
+
+- **Módulo de Audiências Completo**
+  - Novo módulo para gerenciamento de audiências judiciais
+  - CRUD completo: Criar, Editar, Visualizar e Excluir audiências
+  - Campos da audiência:
+    - Título da audiência
+    - Data da audiência (formato: "DD de mês por extenso de AAAA" + dia da semana)
+    - Hora de início e hora fim (previsão)
+    - Modalidade: Presencial ou Online
+    - Responsável: Lenon Taques ou Gilberto Taques
+    - Múltiplos clientes por audiência
+    - Status: Em aberto ou Concluído
+  - **Filtros Funcionais**:
+    - Filtro por status: Em aberto (padrão) / Concluídas / Todas
+    - Filtro por mês com navegação inteligente:
+      - Botões de navegação (anterior/próximo)
+      - Botão "Mês Atual" (aparece ao navegar para outros meses)
+      - Botão "Todos" para ver todas as audiências
+      - Padrão: "Todos os meses"
+  - **Checkbox de Status**:
+    - Permite alternar entre "Em aberto" e "Concluído"
+    - Diálogo de confirmação ao clicar no checkbox
+    - Mensagens contextuais baseadas na ação
+  - **Interface Responsiva**:
+    - Tabela com quebra de linha automática
+    - Coluna "Título" como principal (mais larga e flexível)
+    - Ajuste automático ao tamanho da tela
+    - Linhas maiores (60px) para melhor visualização
+  - **Integração Completa**:
+    - Item "Audiências" adicionado ao menu lateral (logo abaixo de "Prazos")
+    - Ícone: `event` (calendário com check)
+    - Rota: `/audiencias`
+    - Breadcrumbs integrados
+  - **Nova Collection Firebase**: `audiencias`
+  - **Script de Backup Automático**:
+    - Script Python para exportar collections do Firebase
+    - Arquivo: `scripts/backup_firebase.py`
+    - Gera backups com timestamp: `backup_YYYYMMDD_HHMMSS.json`
+    - Exporta 6 collections: audiencias, vg_casos, prioridades, usuarios_sistema, vg_pessoas, processes
+
+### Modificado
+
+- **Cores dos Status**:
+  - "Em aberto": Fundo amarelo claro/pastel (#FEF3C7) com texto marrom escuro (#92400E)
+  - "Concluído": Fundo verde intermediário (#10B981) com texto branco
+- **Formato de Data**: 
+  - Exibe data por extenso com dia da semana em linha separada
+  - Exemplo: "18 de janeiro de 2026\nDomingo"
+- **Busca de Usuários**:
+  - Dropdown "Responsável" agora exibe nomes corretos (não mais emails)
+  - Filtro robusto com fallback garantido
+
+### Corrigido
+
+- Formatação de nomes no dropdown de responsáveis
+- Responsividade da tabela em telas menores (MacBook)
+- Width das colunas para melhor aproveitamento do espaço
+
+---
+
 ## [v1.14.0] - 2026-01-18
 
 ### Adicionado
