@@ -12,7 +12,7 @@ def listar_audiencias() -> List[Dict[str, Any]]:
     Lista todas as audiências ordenadas por data.
     
     Returns:
-        Lista de audiências
+        Lista de audiências ordenadas cronologicamente (próximas primeiro)
     """
     try:
         db = get_db()
@@ -23,8 +23,9 @@ def listar_audiencias() -> List[Dict[str, Any]]:
             audiencia['_id'] = doc.id
             audiencias.append(audiencia)
         
-        # Ordenar por data_hora (mais recentes primeiro)
-        audiencias.sort(key=lambda x: x.get('data_hora', 0), reverse=True)
+        # Ordenar por data_hora em ordem crescente (próximas primeiro)
+        # Audiências sem data vão para o final da lista
+        audiencias.sort(key=lambda x: x.get('data_hora', float('inf')))
         
         return audiencias
     except Exception as e:
